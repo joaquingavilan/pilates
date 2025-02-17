@@ -16,7 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-
+from Pilapp.views import *
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('inscripcion/', inscripcion_view, name='inscripcion'),
+    path('inscripcion-exitosa/', inscripcion_exitosa, name='inscripcion_exitosa'),
+    path('registrar-paquete/', registrar_paquete_view, name='registrar_paquete'),
+    path('registro-exitoso/', paquete_registro_exitoso, name='paquete_registro_exitoso'),
 ]

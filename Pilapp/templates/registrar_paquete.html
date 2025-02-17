@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Registrar Paquete - Sin JavaScript</title>
+</head>
+<body>
+<h1>Registrar Paquete (Flujo Manual, Múltiples Pasos)</h1>
+
+{% if form and form.errors %}
+<div style="color:red;">
+    <strong>Errores del formulario:</strong>
+    <ul>
+    {% for field, errors in form.errors.items %}
+        <li>{{ field }}: {{ errors|escape }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<form method="POST">
+    {% csrf_token %}
+    
+    {% if not combos %}
+        <!-- PASO 1: Elegir Alumno y Paquete -->
+        {{ form.alumno.label_tag }}<br>
+        {{ form.alumno }}<br><br>
+        
+        {{ form.paquete.label_tag }}<br>
+        {{ form.paquete }}<br><br>
+        
+        <button type="submit" name="btn_paquete">Obtener Cantidad de Turnos</button>
+
+    {% else %}
+        <!-- Ya tenemos combos: mostramos hidden para alumno/paquete/combos -->
+        <input type="hidden" name="alumno_id" value="{{ alumno.id_alumno }}">
+        <input type="hidden" name="paquete_id" value="{{ paquete.id_paquete }}">
+        <input type="hidden" name="combos" value="{{ combos }}">
+
+        <p><strong>Alumno:</strong> {{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</p>
+        <p><strong>Paquete:</strong> {{ paquete }} ({{ paquete.cantidad_clases }} clases)</p>
+        <hr>
+        
+        <!-- PASO 2: Seleccionar turnos. combos veces -->
+        <h3>Selecciona tus {{ combos }} turnos (días)</h3>
+        {% for i in range_combos %}
+            <label>Turno #{{ forloop.counter }}:</label>
+            <select name="turno_{{ forloop.counter0 }}">
+                <option value="">-- Seleccionar Turno --</option>
+                {% for t in turnos_libres %}
+                    {% if seleccion_turnos and seleccion_turnos|length >= forloop.counter and seleccion_turnos.forloop.counter0 < seleccion_turnos|length %}
+                        {# Podrías marcar selected si coincide #}
+                    {% endif %}
+                    <option value="{{ t.id_turno }}">{{ t.dia }} - {{ t.horario }}</option>
+                {% endfor %}
+            </select>
+            <br><br>
+        {% endfor %}
+
+        {% if not fechas_posibles %}
+            <!-- Si aún no se generaron fechas, ofrecemos el botón "Obtener Fechas" -->
+            <button type="submit" name="btn_turnos">Obtener Fechas</button>
+        {% else %}
+            <!-- PASO 3: Mostrar fechas posibles y permitir elegir fecha de inicio -->
+            <h3>Fechas Posibles</h3>
+            <p>Selecciona la fecha de inicio para tu paquete:</p>
+            <select name="fecha_inicio">
+                {% for fecha in fechas_posibles %}
+                    <option value="{{ fecha|date:'Y-m-d' }}">{{ fecha|date:'d/m/Y' }}</option>
+                {% endfor %}
+            </select>
+            <br><br>
+
+            <button type="submit" name="btn_registrar">Registrar</button>
+        {% endif %}
+    {% endif %}
+</form>
+
+</body>
+</html>
