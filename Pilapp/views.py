@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect
 from .models import *
+import json
+from django.views.decorators.csrf import csrf_exempt
 from .forms import *
 from django.http import JsonResponse
 from datetime import date, timedelta
@@ -14,30 +16,139 @@ DAY_INDEX = {
 }
 
 
-def inscripcion_view(request):
-    if request.method == 'POST':
-        persona_form = PersonaForm(request.POST)
-        alumno_form = AlumnoForm(request.POST)
-        if persona_form.is_valid() and alumno_form.is_valid():
-            # Guardamos primero la persona
-            persona = persona_form.save()
-            # Luego creamos el alumno asociando la persona
-            alumno = alumno_form.save(commit=False)
-            alumno.id_persona = persona
-            alumno.save()
-            return redirect('inscripcion_exitosa')  # Redirige a la página que quieras
-    else:
-        persona_form = PersonaForm()
-        alumno_form = AlumnoForm()
+@csrf_exempt  # Para permitir pruebas sin autenticación
+def registrar_alumno(request):
+    if request.method == "POST":
+        try:
+            # 📌 1. Obtener los datos de la solicitud
+            data = json.loads(request.body)
+
+            # 📌 2. Crear la Persona
+            persona = Persona.objects.create(
+                nombre=data["nombre"],
+                apellido=data["apellido"],
+                telefono=data.get("telefono"),
+                ruc=data.get("ruc"),
+                observaciones=data.get("observaciones")
+            )
+
+            # 📌 3. Crear el Alumno asociado a la Persona
+            alumno = Alumno.objects.create(
+                id_persona=persona,
+                canal_captacion=data.get("canal_captacion")
+            )
+
+            # 📌 4. Verificar que el paquete exista
+            try:
+                paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
+            except Paquete.DoesNotExist:
+                return JsonResponse({"error": "Paquete no encontrado"}, status=400)
+
+            # 📌 5. Asignar el paquete al alumno
+            alumno_paquete = AlumnoPaquete.objects.create(
+                id_alumno=alumno,
+                id_paquete=paquete,
+                estado="activo",
+                fecha_inicio=data["fecha_inicio"]
+            )
+
+            # 📌 6. Buscar el turno basado en "Lunes 18:00"
+            turnos_recibidos = data["turnos"]  # Se espera una lista ["Lunes 18:00", "Miércoles 19:00"]
+            if not isinstance(turnos_recibidos, list) or len(turnos_recibidos) > 4:
+                return JsonResponse({"error": "Se pueden registrar hasta 4 turnos"}, status=400)
+
+            turnos_asignados = []
+            for turno_str in turnos_recibidos:
+                try:
+                    dia, horario = turno_str.split()
+                    turno = Turno.objects.get(dia=dia, horario=horario)
+                except Turno.DoesNotExist:
+                    return JsonResponse({"error": f"Turno {turno_str} no encontrado"}, status=400)
+
+                # 📌 7. Verificar si el turno está lleno antes de continuar
+                if turno.estado == "Ocupado":
+                    return JsonResponse({"error": f"El turno {turno_str} está lleno"}, status=400)
+
+                turnos_asignados.append(turno)
+            # 📌 8. Distribuir clases en los turnos y actualizar `lugares_ocupados`
+            cantidad_clases = paquete.cantidad_clases  # Número total de clases del paquete
+            cantidad_turnos = len(turnos_asignados)    # Número de turnos seleccionados
+            clases_por_turno = cantidad_clases // cantidad_turnos  # Clases que tocan a cada turno
+
+            # 📌 9. Asignar turnos y generar clases para cada turno
+            for turno in turnos_asignados:
+                AlumnoPaqueteTurno.objects.create(
+                    id_alumno_paquete=alumno_paquete,
+                    id_turno=turno
+                )
+
+                # Obtener las fechas de clase para este turno
+                fechas_clases = obtener_fechas_turno(turno.id_turno, data["fecha_inicio"], clases_por_turno)["fechas"]
+
+                for fecha in fechas_clases:
+                    # Buscar si ya existe una clase en esa fecha para ese turno
+                    clase, created = Clase.objects.get_or_create(
+                        id_instructor=1,  # Asignar instructor si lo deseas
+                        id_turno=turno,
+                        fecha=fecha
+                    )
+
+                    # Registrar la asistencia del alumno en esa clase
+                    AlumnoClase.objects.create(
+                        id_alumno_paquete=alumno_paquete,
+                        id_clase=clase,
+                        estado="pendiente"
+                    )
+
+                # 📌 10. Actualizar `lugares_ocupados` y cambiar estado si es necesario
+                turno.lugares_ocupados += 1
+                if turno.lugares_ocupados >= 4:
+                    turno.estado = "Ocupado"
+                turno.save()
+
+            return JsonResponse({
+                "message": "Alumno registrado exitosamente",
+                "id_alumno": alumno.id_alumno
+            }, status=201)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+
+def obtener_fechas_turno(id_turno, fecha_inicio, n):
+    try:
+        # 📌 1. Obtener el turno
+        turno = Turno.objects.get(id_turno=id_turno)
+    except Turno.DoesNotExist:
+        return {"error": "Turno no encontrado"}
     
-    return render(request, 'inscripcion.html', {
-        'persona_form': persona_form,
-        'alumno_form': alumno_form
-    })
+    # 📌 2. Mapear el día del turno a un índice de la semana (0 = Lunes, ..., 6 = Domingo)
+    dias_map = {
+        "Lunes": 0,
+        "Martes": 1,
+        "Miércoles": 2,
+        "Jueves": 3,
+        "Viernes": 4
+    }
+    
+    if turno.dia not in dias_map:
+        return {"error": "Día del turno inválido"}
 
+    dia_turno_idx = dias_map[turno.dia]
 
-def inscripcion_exitosa(request):
-    return render(request, 'inscripcion_exitosa.html')
+    # 📌 3. Convertir `fecha_inicio` a objeto `datetime.date`
+    fecha_actual = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+
+    # 📌 4. Buscar las próximas `n` fechas en las que cae el turno
+    fechas = []
+    while len(fechas) < n:
+        if fecha_actual.weekday() == dia_turno_idx:
+            fechas.append(fecha_actual.strftime("%Y-%m-%d"))
+        fecha_actual += timedelta(days=1)
+
+    return {"fechas": fechas}
 
 
 def get_next_dates_for_days(weekdays, count=8, start_date=None):
