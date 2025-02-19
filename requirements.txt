@@ -9,3 +9,4 @@ sqlparse==0.5.1
 tzdata==2024.1
 dj-database-url
 twilio==9.4.5
+whitenoise==6.9.0
