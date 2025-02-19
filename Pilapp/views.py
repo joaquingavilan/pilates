@@ -310,7 +310,7 @@ def registrar_paquete_view(request):
             alumno_id = request.POST.get('alumno_id')
             paquete_id = request.POST.get('paquete_id')
             combos = int(request.POST.get('combos', '0'))
-            print(f"Registrando alumno id: {} paquete_id {} combos: {combos}")
+            print(f"Registrando alumno id: {alumno_id} paquete_id {paquete_id} combos: {combos}")
             alumno = Alumno.objects.get(pk=alumno_id) if alumno_id else None
             paquete = Paquete.objects.get(pk=paquete_id) if paquete_id else None
 
