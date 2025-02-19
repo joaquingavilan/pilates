@@ -136,3 +136,11 @@ class FacturaPago(models.Model):
 
     def __str__(self):
         return f"Factura {self.id_factura}"
+
+class Conversacion(models.Model):
+    estado = models.CharField(max_length=50, default="MenuPrincipal")  # Estado actual del flujo
+    paso = models.IntegerField(default=0)  # Paso en el proceso de registro
+    datos = models.JSONField(default=dict)  # Datos recolectados
+
+    def __str__(self):
+        return f"Conversación {self.estado} - Paso {self.paso}"
