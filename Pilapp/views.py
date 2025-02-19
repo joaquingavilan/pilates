@@ -42,8 +42,9 @@ def recibir_mensaje_twilio(request):
     """
     if request.method == "POST":
         mensaje = request.POST.get("Body", "").strip()
+        print(mensaje)
         numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
-
+        print(numero_remitente)
         # 📌 Obtener o crear la conversación
         conversacion = Conversacion.objects.last()
 
