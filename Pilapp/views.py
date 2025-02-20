@@ -8,6 +8,7 @@ from datetime import date, timedelta, datetime
 from django.db.models import Q
 from twilio.rest import Client
 from django.conf import settings
+from django.http import HttpResponse
 
 
 DAY_INDEX = {
@@ -33,13 +34,12 @@ def enviar_mensaje_whatsapp(mensaje, destinatario):
 
     return message.sid  # Devuelve el ID del mensaje enviado
 
-from django.http import HttpResponse
 
-@csrf_exempt
 @csrf_exempt
 def recibir_mensaje_twilio(request):
     if request.method == "POST":
         try:
+            print('OP IMPRESO')
             mensaje = request.POST.get("Body", "").strip()
             numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
 
