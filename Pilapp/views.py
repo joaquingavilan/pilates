@@ -36,35 +36,26 @@ def enviar_mensaje_whatsapp(mensaje, destinatario):
 from django.http import HttpResponse
 
 @csrf_exempt
+@csrf_exempt
 def recibir_mensaje_twilio(request):
-    """
-    Recibe los mensajes de WhatsApp enviados a Twilio y responde según el estado de la conversación.
-    """
     if request.method == "POST":
-        mensaje = request.POST.get("Body", "").strip()
-        print(mensaje)
-        numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
-        print(numero_remitente)
-        # 📌 Obtener o crear la conversación
-        conversacion = Conversacion.objects.last()
+        try:
+            mensaje = request.POST.get("Body", "").strip()
+            numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
 
-        if not conversacion:
-            conversacion = Conversacion.objects.create()
+            print(f"Mensaje recibido: {mensaje}")
+            print(f"Número remitente: {numero_remitente}")
+            
+            if not mensaje or not numero_remitente:
+                return JsonResponse({"error": "Datos incorrectos"}, status=400)
 
-        # 📌 Redirigir según el estado
-        if conversacion.estado == "MenuPrincipal":
-            respuesta = menu_principal(conversacion, mensaje)
-        elif conversacion.estado == "RegistrandoAlumno":
-            respuesta = pedir_datos_alumno(conversacion, mensaje)
-        else:
-            respuesta = {"respuesta": "Error en la conversación."}
-
-        # 📌 Enviar respuesta a WhatsApp
-        enviar_mensaje_whatsapp(respuesta["respuesta"], numero_remitente)
+            return JsonResponse({"message": "Recibido correctamente"}, status=200)
         
-        return HttpResponse("OK", content_type="text/plain")
+        except Exception as e:
+            print(f"Error en recibir_mensaje_twilio: {str(e)}")
+            return JsonResponse({"error": str(e)}, status=500)
 
-    return HttpResponse("Método no permitido", status=405, content_type="text/plain")
+    return JsonResponse({"error": "Método no permitido"}, status=405)
 
 
 
