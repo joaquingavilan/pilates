@@ -15,10 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from Pilapp.views import *
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("", include("Pilapp.urls")),  # Asegúrate de importar las URLs de la app
     path("twilio/whatsapp/", recibir_mensaje_twilio, name="recibir_mensaje_twilio"),
     path("prueba/", prueba_railway, name="prueba_railway")
 ]
