@@ -79,14 +79,15 @@ def menu_principal(conversacion, mensaje):
     Muestra el menú de opciones y maneja la selección del usuario.
     """
     if mensaje == "1":
-        # Actualizar la conversación y pasar a registro de alumno
+        # 📌 Actualizar la conversación y pasar a registro de alumno
         conversacion.estado = "RegistrandoAlumno"
         conversacion.paso = 1
         conversacion.datos = {}  # Resetear datos
         conversacion.save()
-        return {"respuesta": "Por favor, envíame el nombre del alumno."}
-    
-    return {"respuesta": "Menú de opciones:\n1. Registrar alumno\nEscribe el número de la opción que deseas elegir."}
+        return {"respuesta": "Por favor, envíame el nombre del alumno."} 
+
+    return {"respuesta": "Menú de opciones:\n1. Registrar alumno\nEscribe el número de la opción que deseas elegir."}  
+
 
 def pedir_datos_alumno(conversacion, mensaje):
     """
@@ -122,7 +123,7 @@ def pedir_datos_alumno(conversacion, mensaje):
         }
         conversacion.paso += 1
         conversacion.save()
-        return {"respuesta": siguiente_pregunta[paso_actual]}
+        return {"respuesta": siguiente_pregunta[paso_actual]} 
 
     # 📌 Todos los datos han sido recibidos, llamar a `procesar_registro_alumno`
     return procesar_registro_alumno(conversacion)
@@ -149,8 +150,11 @@ def procesar_registro_alumno(conversacion):
 
     # Eliminar la conversación (ya completamos el flujo)
     conversacion.delete()
-
-    return JsonResponse(response)
+    # 📌 Devolver un diccionario con la clave `respuesta`
+    if "error" in response:
+        return {"respuesta": f"Error: {response['error']}"}
+    
+    return {"respuesta": "Alumno registrado exitosamente."}
 
 
 def registrar_alumno_datos(data):
