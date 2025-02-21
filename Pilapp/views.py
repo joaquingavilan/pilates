@@ -51,7 +51,7 @@ def recibir_mensaje_twilio(request):
                 return HttpResponse("<Response><Message>Error en los datos</Message></Response>", content_type="text/xml", status=400)
 
             # 📌 Obtener o crear la conversación
-            conversacion, created = Conversacion.objects.get_or_create(numero=numero_remitente, defaults={"estado": "MenuPrincipal", "paso": 0, "datos": {}})
+            conversacion, created = Conversacion.objects.get_or_create(id=1)
 
             # 📌 Redirigir la interacción según el estado de la conversación
             if conversacion.estado == "MenuPrincipal":
