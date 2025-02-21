@@ -19,6 +19,9 @@ DAY_INDEX = {
     "Viernes": 4,
 }
 
+@csrf_exempt
+def prueba_railway(request):
+    return JsonResponse({"message": "Hola"})
 
 def enviar_mensaje_whatsapp(mensaje, destinatario):
     """
