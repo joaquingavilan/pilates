@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from .views import *
+from Pilapp.views import *
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("twilio/whatsapp/", recibir_mensaje_twilio, name="recibir_mensaje_twilio"),
