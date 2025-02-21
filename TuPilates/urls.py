@@ -20,4 +20,5 @@ from Pilapp.views import *
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("twilio/whatsapp/", recibir_mensaje_twilio, name="recibir_mensaje_twilio"),
+    path("prueba/", prueba_railway, name="prueba_railway")
 ]
