@@ -37,9 +37,6 @@ def enviar_mensaje_whatsapp(mensaje, destinatario):
 
     return message.sid  # Devuelve el ID del mensaje enviado
 
-
-from django.http import HttpResponse
-
 @csrf_exempt
 def recibir_mensaje_twilio(request):
     if request.method == "POST":
@@ -53,18 +50,28 @@ def recibir_mensaje_twilio(request):
             if not mensaje or not numero_remitente:
                 return HttpResponse("<Response><Message>Error en los datos</Message></Response>", content_type="text/xml", status=400)
 
-            # 📌 Respuesta automática al usuario en WhatsApp
+            # 📌 Obtener o crear la conversación
+            conversacion, created = Conversacion.objects.get_or_create(numero=numero_remitente, defaults={"estado": "MenuPrincipal", "paso": 0, "datos": {}})
+
+            # 📌 Redirigir la interacción según el estado de la conversación
+            if conversacion.estado == "MenuPrincipal":
+                respuesta_data = menu_principal(conversacion, mensaje)
+            elif conversacion.estado == "RegistrandoAlumno":
+                respuesta_data = pedir_datos_alumno(conversacion, mensaje)
+            else:
+                respuesta_data = {"respuesta": "No entiendo tu mensaje. Escribe '1' para registrar un alumno."}
+
+            # 📌 Respuesta para Twilio
             respuesta = MessagingResponse()
-            respuesta.message(f"Recibí tu mensaje: {mensaje}")
+            respuesta.message(respuesta_data["respuesta"])
 
             return HttpResponse(str(respuesta), content_type="text/xml", status=200)
-        
+
         except Exception as e:
             print(f"Error en recibir_mensaje_twilio: {str(e)}")
             return HttpResponse(f"<Response><Message>Error en el servidor</Message></Response>", content_type="text/xml", status=500)
 
     return HttpResponse("<Response><Message>Método no permitido</Message></Response>", content_type="text/xml", status=405)
-
 
 
 def menu_principal(conversacion, mensaje):
@@ -77,9 +84,9 @@ def menu_principal(conversacion, mensaje):
         conversacion.paso = 1
         conversacion.datos = {}  # Resetear datos
         conversacion.save()
-        return JsonResponse({"respuesta": "Por favor, envíame el nombre del alumno."})
+        return {"respuesta": "Por favor, envíame el nombre del alumno."}
     
-    return JsonResponse({"respuesta": "Menú de opciones:\n1. Registrar alumno\nEscribe el número de la opción que deseas elegir."})
+    return {"respuesta": "Menú de opciones:\n1. Registrar alumno\nEscribe el número de la opción que deseas elegir."}
 
 def pedir_datos_alumno(conversacion, mensaje):
     """
@@ -115,7 +122,7 @@ def pedir_datos_alumno(conversacion, mensaje):
         }
         conversacion.paso += 1
         conversacion.save()
-        return JsonResponse({"respuesta": siguiente_pregunta[paso_actual]})
+        return {"respuesta": siguiente_pregunta[paso_actual]}
 
     # 📌 Todos los datos han sido recibidos, llamar a `procesar_registro_alumno`
     return procesar_registro_alumno(conversacion)
