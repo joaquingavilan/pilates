@@ -9,7 +9,7 @@ from django.db.models import Q
 from twilio.rest import Client
 from django.conf import settings
 from django.http import HttpResponse
-
+from twilio.twiml.messaging_response import MessagingResponse
 
 DAY_INDEX = {
     "Lunes": 0,
@@ -38,11 +38,12 @@ def enviar_mensaje_whatsapp(mensaje, destinatario):
     return message.sid  # Devuelve el ID del mensaje enviado
 
 
+from django.http import HttpResponse
+
 @csrf_exempt
 def recibir_mensaje_twilio(request):
     if request.method == "POST":
         try:
-            print('OP IMPRESO')
             mensaje = request.POST.get("Body", "").strip()
             numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
 
@@ -50,15 +51,19 @@ def recibir_mensaje_twilio(request):
             print(f"Número remitente: {numero_remitente}")
             
             if not mensaje or not numero_remitente:
-                return JsonResponse({"error": "Datos incorrectos"}, status=400)
+                return HttpResponse("<Response><Message>Error en los datos</Message></Response>", content_type="text/xml", status=400)
 
-            return JsonResponse({"message": "Recibido correctamente"}, status=200)
+            # 📌 Respuesta automática al usuario en WhatsApp
+            respuesta = MessagingResponse()
+            respuesta.message(f"Recibí tu mensaje: {mensaje}")
+
+            return HttpResponse(str(respuesta), content_type="text/xml", status=200)
         
         except Exception as e:
             print(f"Error en recibir_mensaje_twilio: {str(e)}")
-            return JsonResponse({"error": str(e)}, status=500)
+            return HttpResponse(f"<Response><Message>Error en el servidor</Message></Response>", content_type="text/xml", status=500)
 
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return HttpResponse("<Response><Message>Método no permitido</Message></Response>", content_type="text/xml", status=405)
 
 
 
