@@ -162,6 +162,7 @@ def registrar_alumno_datos(data):
     Versión interna de `registrar_alumno`, pero sin `request`, para manejar registros internos.
     """
     try:
+        print(f'Nombre: {data["nombre"]}, Apellido: {data["apellido"]}, Telefono: {data.get("telefono")}, RUC: {data.get("ruc")}, Obs: {data.get("observaciones")}')
         # 📌 1. Crear la Persona
         persona = Persona.objects.create(
             nombre=data["nombre"],
@@ -176,7 +177,7 @@ def registrar_alumno_datos(data):
             id_persona=persona,
             canal_captacion=data.get("canal_captacion")
         )
-
+        print(f'Paquete: {data["paquete"]}')
         # 📌 3. Verificar que el paquete exista
         paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
 
