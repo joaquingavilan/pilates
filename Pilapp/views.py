@@ -10,6 +10,8 @@ from twilio.rest import Client
 from django.conf import settings
 from django.http import HttpResponse
 from twilio.twiml.messaging_response import MessagingResponse
+import logging
+from . import utils
 
 DAY_INDEX = {
     "Lunes": 0,
@@ -44,10 +46,8 @@ def recibir_mensaje_twilio(request):
             mensaje = request.POST.get("Body", "").strip()
             numero_remitente = request.POST.get("From", "").replace("whatsapp:", "")
 
-            print(f"Mensaje recibido: {mensaje}")
-            print(f"Número remitente: {numero_remitente}")
-            
             if not mensaje or not numero_remitente:
+                logging.error(f"Error en los datos: Mensaje: {mensaje}, Número remitente: {numero_remitente}")
                 return HttpResponse("<Response><Message>Error en los datos</Message></Response>", content_type="text/xml", status=400)
 
             # 📌 Obtener o crear la conversación
@@ -75,6 +75,8 @@ def recibir_mensaje_twilio(request):
 
 
 def menu_principal(conversacion, mensaje):
+    crear_turnos()
+    crear_clases()
     """
     Muestra el menú de opciones y maneja la selección del usuario.
     """
@@ -85,7 +87,9 @@ def menu_principal(conversacion, mensaje):
         conversacion.datos = {}  # Resetear datos
         conversacion.save()
         return {"respuesta": "Por favor, envíame el nombre del alumno."} 
-
+    elif mensaje == "2":
+        conversacion.estado = "Reagendamiento"
+        
     return {"respuesta": "Menú de opciones:\n1. Registrar alumno\nEscribe el número de la opción que deseas elegir."}  
 
 
@@ -192,6 +196,7 @@ def registrar_alumno_datos(data):
         turnos_asignados = []
         for turno_str in data["turnos"]:
             dia, horario = turno_str.split()
+            logging.info(f"Dia: {dia}, Horario: {horario}")
             turno = Turno.objects.get(dia=dia, horario=horario)
             if turno.estado == "Ocupado":
                 return {"error": f"El turno {turno_str} está lleno"}
@@ -199,34 +204,66 @@ def registrar_alumno_datos(data):
 
         # 📌 6. Distribuir clases en los turnos
         cantidad_clases = paquete.cantidad_clases
+        logging.info(f"Cantidad de clases: {cantidad_clases}")
         cantidad_turnos = len(turnos_asignados)
+        logging.info(f"Cantidad de turnos: {cantidad_turnos}")
         clases_por_turno = cantidad_clases // cantidad_turnos
+        logging.info(f"Clases por turno: {clases_por_turno}")
 
+        # Convertir fecha_inicio a objeto date
+        fecha_inicio_obj = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+        logging.info(f"Fecha de inicio: {fecha_inicio_obj}, día de la semana: {fecha_inicio_obj.weekday()}")
+        
+        # Verificar si la fecha de inicio coincide con algún turno
+        fecha_inicio_coincide_con_turno = False
+        for turno in turnos_asignados:
+            dia_turno_idx = DAY_INDEX[turno.dia]
+            if fecha_inicio_obj.weekday() == dia_turno_idx:
+                fecha_inicio_coincide_con_turno = True
+                logging.info(f"La fecha de inicio coincide con el turno {turno.dia}")
+                break
+        
+        # Procesar los turnos normales
         for turno in turnos_asignados:
             AlumnoPaqueteTurno.objects.create(id_alumno_paquete=alumno_paquete, id_turno=turno)
-            fechas_clases = obtener_fechas_turno(turno.id_turno, data["fecha_inicio"], clases_por_turno)["fechas"]
-
+            
+            # Obtener fechas para este turno (siempre usando la lógica normal)
+            fechas_clases = obtener_fechas_turno_normal(turno.id_turno, data["fecha_inicio"], clases_por_turno)["fechas"]
+            logging.info(f"Fechas para turno {turno.dia} {turno.horario}: {fechas_clases}")
+            
             for fecha in fechas_clases:
-                clase, _ = Clase.objects.get_or_create(id_instructor=None, id_turno=turno, fecha=fecha)
+                fecha_clase = datetime.strptime(fecha, "%Y-%m-%d").date()
+                logging.info(f"Fecha de clase: {fecha_clase}, turno: {turno.dia} {turno.horario}")
+                clase = Clase.objects.get(id_instructor=Instructor.objects.get(id_instructor=1), id_turno=turno, fecha=fecha_clase)
                 AlumnoClase.objects.create(id_alumno_paquete=alumno_paquete, id_clase=clase, estado="pendiente")
-
+                logging.info(f"Clase creada: {clase}")
+            
             turno.lugares_ocupados += 1
+            logging.info(f"Lugares ocupados: {turno.lugares_ocupados}")
             if turno.lugares_ocupados >= 4:
                 turno.estado = "Ocupado"
             turno.save()
-
+            logging.info(f"Turno actualizado: {turno}")
+        
         return {"message": "Alumno registrado exitosamente"}
 
     except Exception as e:
+        logging.error(f"Error en registrar_alumno_datos: {str(e)}")
         return {"error": str(e)}
 
 
-
-def obtener_fechas_turno(id_turno, fecha_inicio, n):
+def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
+    """
+    Obtiene las fechas para un turno sin considerar la fecha de inicio como una fecha especial.
+    Esta función implementa la lógica original donde simplemente se buscan las próximas n fechas
+    del turno a partir de la fecha de inicio.
+    """
     try:
         # 📌 1. Obtener el turno
         turno = Turno.objects.get(id_turno=id_turno)
+        logging.info(f"obtener_fechas_turno_normal - Turno: {turno.dia} {turno.horario}")
     except Turno.DoesNotExist:
+        logging.error(f"obtener_fechas_turno_normal - Turno no encontrado: {id_turno}")
         return {"error": "Turno no encontrado"}
     
     # 📌 2. Mapear el día del turno a un índice de la semana (0 = Lunes, ..., 6 = Domingo)
@@ -239,18 +276,48 @@ def obtener_fechas_turno(id_turno, fecha_inicio, n):
     }
     
     if turno.dia not in dias_map:
+        logging.error(f"obtener_fechas_turno_normal - Día del turno inválido: {turno.dia}")
         return {"error": "Día del turno inválido"}
 
     dia_turno_idx = dias_map[turno.dia]
+    logging.info(f"obtener_fechas_turno_normal - Índice del día del turno: {dia_turno_idx}")
 
     # 📌 3. Convertir `fecha_inicio` a objeto `datetime.date`
     fecha_actual = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-
+    logging.info(f"obtener_fechas_turno_normal - Fecha de inicio: {fecha_actual}, día de la semana: {fecha_actual.weekday()}")
+    
+    # Avanzar hasta el primer día después de la fecha de inicio que coincida con el día del turno
+    while fecha_actual.weekday() != dia_turno_idx:
+        fecha_actual += timedelta(days=1)
+    
+    logging.info(f"obtener_fechas_turno_normal - Primera fecha del turno: {fecha_actual}")
+    
     # 📌 4. Buscar las próximas `n` fechas en las que cae el turno
     fechas = []
-    while len(fechas) < n:
-        if fecha_actual.weekday() == dia_turno_idx:
-            fechas.append(fecha_actual.strftime("%Y-%m-%d"))
-        fecha_actual += timedelta(days=1)
+    for _ in range(n):
+        fechas.append(fecha_actual.strftime("%Y-%m-%d"))
+        fecha_actual += timedelta(days=7)  # Avanzar una semana para la próxima clase
 
+    logging.info(f"obtener_fechas_turno_normal - Fechas generadas: {fechas}")
     return {"fechas": fechas}
+
+
+def crear_turnos():
+    """Crea turnos solo si la tabla está vacía."""
+    if Turno.objects.exists():
+        print("Los turnos ya están creados. No es necesario ejecutar el script.")
+        return {"mensaje": "Los turnos ya existen, no se crearon nuevos."}
+    else:
+        utils.crear_turnos()
+
+    return {"mensaje": f"Se crearon los turnos"}
+
+def crear_clases():
+    """Crea clases solo si la tabla está vacía."""
+    if Clase.objects.exists():
+        logging.info("Las clases ya están creadas. No es necesario ejecutar el script.")
+        return {"mensaje": "Las clases ya existen, no se crearon nuevas."}
+    else:
+        utils.crear_clases_rango_fechas('2025-01-01', '2025-12-31')
+        logging.info("Se crearon las clases")
+        return {"mensaje": f"Se crearon las clases"}

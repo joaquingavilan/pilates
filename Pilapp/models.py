@@ -54,7 +54,7 @@ class Clase(models.Model):
     id_clase = models.AutoField(primary_key=True)
     id_instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)
     id_turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
-    fecha = models.DateTimeField()
+    fecha = models.DateField()
 
     def __str__(self):
         return f"Clase {self.id_clase} - {self.fecha}"

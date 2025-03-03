@@ -9,7 +9,7 @@ load_dotenv()  # Carga variables de entorno desde un archivo .env si existe
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'cambia-esto-en-produccion')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
@@ -57,11 +57,35 @@ TEMPLATES = [
     },
 ]
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
+
 WSGI_APPLICATION = 'TuPilates.wsgi.application'
 
 # Configuración de Base de Datos con Railway
 DATABASES = {
-    'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
+    #'default': dj_database_url.config(default=os.getenv('DATABASE_URL')) #comentar para local
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'pilates_db',
+        'USER': 'postgres',
+        'PASSWORD': 'cabra123',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
