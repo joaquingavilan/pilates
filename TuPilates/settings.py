@@ -1,23 +1,15 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-import dj_database_url
-import os
 
-load_dotenv()  # Carga variables de entorno desde un archivo .env si existe
-
+# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'cambia-esto-en-produccion')
+# Seguridad
+SECRET_KEY = 'clave-insegura-para-local'  # Literalmente hardcodeada
 DEBUG = True
-
 ALLOWED_HOSTS = ["*"]
 
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
-
-
+# Aplicaciones instaladas
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,9 +20,9 @@ INSTALLED_APPS = [
     'Pilapp',
 ]
 
+# Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Para servir archivos estáticos en Railway
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -39,8 +31,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Configuración de URLs
 ROOT_URLCONF = 'TuPilates.urls'
 
+# Plantillas
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -57,6 +51,40 @@ TEMPLATES = [
     },
 ]
 
+# WSGI
+WSGI_APPLICATION = 'TuPilates.wsgi.application'
+
+# Base de Datos (local PostgreSQL)
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'pilates_db',
+        'USER': 'postgres',
+        'PASSWORD': 'cabra123',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
+
+# Validaciones de contraseñas
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# Internacionalización
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Archivos estáticos
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -72,37 +100,5 @@ LOGGING = {
     },
 }
 
-
-WSGI_APPLICATION = 'TuPilates.wsgi.application'
-
-# Configuración de Base de Datos con Railway
-DATABASES = {
-    #'default': dj_database_url.config(default=os.getenv('DATABASE_URL')) #comentar para local
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'pilates_db',
-        'USER': 'postgres',
-        'PASSWORD': 'cabra123',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
-
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-# Configuración de Archivos Estáticos
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
+# Auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
