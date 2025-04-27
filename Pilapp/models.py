@@ -1,5 +1,22 @@
 from django.db import models
 
+class HorarioDisponible(models.Model):
+    DIAS_CHOICES = [
+        ('Lunes', 'Lunes'),
+        ('Martes', 'Martes'),
+        ('Miércoles', 'Miércoles'),
+        ('Jueves', 'Jueves'),
+        ('Viernes', 'Viernes'),
+        ('Sábado', 'Sábado'),
+    ]
+
+    dia = models.CharField(max_length=10, choices=DIAS_CHOICES)
+    horario = models.TimeField()
+
+    def __str__(self):
+        return f"{self.dia} {self.horario.strftime('%H:%M')}"
+
+
 class Persona(models.Model):
     id_persona = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
@@ -34,6 +51,7 @@ class Turno(models.Model):
         ('Miércoles', 'Miércoles'),
         ('Jueves', 'Jueves'),
         ('Viernes', 'Viernes'),
+        ('Sábado', 'Sábado'),
     ]
 
     ESTADO_CHOICES = [

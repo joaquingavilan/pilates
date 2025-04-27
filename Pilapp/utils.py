@@ -1,76 +1,38 @@
 from datetime import datetime, date, timedelta
 from django.utils.timezone import make_aware
-from Pilapp.models import Turno, Clase, Instructor  # Corregido 'myapp' por 'Pilapp'
-
-# Lista de turnos a crear (Día, Hora, Estado, Lugares Ocupados)
-DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
-HORARIOS_SEMANA = ["14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
-HORARIOS_SABADO = ["09:00", "10:00"]
+from Pilapp.models import Turno, Clase, Instructor, HorarioDisponible
 
 def crear_turnos():
     """
-    Crea turnos para cada combinación de día y horario definidos.
-    Para días de lunes a viernes: horarios de 14:00 a 20:00.
-    Para sábados: horarios de 09:00 y 10:00.
-    Todos los turnos se crean con estado 'Libre' y lugares ocupados en 0.
-    
-    Returns:
-        dict: Un diccionario con información sobre la operación realizada.
-              - 'creados': Número de turnos creados.
-              - 'existentes': Número de turnos que ya existían.
-              - 'mensaje': Mensaje descriptivo del resultado.
+    Crea turnos a partir de los horarios disponibles en la tabla HorarioDisponible.
     """
     turnos_creados = 0
     turnos_existentes = 0
-    
-    # Crear turnos para días de semana (Lunes a Viernes)
-    for dia in DIAS[:-1]:  # Todos excepto Sábado
-        for horario_str in HORARIOS_SEMANA:
-            # Convertir el string de horario a objeto time
-            horario_time = datetime.strptime(horario_str, '%H:%M').time()
-            
-            # Verificar si el turno ya existe
-            turno_existente = Turno.objects.filter(dia=dia, horario=horario_time).exists()
-            
-            if not turno_existente:
-                # Crear el turno con estado 'Libre' y lugares_ocupados=0
-                Turno.objects.create(
-                    dia=dia,
-                    horario=horario_time,
-                    estado='Libre',
-                    lugares_ocupados=0
-                )
-                turnos_creados += 1
-            else:
-                turnos_existentes += 1
-    
-    # Crear turnos para Sábado
-    for horario_str in HORARIOS_SABADO:
-        # Convertir el string de horario a objeto time
-        horario_time = datetime.strptime(horario_str, '%H:%M').time()
-        
-        # Verificar si el turno ya existe
-        turno_existente = Turno.objects.filter(dia="Sábado", horario=horario_time).exists()
-        
+
+    horarios = HorarioDisponible.objects.all()
+
+    for horario_disponible in horarios:
+        dia = horario_disponible.dia
+        horario = horario_disponible.horario
+
+        turno_existente = Turno.objects.filter(dia=dia, horario=horario).exists()
+
         if not turno_existente:
-            # Crear el turno con estado 'Libre' y lugares_ocupados=0
             Turno.objects.create(
-                dia="Sábado",
-                horario=horario_time,
+                dia=dia,
+                horario=horario,
                 estado='Libre',
                 lugares_ocupados=0
             )
             turnos_creados += 1
         else:
             turnos_existentes += 1
-    
-    resultado = {
+
+    return {
         'creados': turnos_creados,
         'existentes': turnos_existentes,
         'mensaje': f'Se crearon {turnos_creados} turnos nuevos. {turnos_existentes} turnos ya existían.'
     }
-    
-    return resultado
 
 
 def crear_clases_para_fecha(fecha=None):
