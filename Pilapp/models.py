@@ -33,7 +33,11 @@ class Alumno(models.Model):
     id_persona = models.ForeignKey(Persona, on_delete=models.CASCADE)
     canal_captacion = models.CharField(max_length=100, blank=True, null=True)
     ultima_clase = models.DateField(blank=True, null=True)
-
+    estado = models.CharField(max_length=50, choices=[
+        ('ocasional', 'Ocasional'),  # Attends without package
+        ('regular', 'Regular'),       # Has an active package
+        ('inactivo', 'Inactivo')      # No active packages
+    ], default='ocasional')
     def __str__(self):
         return f"Alumno: {self.id_persona}"
 
@@ -54,18 +58,22 @@ class Turno(models.Model):
         ('Sábado', 'Sábado'),
     ]
 
-    ESTADO_CHOICES = [
-        ('Libre', 'Libre'),
-        ('Ocupado', 'Ocupado'),
-    ]
-
     id_turno = models.AutoField(primary_key=True)
     horario = models.TimeField()
     dia = models.CharField(max_length=10, choices=DIAS_CHOICES)
-    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='Libre')  # Nuevo campo
-    lugares_ocupados = models.IntegerField(default=0)
+
     def __str__(self):
-        return f"{self.dia} - {self.horario.strftime('%H:%M')}"  # ejemplo: "Martes - 15:00"
+        return f"{self.dia} - {self.horario.strftime('%H:%M')}"
+
+    @property
+    def lugares_ocupados(self):
+        from .models import AlumnoPaqueteTurno
+        return AlumnoPaqueteTurno.objects.filter(id_turno_id=self.id_turno).count()
+
+    @property
+    def estado(self):
+        return 'Ocupado' if self.lugares_ocupados >= 4 else 'Libre'
+
 
 
 class Clase(models.Model):
@@ -76,6 +84,14 @@ class Clase(models.Model):
 
     def __str__(self):
         return f"Clase {self.id_clase} - {self.fecha}"
+
+    @property
+    def total_inscriptos(self):
+        from .models import AlumnoClase, AlumnoClaseOcasional  # Evitar import circular
+        cantidad_regulares = AlumnoClase.objects.filter(id_clase_id=self.id_clase).count()
+        cantidad_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase_id=self.id_clase).count()
+        return cantidad_regulares + cantidad_ocasionales
+
 
 class Paquete(models.Model):
     id_paquete = models.AutoField(primary_key=True)
@@ -90,8 +106,12 @@ class AlumnoPaquete(models.Model):
     id_alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE)
     id_paquete = models.ForeignKey(Paquete, on_delete=models.CASCADE)
     estado = models.CharField(max_length=50, choices=[("activo", "Activo"), ("expirado", "Expirado")])
+    estado_pago = models.CharField(max_length=50, choices=[
+        ("pendiente", "Pendiente"),
+        ("pagado", "Pagado"),
+        ("parcial", "Pago Parcial")
+    ], default="pendiente")
     fecha_inicio = models.DateField(null=True)
-
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
 
@@ -114,12 +134,35 @@ class AlumnoClase(models.Model):
     def __str__(self):
         return f"AlumnoClase {self.id_alumno_clase}"
 
+
+class AlumnoClaseOcasional(models.Model):
+    id_alumno_clase_ocasional = models.AutoField(primary_key=True)
+    id_alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE)
+    id_clase = models.ForeignKey(Clase, on_delete=models.CASCADE)
+    estado = models.CharField(max_length=50, choices=[
+        ('reservado', 'Reservado'),
+        ('asistió', 'Asistió'), 
+        ('faltó', 'Faltó'),
+        ('canceló', 'Canceló')
+    ])
+    
+    class Meta:
+        unique_together = ('id_alumno', 'id_clase')  # <-- agrega esto
+
+    def __str__(self):
+        return f"Clase Ocasional: {self.id_alumno} - {self.id_clase}"
+
 class Pago(models.Model):
     id_pago = models.AutoField(primary_key=True)
     fecha = models.DateField()
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     nro_pago = models.CharField(max_length=50)
-    estado = models.CharField(max_length=50, choices=[("pendiente", "Pendiente"), ("confirmado", "Confirmado"), ("rechazado", "Rechazado")])
+    estado = models.CharField(max_length=50, choices=[
+        ("pendiente", "Pendiente"),
+        ("pagado", "Pagado"),
+        ("rechazado", "Rechazado"),
+        ("parcial", "Pago Parcial")
+    ])
     id_factura = models.ForeignKey("FacturaPago", on_delete=models.SET_NULL, blank=True, null=True)
     metodo_pago = models.CharField(max_length=50, choices=[("efectivo", "Efectivo"), ("tarjeta", "Tarjeta"), ("transferencia", "Transferencia")])
     comprobante = models.CharField(max_length=100, blank=True, null=True)
@@ -162,3 +205,20 @@ class Conversacion(models.Model):
 
     def __str__(self):
         return f"Conversación {self.estado} - Paso {self.paso}"
+
+class ClienteProspecto(models.Model):
+    id_prospecto = models.AutoField(primary_key=True)
+    telefono = models.CharField(max_length=20)
+    nombre = models.CharField(max_length=100, blank=True, null=True)
+    apellido = models.CharField(max_length=100, blank=True, null=True)
+    fecha_contacto = models.DateField(auto_now_add=True)
+    canal_captacion = models.CharField(max_length=100, blank=True, null=True)
+    estado = models.CharField(max_length=50, choices=[
+        ('interesado', 'Interesado'),
+        ('contactado', 'Contactado'),
+        ('no_interesado', 'No Interesado')
+    ])
+    notas = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Prospecto: {self.telefono}"

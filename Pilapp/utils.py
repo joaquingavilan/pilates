@@ -20,9 +20,7 @@ def crear_turnos():
         if not turno_existente:
             Turno.objects.create(
                 dia=dia,
-                horario=horario,
-                estado='Libre',
-                lugares_ocupados=0
+                horario=horario
             )
             turnos_creados += 1
         else:
