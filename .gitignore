@@ -1,0 +1,7 @@
+# Ignorar archivos locales de conexión a OpenAI y logs
+Pilapp/conexion_openai.py
+Pilapp/mcp_server.py
+Pilapp/mcp_bridge_server.py
+Pilapp/mcp_bridge_debug.log
+Pilapp/openai_connection.log
+Pilapp/app_simple.py
