@@ -35,6 +35,61 @@ def obtener_fecha_proximo_dia(dia_nombre):
 
 
 @csrf_exempt
+def obtener_id_alumno(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            telefono = data.get("telefono")
+            nombre = data.get("nombre", "").strip().lower()
+            apellido = data.get("apellido", "").strip().lower()
+
+            if not telefono:
+                return JsonResponse({"error": "El campo 'telefono' es obligatorio."}, status=400)
+
+            personas = Persona.objects.filter(telefono=telefono.strip())
+            personas_filtradas = []
+
+            if personas.count() == 0:
+                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
+
+            if personas.count() == 1:
+                persona = personas.first()
+            else:
+                # Más de una persona con ese teléfono, aplicar comparación con nombre y apellido
+                for p in personas:
+                    if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
+                        personas_filtradas.append(p)
+
+                if len(personas_filtradas) == 0:
+                    return JsonResponse({
+                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                    }, status=400)
+                if len(personas_filtradas) > 1:
+                    return JsonResponse({
+                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
+                    }, status=400)
+
+                persona = personas_filtradas[0]
+
+            # Buscar Alumno asociado
+            try:
+                alumno = Alumno.objects.get(id_persona=persona)
+            except Alumno.DoesNotExist:
+                return JsonResponse({"error": "La persona existe pero no está registrada como alumno."}, status=404)
+
+            return JsonResponse({
+                "id_alumno": alumno.id_alumno,
+                "estado": alumno.estado
+            })
+
+        except Exception as e:
+            logging.error(f"[obtener_id_alumno] Error: {str(e)}")
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+
+@csrf_exempt
 @transaction.atomic
 def registrar_alumno_ocasional(request):
     if request.method == "POST":
