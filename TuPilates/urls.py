@@ -17,4 +17,5 @@ urlpatterns = [
     path('obtener_alumnos_dia/', obtener_alumnos_dia, name='obtener_alumnos_dia'),
     path('obtener_alumnos_clase/', obtener_alumnos_clase, name='obtener_alumnos_clase'),
     path('obtener_id_alumno/', obtener_id_alumno, name='obtener_id_alumno'),
+    path('registrar_asistencias/', registrar_asistencias, name='registrar_asistencias'),
 ]

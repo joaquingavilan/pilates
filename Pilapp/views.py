@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from django.db import transaction
 from django.utils.timezone import now  # Para fecha de hoy respetando timezone
 from datetime import date
-
+import unicodedata
+from difflib import get_close_matches
 
 DAY_INDEX = {
     "Lunes": 0,
@@ -19,6 +20,156 @@ DAY_INDEX = {
     "Sábado": 5,
     "Domingo": 6
 }
+
+def normalizar(texto):
+    if not texto:
+        return ""
+    texto = texto.strip().lower()
+    texto = unicodedata.normalize('NFD', texto)
+    return ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+
+def resolver_nombre(nombre_dict, alumnos_dict):
+    """
+    Intenta matchear el nombre recibido con los nombres normalizados de alumnos anotados.
+    Retorna id_alumno si hay un único match.
+    """
+    nombre_input = normalizar(nombre_dict.get("nombre", ""))
+    apellido_input = normalizar(nombre_dict.get("apellido", ""))
+    nombre_completo_input = f"{nombre_input} {apellido_input}".strip()
+
+    posibles = []
+
+    # 1. Coincidencia exacta nombre completo
+    if nombre_completo_input in alumnos_dict:
+        return nombre_completo_input
+
+    # 2. Substring parcial (nombre dentro de nombre completo anotado)
+    for nombre_guardado in alumnos_dict:
+        if nombre_input and nombre_input in nombre_guardado:
+            if apellido_input and apellido_input in nombre_guardado:
+                posibles.append(nombre_guardado)
+            elif not apellido_input:
+                posibles.append(nombre_guardado)
+
+    if len(posibles) == 1:
+        return posibles[0]
+
+    # 3. Fuzzy
+    difusos = get_close_matches(nombre_completo_input, alumnos_dict.keys(), n=1, cutoff=0.85)
+    if len(difusos) == 1:
+        return difusos[0]
+
+    return None
+
+
+@csrf_exempt
+@transaction.atomic
+def registrar_asistencias(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    errores = []
+    try:
+        data = json.loads(request.body)
+        dia = data.get("dia")
+        horario = data.get("horario")
+        fecha_str = data.get("fecha")
+        faltaron = data.get("faltaron", [])
+        asistieron = data.get("asistieron", [])
+
+        if not dia:
+            errores.append("Falta el campo 'dia'.")
+        if not horario:
+            errores.append("Falta el campo 'horario'.")
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        # Validar fecha
+        if fecha_str:
+            try:
+                fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                if fecha > date.today():
+                    errores.append("No se puede registrar asistencia para fechas futuras.")
+            except ValueError:
+                errores.append("Formato de fecha inválido, debe ser YYYY-MM-DD.")
+        else:
+            fecha = date.today()
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        # Turno
+        try:
+            turno = Turno.objects.get(dia=dia, horario=horario)
+        except Turno.DoesNotExist:
+            errores.append("Turno no encontrado.")
+            return JsonResponse({"errores": errores}, status=404)
+
+        # Clase
+        try:
+            clase = Clase.objects.get(id_turno=turno, fecha=fecha)
+        except Clase.DoesNotExist:
+            errores.append("Clase no encontrada para ese turno y fecha.")
+            return JsonResponse({"errores": errores}, status=404)
+
+        # Construir diccionario: nombre_normalizado → (id_alumno, instancia, tipo)
+        alumnos_dict = {}
+
+        alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase)
+        for ac in alumnos_regulares:
+            persona = ac.id_alumno_paquete.id_alumno.id_persona
+            nombre = normalizar(f"{persona.nombre} {persona.apellido}")
+            alumnos_dict[nombre] = (persona.id_persona, ac, "regular")
+
+        alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase)
+        for ao in alumnos_ocasionales:
+            persona = ao.id_alumno.id_persona
+            nombre = normalizar(f"{persona.nombre} {persona.apellido}")
+            alumnos_dict[nombre] = (persona.id_persona, ao, "ocasional")
+
+        procesados = []
+        ya_procesados = set()
+        no_encontrados = []
+
+        # Marcar faltaron
+        for alumno_dict in faltaron:
+            nombre_match = resolver_nombre(alumno_dict, alumnos_dict)
+            if nombre_match:
+                _, instancia, _ = alumnos_dict[nombre_match]
+                instancia.estado = "faltó"
+                instancia.save()
+                if nombre_match not in ya_procesados:
+                    procesados.append(nombre_match)
+                    ya_procesados.add(nombre_match)
+            else:
+                nombre_visible = alumno_dict.get("nombre", "")
+                apellido_visible = alumno_dict.get("apellido", "")
+                no_encontrados.append(f"{nombre_visible} {apellido_visible}".strip())
+
+        # Marcar asistieron
+        for alumno_dict in asistieron:
+            nombre_match = resolver_nombre(alumno_dict, alumnos_dict)
+            if nombre_match and nombre_match not in ya_procesados:
+                _, instancia, _ = alumnos_dict[nombre_match]
+                instancia.estado = "asistió"
+                instancia.save()
+                procesados.append(nombre_match)
+                ya_procesados.add(nombre_match)
+            elif not nombre_match:
+                nombre_visible = alumno_dict.get("nombre", "")
+                apellido_visible = alumno_dict.get("apellido", "")
+                no_encontrados.append(f"{nombre_visible} {apellido_visible}".strip())
+
+        return JsonResponse({
+            "asistencias_registradas": procesados,
+            "alumnos_no_encontrados": no_encontrados,
+            "message": f"Asistencias registradas correctamente para {len(procesados)} alumnos."
+        })
+
+    except Exception as e:
+        logging.error(f"[registrar_asistencias] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 def obtener_fecha_proximo_dia(dia_nombre):
@@ -89,19 +240,6 @@ def obtener_id_alumno(request):
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
 
-@csrf_exempt
-@transaction.atomic
-def registrar_alumno_ocasional(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            response = registrar_alumno_ocasional_datos(data)
-            return JsonResponse(response)
-        except Exception as e:
-            logging.error(f"Error en registrar_alumno_ocasional: {str(e)}")
-            return JsonResponse({"error": str(e)}, status=400)
-    return JsonResponse({"error": "Método no permitido"}, status=405)
-
 
 @csrf_exempt
 @transaction.atomic
@@ -128,32 +266,48 @@ def registrar_alumno_ocasional_datos(data):
         errores.append("Debe proporcionar un apellido.")
     if not data.get("telefono"):
         errores.append("Debe proporcionar un número de teléfono.")
-    if not data.get("dia_turno"):
-        errores.append("Debe proporcionar el día del turno.")
     if not data.get("hora_turno"):
         errores.append("Debe proporcionar el horario del turno.")
+
+    fecha_clase = None
+    dia_turno = data.get("dia_turno")
+    fecha_str = data.get("fecha")
+
+    # 📌 Resolver fecha y día
+    if fecha_str:
+        try:
+            fecha_clase = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            if not dia_turno:
+                dia_numero = fecha_clase.weekday()
+                dia_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                dia_turno = dia_nombre[dia_numero]
+        except ValueError:
+            errores.append("La fecha debe tener el formato YYYY-MM-DD.")
+    else:
+        if not dia_turno:
+            errores.append("Debe proporcionar el día del turno si no proporciona la fecha.")
+        else:
+            fecha_clase = obtener_fecha_proximo_dia(dia_turno)
 
     turno = None
     clase = None
 
     if not errores:
-        # 📌 Validar turno
+        # 📌 Obtener turno
         try:
-            turno = Turno.objects.get(dia=data["dia_turno"], horario=data["hora_turno"])
-            if turno.estado == "Ocupado":
-                errores.append(f"El turno {data['dia_turno']} {data['hora_turno']} ya está lleno.")
+            turno = Turno.objects.get(dia=dia_turno, horario=data["hora_turno"])
         except Turno.DoesNotExist:
-            errores.append(f"El turno {data['dia_turno']} {data['hora_turno']} no existe.")
+            errores.append(f"El turno {dia_turno} {data['hora_turno']} no existe.")
 
-    if turno and not errores:
-        # 📌 Validar clase correspondiente al próximo día
-        fecha_clase = obtener_fecha_proximo_dia(data["dia_turno"])
+    if not errores:
+        # 📌 Validar clase específica en esa fecha
         try:
             clase = Clase.objects.get(id_turno=turno, fecha=fecha_clase)
             if clase.total_inscriptos >= 4:
                 errores.append(f"La clase del {fecha_clase} a las {data['hora_turno']} ya está llena.")
         except Clase.DoesNotExist:
-            errores.append(f"No existe clase programada para {fecha_clase} en el turno {data['dia_turno']} {data['hora_turno']}.")
+            errores.append(f"No existe clase programada para {fecha_clase} en el turno {dia_turno} {data['hora_turno']}.")
+
 
     # 📌 Si hay errores, abortar
     if errores:
@@ -181,7 +335,11 @@ def registrar_alumno_ocasional_datos(data):
         estado="reservado"
     )
 
-    return {"mensaje": "Alumno ocasional registrado correctamente"}
+    return {
+        "mensaje": "Alumno ocasional registrado correctamente",
+        "fecha_clase": str(fecha_clase),
+        "turno": f"{dia_turno} {data['hora_turno']}"
+    }
 
 
 
@@ -787,36 +945,60 @@ def actualizar_ruc(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            nombre = data.get("nombre")
-            apellido = data.get("apellido")
+            telefono = data.get("telefono")
+            nombre = data.get("nombre", "").strip().lower()
+            apellido = data.get("apellido", "").strip().lower()
             nuevo_ruc = data.get("ruc")
 
             errores = []
-            if not nombre:
-                errores.append("El nombre es obligatorio.")
-            if not apellido:
-                errores.append("El apellido es obligatorio.")
+            if not telefono:
+                errores.append("El teléfono es obligatorio.")
             if not nuevo_ruc:
                 errores.append("El nuevo RUC es obligatorio.")
 
             if errores:
                 return JsonResponse({"error": " ".join(errores)}, status=400)
 
-            try:
-                persona = Persona.objects.get(nombre=nombre, apellido=apellido)
-            except Persona.DoesNotExist:
-                return JsonResponse({"error": "No se encontró la persona con ese nombre y apellido."}, status=404)
+            # Buscar por teléfono
+            personas = Persona.objects.filter(telefono=telefono.strip())
+            personas_filtradas = []
 
+            if personas.count() == 0:
+                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
+
+            if personas.count() == 1:
+                persona = personas.first()
+            else:
+                # Hay más de una → usar nombre y apellido para desambiguar
+                for p in personas:
+                    if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
+                        personas_filtradas.append(p)
+
+                if len(personas_filtradas) == 0:
+                    return JsonResponse({
+                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                    }, status=400)
+                if len(personas_filtradas) > 1:
+                    return JsonResponse({
+                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
+                    }, status=400)
+
+                persona = personas_filtradas[0]
+
+            # Actualizar RUC
             persona.ruc = nuevo_ruc
             persona.save()
 
-            return JsonResponse({"message": f"RUC actualizado correctamente para {nombre} {apellido}"})
+            return JsonResponse({
+                "message": f"RUC actualizado correctamente para {persona.nombre} {persona.apellido}."
+            })
 
         except Exception as e:
-            logging.error(f"Error en actualizar_ruc: {str(e)}")
+            logging.error(f"[actualizar_ruc] Error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
+
 
 
 def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
