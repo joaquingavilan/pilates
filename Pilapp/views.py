@@ -20,6 +20,257 @@ DAY_INDEX = {
     "Sábado": 5,
     "Domingo": 6
 }
+DAY_NAME_ES = {
+    0: "Lunes",
+    1: "Martes",
+    2: "Miércoles",
+    3: "Jueves",
+    4: "Viernes",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+
+@csrf_exempt
+@transaction.atomic
+def reprogramar_clase(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    errores = []
+
+    try:
+        data = json.loads(request.body)
+        id_alumno = data.get("id_alumno")
+        id_clase_origen = data.get("id_clase_origen")
+        dia_destino = data.get("dia_destino")
+        hora_destino = data.get("hora_destino")
+        fecha_destino_str = data.get("fecha_destino")
+
+        if not id_alumno:
+            errores.append("Falta el campo 'id_alumno'.")
+        if not id_clase_origen:
+            errores.append("Falta el campo 'id_clase_origen'.")
+        if not dia_destino or not hora_destino or not fecha_destino_str:
+            errores.append("Debes proporcionar 'dia_destino', 'hora_destino' y 'fecha_destino'.")
+
+        try:
+            fecha_destino = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            errores.append("La fecha debe tener el formato YYYY-MM-DD.")
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        alumno = Alumno.objects.get(id_alumno=id_alumno)
+
+        clase_origen = Clase.objects.get(id_clase=id_clase_origen)
+
+        # Determinar si es regular u ocasional
+        paquetes = AlumnoPaquete.objects.filter(id_alumno=alumno)
+        alumno_clase = AlumnoClase.objects.filter(id_alumno_paquete__in=paquetes, id_clase=clase_origen).first()
+        tipo_alumno = "regular" if alumno_clase else None
+
+
+        if not alumno_clase:
+            alumno_clase_ocasional = AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_origen).first()
+            if alumno_clase_ocasional:
+                tipo_alumno = "ocasional"
+
+        if not tipo_alumno:
+            return JsonResponse({"errores": ["El alumno no está registrado en la clase de origen."]}, status=404)
+
+        # Verificar clase destino
+        try:
+            turno_destino = Turno.objects.get(dia=dia_destino, horario=hora_destino)
+        except Turno.DoesNotExist:
+            return JsonResponse({"errores": ["No existe el turno destino especificado."]}, status=404)
+
+        try:
+            clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_destino)
+        except Clase.DoesNotExist:
+            return JsonResponse({"errores": ["No existe una clase programada para ese turno y fecha."]}, status=404)
+
+        if clase_destino.total_inscriptos >= 4:
+            return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
+
+        # Verificar si ya está anotado a la clase destino
+        ya_en_clase = False
+        if tipo_alumno == "regular":
+            ya_en_clase = AlumnoClase.objects.filter(
+                id_alumno_paquete__id_alumno=alumno,
+                id_clase=clase_destino
+            ).exists()
+        else:
+            ya_en_clase = AlumnoClaseOcasional.objects.filter(
+                id_alumno=alumno,
+                id_clase=clase_destino
+            ).exists()
+
+        if ya_en_clase:
+            return JsonResponse({"errores": ["El alumno ya está registrado en la clase destino."]}, status=400)
+
+        # Realizar la reprogramación
+        if tipo_alumno == "regular":
+            alumno_paquete = alumno_clase.id_alumno_paquete
+            alumno_clase.estado = "reprogramó"
+            alumno_clase.save()
+
+            AlumnoClase.objects.create(
+                id_alumno_paquete=alumno_paquete,
+                id_clase=clase_destino,
+                estado="recuperó"
+            )
+        else:
+            alumno_clase_ocasional.estado = "canceló"
+            alumno_clase_ocasional.save()
+
+            AlumnoClaseOcasional.objects.create(
+                id_alumno=alumno,
+                id_clase=clase_destino,
+                estado="reservado"
+            )
+
+        return JsonResponse({
+            "message": "Clase reprogramada correctamente.",
+            "tipo_alumno": tipo_alumno,
+            "clase_origen": {
+                "fecha": str(clase_origen.fecha),
+                "hora": clase_origen.id_turno.horario.strftime("%H:%M")
+            },
+            "clase_destino": {
+                "fecha": str(clase_destino.fecha),
+                "hora": clase_destino.id_turno.horario.strftime("%H:%M")
+            }
+        })
+
+    except Alumno.DoesNotExist:
+        return JsonResponse({"errores": ["Alumno no encontrado."]}, status=404)
+    except Clase.DoesNotExist:
+        return JsonResponse({"errores": ["Clase de origen no encontrada."]}, status=404)
+    except Exception as e:
+        logging.error(f"[reprogramar_clase] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+@transaction.atomic
+def obtener_clases_agendadas(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    errores = []
+
+    try:
+        data = json.loads(request.body)
+        id_alumno = data.get("id_alumno")
+        fecha_minima_str = data.get("fecha_minima")
+
+        if not id_alumno:
+            errores.append("Falta el campo 'id_alumno'.")
+
+        # Validar y convertir fecha
+        fecha_minima = date.today()
+        if fecha_minima_str:
+            try:
+                fecha_minima = datetime.strptime(fecha_minima_str, "%Y-%m-%d").date()
+            except ValueError:
+                errores.append("La fecha debe tener el formato YYYY-MM-DD.")
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        try:
+            alumno = Alumno.objects.get(id_alumno=id_alumno)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": ["Alumno no encontrado"]}, status=404)
+
+        clases_resultado = []
+
+        if alumno.estado == "regular":
+            clases_regulares = AlumnoClase.objects.filter(
+                id_alumno_paquete__id_alumno=alumno
+            ).select_related("id_clase", "id_clase__id_turno")
+
+            for ac in clases_regulares:
+                clase = ac.id_clase
+                clases_resultado.append({
+                    "id_clase": clase.id_clase,
+                    "fecha": str(clase.fecha),
+                    "dia": clase.fecha.strftime("%A").capitalize(),
+                    "hora": clase.id_turno.horario.strftime("%H:%M"),
+                    "tipo": "regular",
+                    "estado": ac.estado
+                })
+
+        elif alumno.estado == "ocasional":
+            clases_ocasionales = AlumnoClaseOcasional.objects.filter(
+                id_alumno=alumno,
+                id_clase__fecha__gte=fecha_minima
+            ).select_related("id_clase", "id_clase__id_turno")
+
+            for ao in clases_ocasionales:
+                clase = ao.id_clase
+                clases_resultado.append({
+                    "id_clase": clase.id_clase,
+                    "fecha": str(clase.fecha),
+                    "dia": clase.fecha.strftime("%A").capitalize(),
+                    "dia": DAY_NAME_ES[clase.fecha.weekday()],
+                    "tipo": "ocasional",
+                    "estado": ao.estado
+                })
+
+        else:
+            return JsonResponse({
+                "clases": [],
+                "message": "El alumno está inactivo, no tiene clases agendadas actualmente."
+            })
+
+        # Filtrar por fecha mínima
+        clases_filtradas = [
+            c for c in clases_resultado
+            if datetime.strptime(c["fecha"], "%Y-%m-%d").date() >= fecha_minima
+        ]
+
+        clases_ordenadas = sorted(clases_filtradas, key=lambda c: (c["fecha"], c["hora"]))
+
+        return JsonResponse({"clases": clases_ordenadas})
+
+    except Exception as e:
+        logging.error(f"[obtener_clases_agendadas] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def normalizar(texto):
     if not texto:
@@ -422,13 +673,14 @@ def registrar_alumno_datos(data):
 
     alumno = Alumno.objects.create(
         id_persona=persona,
-        canal_captacion=data.get("canal_captacion")
+        canal_captacion=data.get("canal_captacion"),
+        estado="regular"
     )
 
     alumno_paquete = AlumnoPaquete.objects.create(
         id_alumno=alumno,
         id_paquete=paquete,
-        estado="activo",
+        estado='activo',
         fecha_inicio= fecha_inicio
     )
 
