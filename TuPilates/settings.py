@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
+import dj_database_url
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Seguridad
-SECRET_KEY = 'clave-insegura-para-local'  # Literalmente hardcodeada
-DEBUG = True
+SECRET_KEY = os.environ.get("SECRET_KEY", "clave-insegura-para-local")
+DEBUG = os.environ.get("DEBUG", "True") == "True"
 ALLOWED_HOSTS = ["*"]
 
 # Aplicaciones instaladas
@@ -54,16 +55,13 @@ TEMPLATES = [
 # WSGI
 WSGI_APPLICATION = 'TuPilates.wsgi.application'
 
-# Base de Datos (local PostgreSQL)
+# Base de Datos (local por default si no se encuentra la bd en la nube)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'pilates_db',
-        'USER': 'postgres',
-        'PASSWORD': 'cabra123',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default='postgres://postgres:cabra123@localhost:5432/pilates_db',
+        conn_max_age=600,
+        ssl_require=False  # Railway requiere True en producción
+    )
 }
 
 # Validaciones de contraseñas
