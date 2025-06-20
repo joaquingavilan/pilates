@@ -10,6 +10,18 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "clave-insegura-para-local")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 ALLOWED_HOSTS = ["*"]
 
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://tupilates.up.railway.app",
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+
+
 # Aplicaciones instaladas
 INSTALLED_APPS = [
     'django.contrib.admin',
