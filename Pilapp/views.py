@@ -1176,7 +1176,9 @@ def verificar_clase_hoy(request):
                 return JsonResponse({"message": "No hay clase programada hoy a ese horario."})
 
             # Calcular lugares ocupados
-            lugares_ocupados = AlumnoClase.objects.filter(id_clase=clase).count()
+            lugares_ocupados = lugares_ocupados = (AlumnoClase.objects.filter(id_clase=clase).count() +
+                    AlumnoClaseOcasional.objects.filter(id_clase=clase).count())
+            
             lugares_disponibles = 4 - lugares_ocupados
 
             if lugares_disponibles > 0:
