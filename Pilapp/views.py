@@ -212,13 +212,14 @@ def obtener_clases_agendadas(request):
             for ao in clases_ocasionales:
                 clase = ao.id_clase
                 clases_resultado.append({
-                    "id_clase": clase.id_clase,
-                    "fecha": str(clase.fecha),
-                    "dia": clase.fecha.strftime("%A").capitalize(),
-                    "dia": DAY_NAME_ES[clase.fecha.weekday()],
-                    "tipo": "ocasional",
-                    "estado": ao.estado
+                "id_clase": clase.id_clase,
+                "fecha": str(clase.fecha),
+                "dia": clase.fecha.strftime("%A").capitalize(),  # o un mapa ES consistente
+                "hora": clase.id_turno.horario.strftime("%H:%M"),
+                "tipo": "ocasional",
+                "estado": ao.estado
                 })
+
 
         else:
             return JsonResponse({
