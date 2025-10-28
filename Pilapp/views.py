@@ -990,7 +990,7 @@ def verificar_turno(request):
             try:
                 turno = Turno.objects.get(dia=dia, horario=horario)
             except Turno.DoesNotExist:
-                return JsonResponse({"message": "No hay turno registrado para ese día y horario."})
+                return JsonResponse({"message": "No hay un turno registrado para ese día y horario. No tenemos clases en ese horario."})
 
             lugares_disponibles = 4 - turno.lugares_ocupados
 
