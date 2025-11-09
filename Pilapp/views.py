@@ -34,6 +34,51 @@ DAY_NAME_ES = {
 @csrf_exempt
 @transaction.atomic
 def reprogramar_clase(request):
+    """
+    POST /reprogramar_clase/
+    ------------------------
+    Reprograma una clase de un alumno (regular u ocasional) hacia otra fecha y horario.
+
+    Métodos admitidos:
+    - POST → ejecuta la reprogramación.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - id_alumno (int)                 [obligatorio]
+    - id_clase_origen (int)           [obligatorio]
+    - dia_destino (str)               [obligatorio]
+    - hora_destino (str)              [obligatorio]
+    - fecha_destino (str, YYYY-MM-DD) [obligatorio]
+
+    Validaciones y posibles errores:
+    - Falta alguno de los campos anteriores → 400 {"errores": ["Falta el campo '...'", ...]}
+    - Fecha con formato inválido → 400 {"errores": ["La fecha debe tener el formato YYYY-MM-DD."]}
+    - Alumno no encontrado → 404 {"errores": ["Alumno no encontrado."]}
+    - Clase de origen no encontrada → 404 {"errores": ["Clase de origen no encontrada."]}
+    - Alumno no registrado en la clase de origen → 404 {"errores": ["El alumno no está registrado en la clase de origen."]}
+    - Turno destino inexistente → 404 {"errores": ["No existe el turno destino especificado."]}
+    - Clase destino inexistente → 404 {"errores": ["No existe una clase programada para ese turno y fecha."]}
+    - Clase destino con cupo completo (>=4) → 400 {"errores": ["La clase destino ya está llena."]}
+    - Alumno ya registrado en clase destino → 400 {"errores": ["El alumno ya está registrado en la clase destino."]}
+    - Error no controlado → 500 {"error": "<mensaje de excepción>"}
+
+    Operaciones internas observables:
+    - Determina si el alumno es "regular" (AlumnoClase) u "ocasional" (AlumnoClaseOcasional).
+    - Si es regular:
+    • marca la clase original como estado="reprogramó".
+    • crea un nuevo AlumnoClase con estado="recuperó".
+    - Si es ocasional:
+    • marca la clase original como estado="canceló".
+    • crea un nuevo AlumnoClaseOcasional con estado="reservado".
+
+    Respuesta 200 OK:
+    {
+    "message": "Clase reprogramada correctamente.",
+    "tipo_alumno": "regular" | "ocasional",
+    "clase_origen":  {"fecha": "YYYY-MM-DD", "hora": "HH:MM"},
+    "clase_destino": {"fecha": "YYYY-MM-DD", "hora": "HH:MM"}
+    }
+    """
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -156,6 +201,56 @@ def reprogramar_clase(request):
 @csrf_exempt
 @transaction.atomic
 def obtener_clases_agendadas(request):
+    """
+    POST /obtener_clases_agendadas/
+    -------------------------------
+    Devuelve la lista de clases agendadas para un alumno, filtradas desde una fecha mínima (por defecto, la fecha actual).
+
+    Métodos admitidos:
+    - POST → obtiene las clases agendadas.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - id_alumno (int)                 [obligatorio]
+    - fecha_minima (str, YYYY-MM-DD)  [opcional]
+
+    Validaciones y posibles errores:
+    - Falta 'id_alumno' → 400 {"errores": ["Falta el campo 'id_alumno'."]}
+    - 'fecha_minima' con formato inválido → 400 {"errores": ["La fecha debe tener el formato YYYY-MM-DD."]}
+    - Alumno no encontrado → 404 {"errores": ["Alumno no encontrado"]}
+    - Error no controlado → 500 {"error": "<mensaje de excepción>"}
+
+    Comportamiento según estado del alumno:
+    - estado == "regular" → consulta en AlumnoClase (clases regulares).
+    - estado == "ocasional" → consulta en AlumnoClaseOcasional (clases con fecha >= fecha_minima).
+    - estado distinto (p. ej. "inactivo") → 200 {"clases": [], "message": "El alumno está inactivo, no tiene clases agendadas actualmente."}
+
+    Cada elemento de la lista "clases" tiene esta estructura:
+    {
+    "id_clase": int,
+    "fecha": "YYYY-MM-DD",
+    "dia": "NombreDelDía",
+    "hora": "HH:MM",
+    "tipo": "regular" | "ocasional",
+    "estado": "<estado actual>"
+    }
+
+    Respuesta 200 OK:
+    {
+    "clases": [
+        {
+        "id_clase": 12,
+        "fecha": "2025-11-10",
+        "dia": "Lunes",
+        "hora": "18:00",
+        "tipo": "regular",
+        "estado": "reservado"
+        },
+        ...
+    ]
+    }
+    """
+
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -243,36 +338,6 @@ def obtener_clases_agendadas(request):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def normalizar(texto):
     if not texto:
         return ""
@@ -317,6 +382,47 @@ def resolver_nombre(nombre_dict, alumnos_dict):
 @csrf_exempt
 @transaction.atomic
 def registrar_asistencias(request):
+    """
+    POST /registrar_asistencias/
+    ----------------------------
+    Registra las asistencias y ausencias de alumnos (regulares y ocasionales) en una clase determinada por día, horario y fecha.
+
+    Métodos admitidos:
+    - POST → registra las asistencias.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - dia (str)                   [obligatorio]
+    - horario (str)               [obligatorio]
+    - fecha (str, YYYY-MM-DD)     [opcional; si falta, se usa la fecha actual del sistema]
+    - asistieron (list[dict])     [opcional; formato {"nombre": "Ana", "apellido": "Pérez"}]
+    - faltaron (list[dict])       [opcional; formato {"nombre": "Laura", "apellido": "Gómez"}]
+
+    Validaciones y posibles errores:
+    - Falta 'dia' o 'horario' → 400 {"errores": ["Falta el campo 'dia'.", "Falta el campo 'horario'."]}
+    - 'fecha' con formato inválido → 400 {"errores": ["Formato de fecha inválido, debe ser YYYY-MM-DD."]}
+    - 'fecha' futura → 400 {"errores": ["No se puede registrar asistencia para fechas futuras."]}
+    - Turno no encontrado → 404 {"errores": ["Turno no encontrado."]}
+    - Clase no encontrada para ese turno y fecha → 404 {"errores": ["Clase no encontrada para ese turno y fecha."]}
+    - Excepción no controlada → 500 {"error": "<mensaje de excepción>"}
+
+    Comportamiento interno:
+    - Busca el turno (Turno.dia, Turno.horario).
+    - Busca la clase correspondiente (Clase.id_turno, Clase.fecha).
+    - Crea un diccionario de alumnos de la clase (regulares y ocasionales), indexados por nombre normalizado.
+    - Actualiza el estado de cada alumno:
+    • "faltó" para los incluidos en `faltaron`
+    • "asistió" para los incluidos en `asistieron`
+    - Si el nombre no se encuentra, se agrega a `alumnos_no_encontrados`.
+
+    Respuesta 200 OK:
+    {
+    "asistencias_registradas": ["ana pérez", "laura gómez", ...],
+    "alumnos_no_encontrados": ["maría fernández", ...],
+    "message": "Asistencias registradas correctamente para <N> alumnos."
+    }
+    """
+
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -425,6 +531,25 @@ def registrar_asistencias(request):
 
 
 def obtener_fecha_proximo_dia(dia_nombre):
+    """
+    Calcula la próxima fecha (tipo date) correspondiente a un día de la semana dado.
+
+    Parámetros:
+    - dia_nombre (str): nombre del día ("Lunes".."Domingo"), que debe existir en el diccionario DAY_INDEX.
+
+    Lógica:
+    - Obtiene el día actual (weekday 0..6).
+    - Compara con el índice del día objetivo (DAY_INDEX[dia_nombre]).
+    - Si el día objetivo es hoy, devuelve la fecha del mismo día en la semana siguiente.
+    - De lo contrario, devuelve la próxima ocurrencia de ese día.
+
+    Retorna:
+    - datetime.date → fecha del próximo día solicitado.
+
+    Ejemplo:
+    >>> obtener_fecha_proximo_dia("Viernes")
+    datetime.date(2025, 11, 14)  # suponiendo que hoy sea 2025-11-07
+    """
     hoy = datetime.now().date()
     dia_actual = hoy.weekday()
     dia_objetivo = DAY_INDEX[dia_nombre]
@@ -439,6 +564,36 @@ def obtener_fecha_proximo_dia(dia_nombre):
 
 @csrf_exempt
 def obtener_id_alumno(request):
+    """
+    POST /obtener_id_alumno/
+    ------------------------
+    Obtiene el ID y el estado de un alumno a partir de su número de teléfono.  
+    Si existen múltiples personas con el mismo teléfono, utiliza nombre y apellido para desambiguar.
+
+    Métodos admitidos:
+    - POST → realiza la búsqueda del alumno.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - telefono (str)    [obligatorio]
+    - nombre (str)      [opcional; usado para desambiguar si hay más de una persona con el mismo teléfono]
+    - apellido (str)    [opcional; usado para desambiguar si hay más de una persona con el mismo teléfono]
+
+    Validaciones y posibles errores:
+    - Falta 'telefono' → 400 {"error": "El campo 'telefono' es obligatorio."}
+    - Ninguna persona con ese teléfono → 404 {"error": "No se encontró ninguna persona con ese teléfono."}
+    - Varias personas con el mismo teléfono y sin coincidencia exacta de nombre/apellido → 400 {"error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."}
+    - Más de una coincidencia exacta → 400 {"error": "Se encontró más de una persona con ese teléfono, nombre y apellido."}
+    - Persona sin registro como alumno → 404 {"error": "La persona existe pero no está registrada como alumno."}
+    - Error no controlado → 500 {"error": "<mensaje de excepción>"}
+
+    Salida exitosa (200 OK):
+    {
+    "id_alumno": <int>,
+    "estado": "<regular|ocasional|inactivo>"
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -496,6 +651,54 @@ def obtener_id_alumno(request):
 @csrf_exempt
 @transaction.atomic
 def registrar_alumno_ocasional(request):
+    """
+    POST /registrar_alumno_ocasional/
+    ---------------------------------
+    Registra un nuevo alumno ocasional en una clase puntual (sin paquete).
+
+    Métodos admitidos:
+    - POST → crea la persona, el alumno y su registro en una clase existente.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - nombre (str)              [obligatorio]
+    - apellido (str)            [obligatorio]
+    - telefono (str)            [obligatorio]
+    - hora_turno (str)          [obligatorio]
+    - dia_turno (str)           [opcional si se envía 'fecha']
+    - fecha (str, YYYY-MM-DD)   [opcional]
+    - canal_captacion (str)     [opcional]
+    - observaciones (str)       [opcional]
+
+    Validaciones y posibles errores:
+    - Falta alguno de los campos obligatorios → ValueError con mensaje unificado.
+    - 'fecha' con formato inválido → "La fecha debe tener el formato YYYY-MM-DD."
+    - Si no se proporciona 'fecha' ni 'dia_turno' → "Debe proporcionar el día del turno si no proporciona la fecha."
+    - Turno inexistente → "El turno <día> <hora> no existe."
+    - Clase inexistente en ese turno/fecha → "No existe clase programada para <fecha> en el turno <día> <hora>."
+    - Clase llena (≥4 inscriptos) → "La clase del <fecha> a las <hora> ya está llena."
+    - Excepción no controlada → 400 {"error": "<mensaje>"}
+
+    Comportamiento interno:
+    1. Si se envía `fecha`:
+    - Se convierte a date.
+    - Si falta `dia_turno`, se infiere desde la fecha.
+    2. Si no se envía `fecha`, calcula la próxima fecha correspondiente a `dia_turno` (usando `obtener_fecha_proximo_dia`).
+    3. Busca el `Turno` correspondiente al día y horario.
+    4. Busca la `Clase` existente en esa fecha.
+    5. Si hay cupo, crea:
+    - Una nueva `Persona`.
+    - Un `Alumno` con estado `"ocasional"`.
+    - Un `AlumnoClaseOcasional` asociado con estado `"reservado"`.
+
+    Salida exitosa (200 OK):
+    {
+    "mensaje": "Alumno ocasional registrado correctamente",
+    "fecha_clase": "YYYY-MM-DD",
+    "turno": "Día HH:MM"
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -509,6 +712,49 @@ def registrar_alumno_ocasional(request):
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
 def registrar_alumno_ocasional_datos(data):
+    """
+    Registra en base de datos un nuevo alumno ocasional y lo asigna a una clase específica.
+
+    Parámetros:
+    - data (dict): Diccionario con los datos de entrada.  
+    Claves esperadas:
+        - nombre (str)              [obligatorio]
+        - apellido (str)            [obligatorio]
+        - telefono (str)            [obligatorio]
+        - hora_turno (str)          [obligatorio]
+        - dia_turno (str)           [opcional si se envía 'fecha']
+        - fecha (str, YYYY-MM-DD)   [opcional]
+        - canal_captacion (str)     [opcional]
+        - observaciones (str)       [opcional]
+
+    Validaciones:
+    - Verifica que existan los campos obligatorios.
+    - Si se envía `fecha`, la convierte a `datetime.date`.  
+    - Si no se envía `dia_turno`, lo deduce automáticamente desde la fecha.  
+    - Si el formato de `fecha` es incorrecto, agrega error.
+    - Si no se envía `fecha`, requiere `dia_turno` y calcula la próxima fecha válida usando `obtener_fecha_proximo_dia`.
+    - Verifica que exista un `Turno` para el `dia_turno` y `hora_turno`.
+    - Verifica que exista una `Clase` para ese turno y fecha, y que no esté completa (`total_inscriptos < 4`).
+    - Si hay errores acumulados, lanza `ValueError` con el resumen de los mensajes concatenados.
+
+    Acciones ejecutadas:
+    1. Crea una instancia de `Persona` (nombre, apellido, teléfono, observaciones).
+    2. Crea un `Alumno` asociado con esa persona (`estado="ocasional"`).
+    3. Crea un registro en `AlumnoClaseOcasional` vinculado a la `Clase` existente, con `estado="reservado"`.
+
+    Retorna:
+    - dict con los datos del registro creado:
+    {
+        "mensaje": "Alumno ocasional registrado correctamente",
+        "fecha_clase": "YYYY-MM-DD",
+        "turno": "Día HH:MM"
+    }
+
+    Excepciones:
+    - ValueError: cuando se detectan errores de validación o disponibilidad.
+    - Cualquier otra excepción será capturada por la vista superior (`registrar_alumno_ocasional`) y devuelta como JSON con status 400.
+    """
+
     errores = []
 
     # 📌 Validar campos básicos
@@ -598,6 +844,56 @@ def registrar_alumno_ocasional_datos(data):
 @csrf_exempt
 @transaction.atomic
 def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
+    """
+    POST /registrar_alumno/
+    -----------------------
+    Registra un nuevo alumno regular con un paquete de clases y sus turnos asociados.
+
+    Métodos admitidos:
+    - POST → crea la persona, el alumno, el paquete y las clases asociadas.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Entradas (JSON):
+    - nombre (str)                 [obligatorio]
+    - apellido (str)               [obligatorio]
+    - telefono (str)               [obligatorio]
+    - paquete (int)                [obligatorio] cantidad de clases (ej. 4, 8, 12)
+    - turnos (list[str])           [obligatorio] formato ["Lunes 18:00", "Miércoles 19:00", ...]
+    - fecha_inicio (str, YYYY-MM-DD) [opcional]
+    - canal_captacion (str)        [opcional]
+    - ruc (str)                    [opcional]
+    - observaciones (str)          [opcional]
+
+    Validaciones y posibles errores:
+    - Turno inexistente → "El turno <día> <hora> no existe."
+    - Turno con estado "Ocupado" → "El turno <día> <hora> ya tiene su cupo general completo."
+    - Paquete inexistente → "Paquete con <n> clases no existe."
+    - Clase no programada → "No existe clase programada para <fecha> en el turno <día> <hora>."
+    - Clase llena (≥4 inscriptos) → "La clase del <fecha> a las <hora> ya está llena."
+    - Excepciones de validación → 400 {"error": "Errores encontrados: ..."}
+    - Excepciones no controladas → 400 {"error": "<mensaje de excepción>"}
+
+    Comportamiento interno:
+    1. Valida los turnos recibidos, descartando los inexistentes o llenos.
+    2. Valida que el paquete de clases exista.
+    3. Calcula la cantidad de clases por turno (`paquete.cantidad_clases // len(turnos)`).
+    4. Determina las fechas a reservar:
+    - Usa `fecha_inicio` si se especifica.
+    - Si no, obtiene la próxima fecha para cada turno mediante `obtener_fecha_proximo_dia`.
+    - Calcula las fechas reales con `obtener_fechas_turno_normal(id_turno, fecha_inicio, clases_por_turno)`.
+    5. Verifica que existan clases programadas y con cupo disponible en esas fechas.
+    6. Si todas las validaciones pasan:
+    - Crea una `Persona` (nombre, apellido, teléfono, etc.).
+    - Crea un `Alumno` asociado (`estado="regular"`).
+    - Crea un `AlumnoPaquete` con estado `"activo"`.
+    - Registra los turnos (`AlumnoPaqueteTurno`) y las clases (`AlumnoClase` con estado `"pendiente"`).
+
+    Salida exitosa (200 OK):
+    {
+    "message": "Alumno registrado exitosamente"
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -609,6 +905,38 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
 def registrar_alumno_datos(data):
+    """
+    Procesa los datos recibidos en /registrar_alumno/ y realiza las validaciones y registros en base de datos.
+
+    Parámetros:
+    - data (dict): Diccionario con los datos del alumno, paquete y turnos.  
+    Claves esperadas:
+        - nombre, apellido, telefono, paquete, turnos (obligatorios)
+        - fecha_inicio, canal_captacion, ruc, observaciones (opcionales)
+
+    Validaciones:
+    - Verifica que los turnos existan (`Turno.objects.get(dia, horario)`).
+    - Si el turno tiene estado "Ocupado", lo descarta y agrega error.
+    - Verifica que el paquete (`Paquete.cantidad_clases`) exista.
+    - Calcula las fechas de clases por turno, usando `obtener_fechas_turno_normal`.
+    - Comprueba que existan las clases (`Clase`) y tengan cupo (`total_inscriptos < 4`).
+    - Si se acumulan errores, lanza `ValueError` con todos los mensajes concatenados.
+
+    Acciones ejecutadas:
+    1. Crea `Persona` con los datos básicos.
+    2. Crea `Alumno` asociado (`estado="regular"`).
+    3. Crea `AlumnoPaquete` (`estado='activo'`, `fecha_inicio` calculada o enviada).
+    4. Para cada turno:
+    - Crea (si no existe) `AlumnoPaqueteTurno`.
+    - Crea un registro en `AlumnoClase` (`estado="pendiente"`).
+
+    Retorna:
+    - dict → {"message": "Alumno registrado exitosamente"}
+
+    Excepciones:
+    - ValueError → cuando hay errores de validación (devueltos por la vista con status 400).
+    """
+
     errores = []
     turnos_asignados = []
     clases_a_reservar = []  # Nuevo: para preparar las clases validadas
@@ -696,6 +1024,43 @@ def registrar_alumno_datos(data):
 
 @csrf_exempt
 def listar_precios_paquetes(request):
+    """
+    GET /listar_precios_paquetes/
+    -----------------------------
+    Devuelve la lista de paquetes de clases disponibles y sus costos.  
+    Permite filtrar opcionalmente por cantidad de clases.
+
+    Métodos admitidos:
+    - GET → obtiene la lista de paquetes.
+    - Otros métodos → 405 {"error": "Método no permitido"}
+
+    Parámetros (query string):
+    - cantidad (int) [opcional] → si se especifica, filtra por la cantidad exacta de clases.
+
+    Comportamiento:
+    - Si se envía `cantidad`, busca un solo paquete con esa cantidad de clases.
+    • Si existe, devuelve su cantidad y costo.
+    • Si no existe, devuelve {"message": "No existe paquete de <cantidad> clases."}
+    - Si no se envía `cantidad`, lista todos los paquetes existentes ordenados por cantidad de clases.
+    - Los costos se devuelven formateados con separadores de miles usando puntos ("1.200.000").
+
+    Validaciones y posibles errores:
+    - Error interno → 500 {"error": "<mensaje de excepción>"}
+
+    Salida exitosa (200 OK):
+    {
+    "paquetes": [
+        {"cantidad_clases": 4, "costo": "180.000"},
+        {"cantidad_clases": 8, "costo": "340.000"},
+        {"cantidad_clases": 12, "costo": "480.000"}
+    ]
+    }
+
+    Ejemplo con filtro:
+    GET /listar_precios_paquetes/?cantidad=8  
+    → {"paquetes": [{"cantidad_clases": 8, "costo": "340.000"}]}
+    """
+
     if request.method == "GET":
         try:
             cantidad = request.GET.get("cantidad")  # <-- Capturamos parámetro opcional
@@ -731,6 +1096,44 @@ def listar_precios_paquetes(request):
 
 @csrf_exempt
 def obtener_alumnos_turno(request):
+    """
+    POST /obtener_alumnos_turno/
+    ----------------------------
+    Devuelve los alumnos (regulares y ocasionales) del **próximo encuentro**
+    correspondiente al turno indicado (día + horario).
+
+    Concepto:
+    - "Turno" → horario fijo que se repite semanalmente (ej. Martes 18:00).
+    - "Clase" → instancia específica de ese turno en una fecha concreta.
+
+    Entradas (JSON):
+    - dia (str)       [obligatorio] Ejemplo: "Martes"
+    - horario (str)   [obligatorio] Ejemplo: "18:00"
+
+    Lógica:
+    1. Busca el turno definido por día y horario (`Turno`).
+    2. Calcula la próxima fecha que corresponda a ese turno (puede ser hoy o el próximo martes).
+    3. Busca la clase concreta (`Clase`) de ese turno en esa fecha.
+    4. Devuelve la lista de alumnos asociados (regulares y ocasionales).
+
+    Errores comunes:
+    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente → {"message": "No existe turno para <día> a las <hora>."}
+    - Clase no encontrada → {"message": "No hay clase hoy para el turno <día> <hora>."}
+
+    Respuesta:
+    {
+    "dia": "Martes",
+    "horario": "18:00",
+    "fecha": "2025-11-11",
+    "alumnos": [
+        {"nombre": "Laura", "apellido": "Gómez", "telefono": "0981...", "tipo": "regular"},
+        {"nombre": "Sofía", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
+    ]
+    }
+    """
+
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -811,6 +1214,44 @@ def obtener_alumnos_turno(request):
 
 @csrf_exempt
 def obtener_alumnos_clase(request):
+    """
+    POST /obtener_alumnos_clase/
+    ----------------------------
+    Devuelve los alumnos (regulares y ocasionales) de una **clase específica**,
+    identificada por su turno (día y horario) y una fecha concreta.
+
+    Concepto:
+    - "Clase" → la ocurrencia en una fecha particular de un turno semanal.
+
+    Entradas (JSON):
+    - dia (str)       [obligatorio] Ejemplo: "Martes"
+    - horario (str)   [obligatorio] Ejemplo: "18:00"
+    - fecha (str, YYYY-MM-DD) [opcional] → Si no se envía, se usa la próxima fecha para ese turno.
+
+    Lógica:
+    1. Busca el `Turno` correspondiente.
+    2. Determina la fecha:
+    • Usa la recibida, o si falta, calcula la próxima que caiga en ese día.
+    3. Busca la `Clase` asociada a ese turno y fecha.
+    4. Devuelve todos los alumnos inscriptos en esa clase.
+
+    Errores comunes:
+    - Parámetros faltantes → 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente → {"message": "No existe turno <día> <hora>."}
+    - Clase inexistente → {"message": "No hay clase programada para <día> <hora> el <fecha>."}
+
+    Respuesta:
+    {
+    "dia": "Martes",
+    "horario": "18:00",
+    "fecha": "2025-11-11",
+    "alumnos": [
+        {"nombre": "Laura", "apellido": "Gómez", "telefono": "0981...", "tipo": "regular"},
+        {"nombre": "Sofía", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
+    ]
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -894,6 +1335,38 @@ def obtener_alumnos_clase(request):
 
 @csrf_exempt
 def obtener_alumnos_dia(request):
+    """
+    POST /obtener_alumnos_dia/
+    --------------------------
+    Devuelve todos los alumnos (regulares y ocasionales) de **todas las clases**
+    que ocurren en un día determinado (por ejemplo, todos los martes próximos).
+
+    Concepto:
+    - Devuelve múltiples clases, una por turno, en la fecha que coincide con el día indicado.
+
+    Entradas (JSON):
+    - dia (str) [obligatorio] Ejemplo: "Martes"
+
+    Lógica:
+    1. Calcula la fecha del próximo día solicitado (ej. próximo martes).
+    2. Busca todas las clases (`Clase`) programadas para esa fecha y ese día.
+    3. Devuelve los alumnos de todas ellas, indicando a qué turno pertenece cada uno.
+
+    Errores comunes:
+    - Falta 'dia' → 400 {"error": "Debes enviar 'dia'"}
+    - Sin clases programadas → {"message": "No hay clases programadas para hoy <día>."}
+
+    Respuesta:
+    {
+    "dia": "Martes",
+    "fecha": "2025-11-11",
+    "alumnos": [
+        {"nombre": "Lucía", "apellido": "Aguirre", "telefono": "0982...", "turno": "17:00", "tipo": "regular"},
+        {"nombre": "Nadia", "apellido": "Torres", "telefono": "0974...", "turno": "18:00", "tipo": "ocasional"}
+    ]
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -978,6 +1451,36 @@ def obtener_alumnos_dia(request):
 
 @csrf_exempt
 def verificar_turno(request):
+    """
+    POST /verificar_turno/
+    ----------------------
+    Verifica si existe un turno (día + horario) y cuántos lugares disponibles tiene actualmente.
+
+    Concepto:
+    - "Turno" = un horario recurrente semanal (ej. Lunes 07:00).
+    - No se valida la clase de una fecha específica, sino la configuración general del turno.
+
+    Entradas (JSON):
+    - dia (str)       [obligatorio] Ejemplo: "Lunes"
+    - horario (str)   [obligatorio] Ejemplo: "07:00"
+
+    Lógica:
+    1. Busca el turno configurado con ese día y horario (`Turno`).
+    2. Si no existe, devuelve un mensaje indicando que no hay clases en ese horario.
+    3. Si existe, calcula los lugares disponibles (4 - lugares_ocupados).
+    4. Devuelve un mensaje indicando si hay cupos libres o no.
+
+    Errores:
+    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente → {"message": "No hay un turno registrado para ese día y horario. No tenemos clases en ese horario."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {"message": "Hay 2 lugares disponibles."}
+    o
+    {"message": "No hay lugares disponibles."}
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1008,6 +1511,49 @@ def verificar_turno(request):
 
 @csrf_exempt
 def verificar_turno_a_partir_de(request):
+    """
+    POST /verificar_turno_a_partir_de/
+    ----------------------------------
+    Busca todos los turnos disponibles en uno o varios días, a partir de una hora mínima especificada.
+
+    Concepto:
+    - Permite consultar horarios iguales o posteriores a una hora de referencia.
+    - Si no se especifica 'dia', busca en todos los días de la semana hábiles.
+
+    Entradas (JSON):
+    - hora_minima (str) [obligatorio] Ejemplo: "15:00"
+    - dia (str)         [opcional] Ejemplo: "Martes"
+
+    Lógica:
+    1. Si se envía 'dia', busca solo en ese día; si no, recorre todos los días Lunes–Sábado.
+    2. Para cada día, llama a `buscar_turnos_disponibles(dia_actual, operador_hora="gte", hora_referencia=hora_minima)`.
+    3. Devuelve los turnos que tienen lugares disponibles.
+
+    Errores:
+    - Falta de parámetros → 400 {"error": "Debes enviar 'hora_minima'"}
+    - Sin resultados → {"message": "No hay turnos disponibles después de <hora_minima>."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {
+    "resultados": [
+        {
+        "dia": "Martes",
+        "hora_minima": "15:00",
+        "turnos_disponibles": [
+            {"horario": "15:00", "lugares_disponibles": 2},
+            {"horario": "16:00", "lugares_disponibles": 1}
+        ]
+        },
+        {
+        "dia": "Miércoles",
+        "hora_minima": "15:00",
+        "turnos_disponibles": [...]
+        }
+    ]
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1047,6 +1593,39 @@ def verificar_turno_a_partir_de(request):
 
 @csrf_exempt
 def verificar_turno_antes_de(request):
+    """
+    POST /verificar_turno_antes_de/
+    -------------------------------
+    Busca los turnos disponibles antes de una hora máxima dentro de un día determinado.
+
+    Concepto:
+    - Permite conocer los horarios disponibles previos a una hora límite.
+
+    Entradas (JSON):
+    - dia (str)         [obligatorio] Ejemplo: "Miércoles"
+    - hora_maxima (str) [obligatorio] Ejemplo: "10:00"
+
+    Lógica:
+    1. Busca todos los turnos del día indicado cuya hora sea anterior a la hora máxima.
+    2. Usa `buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia=hora_maxima)`.
+    3. Devuelve los turnos con cupos disponibles.
+
+    Errores:
+    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'hora_maxima'"}
+    - Sin resultados → {"message": "No hay turnos disponibles para <día> antes de <hora_maxima>."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {
+    "dia": "Miércoles",
+    "hora_maxima": "10:00",
+    "turnos_disponibles": [
+        {"horario": "08:00", "lugares_disponibles": 1},
+        {"horario": "09:00", "lugares_disponibles": 3}
+    ]
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1076,6 +1655,40 @@ def verificar_turno_antes_de(request):
 
 @csrf_exempt
 def verificar_turno_manana(request):
+    """
+    POST /verificar_turno_manana/
+    -----------------------------
+    Devuelve los turnos con lugares disponibles durante la **mañana** (antes de las 12:00)
+    para un día específico.
+
+    Concepto:
+    - "Turno" = horario fijo recurrente (ej. Lunes 08:00).
+    - Este endpoint filtra todos los turnos de ese día cuya hora sea menor a las 12:00.
+
+    Entradas (JSON):
+    - dia (str) [obligatorio] Ejemplo: "Martes"
+
+    Lógica:
+    1. Valida que se reciba el campo 'dia'.
+    2. Llama a `buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia="12:00")`.
+    3. Si hay turnos con cupos libres, los devuelve con su horario y cantidad de lugares.
+    4. Si no hay, devuelve un mensaje indicando que no hay turnos disponibles esa mañana.
+
+    Errores:
+    - Falta de parámetros → 400 {"error": "Debes enviar 'dia'"}
+    - Sin resultados → {"message": "No hay turnos disponibles para la mañana del <día>."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {
+    "dia": "Martes",
+    "turnos_disponibles_mañana": [
+        {"horario": "07:00", "lugares_disponibles": 2},
+        {"horario": "08:00", "lugares_disponibles": 1}
+    ]
+    }
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1102,16 +1715,34 @@ def verificar_turno_manana(request):
 
 def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
     """
-    Busca turnos disponibles de acuerdo al día y un criterio de horario opcional.
-    
-    Args:
-        dia (str): Día de la semana ("Martes").
-        operador_hora (str, optional): Uno de 'gte' (mayor o igual), 'lt' (menor), 'exact' (igual). Default None.
-        hora_referencia (str, optional): Hora en formato "HH:MM" para comparar. Default None.
-    
-    Returns:
-        list: Lista de turnos disponibles [{'horario': 'HH:MM', 'lugares_disponibles': int}]
+    Busca los turnos con lugares disponibles según el día y un criterio horario opcional.
+
+    Esta función se utiliza por varios endpoints (`verificar_turno_a_partir_de`,
+    `verificar_turno_antes_de`, `verificar_turno_manana`) para obtener turnos libres
+    con distintos filtros de hora.
+
+    Parámetros:
+    - dia (str): Día de la semana. Ejemplo: "Martes".
+    - operador_hora (str, opcional): Tipo de comparación sobre la hora del turno.
+    • 'gte' → mayor o igual que la hora de referencia.
+    • 'lt'  → menor que la hora de referencia.
+    • 'exact' → igual a la hora de referencia.
+    - hora_referencia (str, opcional): Hora de referencia en formato "HH:MM".
+
+    Lógica:
+    1. Construye el filtro dinámico (por ejemplo: `horario__lt="12:00"`).
+    2. Filtra los turnos (`Turno.objects.filter(...)`) del día indicado.
+    3. Calcula los lugares disponibles (4 - lugares_ocupados).
+    4. Retorna solo los turnos con cupos > 0.
+
+    Retorna:
+    list[dict] → Ejemplo:
+    [
+    {"horario": "07:00", "lugares_disponibles": 2},
+    {"horario": "08:00", "lugares_disponibles": 1}
+    ]
     """
+
     filtros = {"dia": dia}
 
     if operador_hora and hora_referencia:
@@ -1134,6 +1765,42 @@ def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
 
 @csrf_exempt
 def verificar_clase_hoy(request):
+    """
+    POST /verificar_clase_hoy/
+    --------------------------
+    Verifica si existe una clase programada **para hoy** en un horario determinado
+    y devuelve cuántos lugares quedan disponibles.
+
+    Concepto:
+    - "Turno" = horario recurrente semanal (ej. Lunes 19:00).
+    - "Clase" = la instancia concreta de ese turno para la fecha actual (hoy).
+
+    Entradas (JSON):
+    - horario (str) [obligatorio] Ejemplo: "19:00"
+
+    Lógica:
+    1. Obtiene la fecha actual (`now().date()`).
+    2. Determina el nombre del día actual en español (Lunes–Sábado).
+    3. Si hoy es domingo → no hay clases.
+    4. Busca el turno correspondiente al día actual y al horario.
+    5. Busca la clase asociada a ese turno y la fecha actual.
+    6. Cuenta los alumnos regulares (`AlumnoClase`) y ocasionales (`AlumnoClaseOcasional`) de esa clase.
+    7. Calcula los lugares disponibles (4 - lugares_ocupados).
+    8. Devuelve un mensaje indicando la disponibilidad.
+
+    Errores:
+    - Falta 'horario' → 400 {"error": "Debes enviar 'horario'."}
+    - Domingo → {"message": "Hoy es domingo y no hay clases."}
+    - Turno inexistente → {"message": "No hay turno registrado para hoy a ese horario."}
+    - Clase inexistente → {"message": "No hay clase programada hoy a ese horario."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {"message": "Hay 2 lugares disponibles para hoy a las 19:00."}
+    o
+    {"message": "No hay lugares disponibles para hoy a las 19:00."}
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1197,6 +1864,40 @@ def verificar_clase_hoy(request):
 @csrf_exempt
 @transaction.atomic
 def actualizar_ruc(request):
+    """
+    POST /actualizar_ruc/
+    ---------------------
+    Actualiza el número de RUC asociado a una persona ya registrada, identificada principalmente por su teléfono.
+
+    Concepto:
+    - Cada persona se identifica primero por su número de teléfono.
+    - Si hay más de una persona con el mismo teléfono, se usa nombre y apellido para desambiguar.
+    - El RUC se guarda directamente en la tabla `Persona`.
+
+    Entradas (JSON):
+    - telefono (str) [obligatorio]
+    - ruc (str) [obligatorio]
+    - nombre (str) [opcional, requerido si hay duplicados de teléfono]
+    - apellido (str) [opcional, requerido si hay duplicados de teléfono]
+
+    Lógica:
+    1. Valida que existan los campos `telefono` y `ruc`.
+    2. Busca todas las personas con ese número de teléfono.
+    3. Si hay más de una coincidencia:
+    - Filtra por nombre y apellido exactos (sin mayúsculas/minúsculas ni espacios extra).
+    4. Si no encuentra coincidencias o encuentra varias ambiguas, devuelve error.
+    5. Si hay una coincidencia válida, actualiza el campo `ruc` de esa persona.
+
+    Errores:
+    - Falta de parámetros → 400 {"error": "El teléfono es obligatorio. El nuevo RUC es obligatorio."}
+    - Persona no encontrada → 404 {"error": "No se encontró ninguna persona con ese teléfono."}
+    - Ambigüedad por duplicados → 400 {"error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente..."}
+    - Error interno → 500 {"error": "<mensaje>"}
+
+    Salida:
+    {"message": "RUC actualizado correctamente para Marta Gómez."}
+    """
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
@@ -1257,6 +1958,37 @@ def actualizar_ruc(request):
 
 
 def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
+    """
+    Genera una lista de fechas semanales correspondientes a un turno recurrente.
+
+    Concepto:
+    - "Turno" = horario fijo en un día de la semana (ej. Lunes 19:00).
+    - Esta función calcula las próximas `n` fechas donde ese turno ocurre,
+    comenzando desde una fecha inicial.
+
+    Parámetros:
+    - id_turno (int): ID del turno en la base de datos.
+    - fecha_inicio (str): Fecha base en formato "YYYY-MM-DD". Si no coincide con el día del turno,
+    se ajusta automáticamente al siguiente día correspondiente.
+    - n (int): Cantidad de fechas a generar (por ejemplo, 4 clases → 4 fechas).
+
+    Lógica:
+    1. Busca el turno correspondiente por `id_turno`.
+    2. Determina el índice del día de la semana (Lunes=0, Viernes=4).
+    3. Ajusta `fecha_inicio` al próximo día que coincida con el día del turno.
+    4. Genera `n` fechas separadas por intervalos de 7 días.
+    5. Devuelve las fechas en formato "YYYY-MM-DD".
+
+    Errores:
+    - Turno inexistente → {"error": "Turno no encontrado"}
+    - Día del turno inválido → {"error": "Día del turno inválido"}
+
+    Salida:
+    {
+    "fechas": ["2025-11-10", "2025-11-17", "2025-11-24", "2025-12-01"]
+    }
+    """
+
     try:
         turno = Turno.objects.get(id_turno=id_turno)
     except Turno.DoesNotExist:
