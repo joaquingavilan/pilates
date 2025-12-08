@@ -30,4 +30,6 @@ urlpatterns = [
 
     path("api/calendario/", views_panel.api_calendario, name="api_calendario"),
 
+    path('api/turno/<int:id_turno>/alumnos/', views_panel.api_turno_alumnos, name='api_turno_alumnos'),
+
 ]

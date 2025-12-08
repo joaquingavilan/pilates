@@ -13,7 +13,7 @@
 <div class="row g-4">
     <!-- Info principal -->
     <div class="col-md-4">
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <i class="bi bi-person me-2"></i>Información Personal
             </div>
@@ -66,9 +66,33 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Turnos asignados -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock me-2"></i>Turnos Asignados
+            </div>
+            <div class="card-body">
+                {% if turnos %}
+                <ul class="list-group list-group-flush">
+                    {% for asignacion in turnos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>
+                            <i class="bi bi-calendar-event text-primary me-2"></i>
+                            {{ asignacion.id_turno.dia }}
+                        </span>
+                        <span class="badge bg-primary">{{ asignacion.id_turno.horario|time:"H:i" }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center mb-0">No tiene turnos asignados</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
-    <!-- Paquetes -->
+    <!-- Paquetes e Historial -->
     <div class="col-md-8">
         <div class="card mb-4">
             <div class="card-header">

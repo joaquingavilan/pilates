@@ -9,8 +9,9 @@
 
 <!-- Leyenda -->
 <div class="mb-3">
-    <span class="badge bg-success me-2">Libre (1-3 lugares)</span>
-    <span class="badge bg-danger me-2">Ocupado (4 lugares)</span>
+    <span class="badge bg-danger me-2">Vacío (0)</span>
+    <span class="badge bg-warning text-dark me-2">Parcial (1-3)</span>
+    <span class="badge bg-success me-2">Completo (4)</span>
 </div>
 
 <div class="row g-4">
@@ -23,11 +24,18 @@
             <div class="card-body p-2">
                 {% if turnos %}
                     {% for turno in turnos %}
-                    <div class="d-flex justify-content-between align-items-center p-2 mb-1 rounded {% if turno.estado_precalc == 'Ocupado' %}bg-danger bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                    <div class="d-flex justify-content-between align-items-center p-2 mb-1 rounded bg-{{ turno.estado_color }} bg-opacity-10 turno-clickeable"
+                         style="cursor: pointer;"
+                         data-bs-toggle="modal"
+                         data-bs-target="#modalTurno"
+                         data-turno-id="{{ turno.id_turno }}"
+                         data-turno-dia="{{ turno.dia }}"
+                         data-turno-hora="{{ turno.horario|time:'H:i' }}"
+                         data-turno-ocupados="{{ turno.ocupados }}">
                         <span>{{ turno.horario|time:"H:i" }}</span>
-                    <span class="badge {% if turno.estado_precalc == 'Ocupado' %}bg-danger{% else %}bg-success{% endif %}">
-                        {{ turno.ocupados }}/4
-                    </span>
+                        <span class="badge bg-{{ turno.estado_color }}">
+                            {{ turno.ocupados }}/4
+                        </span>
                     </div>
                     {% endfor %}
                 {% else %}
@@ -38,4 +46,89 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Modal para ver alumnos del turno -->
+<div class="modal fade" id="modalTurno" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock me-2"></i>
+                    <span id="modalTitulo">Detalle de Turno</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalTurno');
+
+    modal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const turnoId = button.dataset.turnoId;
+        const turnoDia = button.dataset.turnoDia;
+        const turnoHora = button.dataset.turnoHora;
+        const ocupados = button.dataset.turnoOcupados;
+
+        document.getElementById('modalTitulo').textContent = `${turnoDia} ${turnoHora}`;
+        document.getElementById('modalBody').innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        `;
+
+        fetch(`/panel/api/turno/${turnoId}/alumnos/`)
+            .then(response => response.json())
+            .then(data => {
+                let html = `
+                    <p><strong>Ocupación:</strong> ${ocupados}/4 alumnos</p>
+                    <hr>
+                `;
+
+                if (data.alumnos && data.alumnos.length > 0) {
+                    html += '<h6>Alumnos asignados a este turno:</h6>';
+                    html += '<ul class="list-group">';
+                    data.alumnos.forEach(alumno => {
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${alumno.nombre} ${alumno.apellido}</strong>
+                                    ${alumno.telefono ? `<br><small class="text-muted">${alumno.telefono}</small>` : ''}
+                                </div>
+                                <span class="badge bg-${alumno.estado_paquete === 'activo' ? 'success' : 'secondary'}">
+                                    ${alumno.estado_paquete}
+                                </span>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                } else {
+                    html += '<p class="text-muted text-center">No hay alumnos asignados a este turno</p>';
+                }
+
+                document.getElementById('modalBody').innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="alert alert-danger">Error al cargar los datos</div>
+                `;
+            });
+    });
+});
+</script>
 {% endblock %}

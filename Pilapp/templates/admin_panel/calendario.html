@@ -97,7 +97,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // === 2) HEADER ===
     cont.innerHTML += `<div class="calendario-cell calendario-header">Hora</div>`;
     dias.forEach(d => {
-        const dObj = new Date(d);
+        // Parsear manualmente para evitar problemas de timezone
+        const [year, month, day] = d.split('-').map(Number);
+        const dObj = new Date(year, month - 1, day);  // month es 0-indexed
         cont.innerHTML += `
             <div class="calendario-cell calendario-header">
                 ${dObj.toLocaleDateString("es-ES", { weekday: "long" })}

@@ -53,8 +53,8 @@
                         <th>Nombre</th>
                         <th>Teléfono</th>
                         <th>Estado</th>
-                        <th>Paquete Activo</th>
-                        <th>Última Clase</th>
+                        <th>Paquete</th>
+                        <th>Turnos</th>
                         <th>Canal</th>
                         <th></th>
                     </tr>
@@ -87,10 +87,14 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if alumno.ultima_clase %}
-                            {{ alumno.ultima_clase|date:"d/m/Y" }}
+                            {% if alumno.turnos %}
+                                {% for turno in alumno.turnos %}
+                                <div class="small">
+                                    <i class="bi bi-clock text-muted me-1"></i>{{ turno.dia }} {{ turno.horario }}
+                                </div>
+                                {% endfor %}
                             {% else %}
-                            <span class="text-muted">Nunca</span>
+                            <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>

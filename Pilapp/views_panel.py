@@ -179,6 +179,8 @@ def api_calendario(request):
 
 def panel_alumnos(request):
     """Lista de alumnos con filtros."""
+    from .models import AlumnoPaqueteTurno
+    
     alumnos = Alumno.objects.select_related('id_persona').all()
     
     filtros = {
@@ -207,11 +209,28 @@ def panel_alumnos(request):
     elif filtros['orden'] == 'ultima_clase':
         alumnos = alumnos.order_by('-ultima_clase')
     
-    # Agregar paquete activo a cada alumno
+    # Obtener turnos por alumno (solo paquetes activos)
+    turnos_por_alumno = {}
+    asignaciones = AlumnoPaqueteTurno.objects.filter(
+        id_alumno_paquete__estado='activo'
+    ).select_related('id_turno', 'id_alumno_paquete__id_alumno')
+    
+    for asig in asignaciones:
+        alumno_id = asig.id_alumno_paquete.id_alumno.id_alumno
+        turno = asig.id_turno
+        if alumno_id not in turnos_por_alumno:
+            turnos_por_alumno[alumno_id] = []
+        turnos_por_alumno[alumno_id].append({
+            'dia': turno.dia,
+            'horario': turno.horario.strftime('%H:%M')
+        })
+    
+    # Agregar paquete activo y turnos a cada alumno
     for alumno in alumnos:
         alumno.paquete_activo = AlumnoPaquete.objects.filter(
             id_alumno=alumno, estado='activo'
         ).select_related('id_paquete').first()
+        alumno.turnos = turnos_por_alumno.get(alumno.id_alumno, [])
     
     return render(request, 'admin_panel/alumnos/lista.html', {
         'alumnos': alumnos,
@@ -221,6 +240,8 @@ def panel_alumnos(request):
 
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""
+    from .models import AlumnoPaqueteTurno
+    
     alumno = get_object_or_404(Alumno.objects.select_related('id_persona'), id_alumno=id_alumno)
     
     # Paquetes del alumno
@@ -232,6 +253,12 @@ def panel_alumno_detalle(request, id_alumno):
         ).count()
         total = paquete.id_paquete.cantidad_clases
         paquete.porcentaje_uso = (paquete.clases_usadas / total * 100) if total > 0 else 0
+    
+    # Turnos asignados (solo paquetes activos)
+    turnos = AlumnoPaqueteTurno.objects.filter(
+        id_alumno_paquete__id_alumno=alumno,
+        id_alumno_paquete__estado='activo'
+    ).select_related('id_turno')
     
     # Historial de clases (regulares + ocasionales)
     historial_clases = []
@@ -273,6 +300,7 @@ def panel_alumno_detalle(request, id_alumno):
     return render(request, 'admin_panel/alumnos/detalle.html', {
         'alumno': alumno,
         'paquetes': paquetes,
+        'turnos': turnos,
         'historial_clases': historial_clases,
         'pagos': pagos,
     })
@@ -337,33 +365,42 @@ def panel_clase_detalle(request, id_clase):
 
 
 def panel_turnos(request):
-    """Vista de todos los turnos optimizada."""
-
-    turnos = (
-        Turno.objects
-        .annotate(
-            ocupados_reg=Count("clase__alumnoclase"),
-            ocupados_ocas=Count("clase__alumnoclaseocasional"),
-        )
-        .order_by("dia", "horario")
-    )
-
-    # Agregar total y estado sin tocar la base
-    for t in turnos:
-        t.ocupados = t.ocupados_reg + t.ocupados_ocas
-        t.estado_precalc = "Ocupado" if t.ocupados >= 4 else "Libre"
-
-    # Agrupación por día
+    """Vista de todos los turnos."""
+    from .models import AlumnoPaqueteTurno
+    
+    turnos = Turno.objects.all().order_by('dia', 'horario')
+    
+    # Contar alumnos por turno (solo paquetes activos)
+    conteo = {}
+    asignaciones = AlumnoPaqueteTurno.objects.filter(
+        id_alumno_paquete__estado='activo'
+    ).values('id_turno').annotate(total=Count('id_turno'))
+    
+    for a in asignaciones:
+        conteo[a['id_turno']] = a['total']
+    
+    # Agregar conteo a cada turno
+    for turno in turnos:
+        turno.ocupados = conteo.get(turno.id_turno, 0)
+        # Colores: 0=rojo, 1-3=amarillo, 4=verde
+        if turno.ocupados == 0:
+            turno.estado_color = 'danger'  # rojo
+        elif turno.ocupados >= 4:
+            turno.estado_color = 'success'  # verde
+        else:
+            turno.estado_color = 'warning'  # amarillo
+    
+    # Agrupar por día
     turnos_por_dia = {}
-    orden_dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
-
+    orden_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    
     for turno in turnos:
         turnos_por_dia.setdefault(turno.dia, []).append(turno)
-
+    
     turnos_ordenados = [(dia, turnos_por_dia.get(dia, [])) for dia in orden_dias]
-
-    return render(request, "admin_panel/turnos.html", {
-        "turnos_por_dia": turnos_ordenados,
+    
+    return render(request, 'admin_panel/turnos.html', {
+        'turnos_por_dia': turnos_ordenados,
     })
 
 
@@ -424,6 +461,35 @@ def api_clase_alumnos(request, id_clase):
             'apellido': persona.apellido,
             'tipo': 'ocasional',
             'estado': ao.estado,
+        })
+    
+    return JsonResponse({'alumnos': alumnos})
+
+
+def api_turno_alumnos(request, id_turno):
+    """API para obtener alumnos asignados a un turno (regulares con paquete activo)."""
+    turno = get_object_or_404(Turno, id_turno=id_turno)
+    
+    alumnos = []
+    
+    # Obtener alumnos que tienen este turno asignado en su paquete
+    from .models import AlumnoPaqueteTurno
+    
+    asignaciones = AlumnoPaqueteTurno.objects.filter(
+        id_turno=turno
+    ).select_related(
+        'id_alumno_paquete__id_alumno__id_persona',
+        'id_alumno_paquete'
+    )
+    
+    for asig in asignaciones:
+        alumno_paquete = asig.id_alumno_paquete
+        persona = alumno_paquete.id_alumno.id_persona
+        alumnos.append({
+            'nombre': persona.nombre,
+            'apellido': persona.apellido,
+            'telefono': persona.telefono,
+            'estado_paquete': alumno_paquete.estado,
         })
     
     return JsonResponse({'alumnos': alumnos})

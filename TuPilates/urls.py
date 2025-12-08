@@ -2,8 +2,10 @@ from django.contrib import admin
 from django.urls import path
 from Pilapp.views import *
 from django.urls import include
+from django.shortcuts import redirect
 
 urlpatterns = [
+    path('', lambda request: redirect('panel_dashboard')),  # Redirige / a /panel/
     path('admin/', admin.site.urls),
     path('registrar_alumno/', registrar_alumno, name='registrar_alumno'),
     path('actualizar_ruc/', actualizar_ruc, name='actualizar_ruc'),
