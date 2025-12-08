@@ -1,0 +1,101 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Prospectos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-person-plus me-2"></i>Prospectos</h2>
+    <span class="badge bg-primary fs-6">{{ prospectos|length }} prospectos</span>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="interesado" {% if estado_filtro == 'interesado' %}selected{% endif %}>Interesado</option>
+                    <option value="contactado" {% if estado_filtro == 'contactado' %}selected{% endif %}>Contactado</option>
+                    <option value="no_interesado" {% if estado_filtro == 'no_interesado' %}selected{% endif %}>No Interesado</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de prospectos -->
+<div class="card">
+    <div class="card-body">
+        {% if prospectos %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Fecha Contacto</th>
+                        <th>Canal</th>
+                        <th>Estado</th>
+                        <th>Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prospecto in prospectos %}
+                    <tr>
+                        <td>
+                            {% if prospecto.nombre or prospecto.apellido %}
+                            <strong>{{ prospecto.nombre }} {{ prospecto.apellido }}</strong>
+                            {% else %}
+                            <span class="text-muted">Sin nombre</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="https://wa.me/{{ prospecto.telefono }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-whatsapp text-success me-1"></i>{{ prospecto.telefono }}
+                            </a>
+                        </td>
+                        <td>{{ prospecto.fecha_contacto|date:"d/m/Y" }}</td>
+                        <td>{{ prospecto.canal_captacion|default:"-" }}</td>
+                        <td>
+                            <span class="badge {% if prospecto.estado == 'interesado' %}bg-success{% elif prospecto.estado == 'contactado' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ prospecto.estado|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if prospecto.notas %}
+                            <span data-bs-toggle="tooltip" title="{{ prospecto.notas }}">
+                                <i class="bi bi-chat-dots"></i>
+                            </span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+            No hay prospectos registrados
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+})
+</script>
+{% endblock %}

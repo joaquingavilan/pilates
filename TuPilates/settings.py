@@ -1,22 +1,43 @@
 import os
 from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+# Detectar entorno
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "local")  # "local" o "production"
+IS_LOCAL = ENVIRONMENT == "local"
+
+
 # Seguridad
 SECRET_KEY = os.environ.get("SECRET_KEY", "clave-insegura-para-local")
-DEBUG = os.environ.get("DEBUG", "True") == "True"
-ALLOWED_HOSTS = ["*"]
+DEBUG = IS_LOCAL or os.environ.get("DEBUG", "False") == "True"
+
+ALLOWED_HOSTS = ["*"] if IS_LOCAL else [
+    "tupilates.up.railway.app",
+    "localhost",
+    "127.0.0.1",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://tupilates.up.railway.app",
 ]
+if IS_LOCAL:
+    CSRF_TRUSTED_ORIGINS += ["http://localhost:8000", "http://127.0.0.1:8000"]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+
+# Solo activar cookies seguras en producción
+SESSION_COOKIE_SECURE = not IS_LOCAL
+CSRF_COOKIE_SECURE = not IS_LOCAL
 
 # Aplicaciones instaladas - AGREGAR corsheaders
 INSTALLED_APPS = [
@@ -50,7 +71,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Alternativamente, para desarrollo puedes usar (MENOS SEGURO):
-# CORS_ALLOW_ALL_ORIGINS = True
+if IS_LOCAL:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Configurar headers CORS específicos
 CORS_ALLOW_CREDENTIALS = True
@@ -73,7 +95,7 @@ ROOT_URLCONF = 'TuPilates.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],  # Para templates globales si los necesitás
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -89,14 +111,30 @@ TEMPLATES = [
 # WSGI
 WSGI_APPLICATION = 'TuPilates.wsgi.application'
 
-# Base de Datos
-DATABASES = {
-    'default': dj_database_url.config(
-        default='postgres://postgres:cabra123@localhost:5432/pilates_db',
-        conn_max_age=600,
-        ssl_require=False
-    )
-}
+# Base de Datos - Railway en ambos casos, pero con SSL solo en producción
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not IS_LOCAL  # SSL solo en producción
+        )
+    }
+else:
+    # Fallback para desarrollo sin variable de entorno
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'railway',
+            'USER': 'postgres',
+            'PASSWORD': os.environ.get("DB_PASSWORD", ""),
+            'HOST': os.environ.get("DB_HOST", ""),
+            'PORT': os.environ.get("DB_PORT", "5432"),
+            'OPTIONS': {} if IS_LOCAL else {'sslmode': 'require'},
+        }
+    }
 
 # Validaciones de contraseñas
 AUTH_PASSWORD_VALIDATORS = [
@@ -106,15 +144,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internacionalización
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'es-py'  # Cambiado a español Paraguay
+TIME_ZONE = 'America/Asuncion'  # Tu timezone
 USE_I18N = True
 USE_TZ = True
 
 # Archivos estáticos
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Logging
@@ -129,9 +167,10 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': 'DEBUG' if IS_LOCAL else 'INFO',
     },
 }
+
 
 # Auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

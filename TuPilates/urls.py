@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from Pilapp.views import *
+from django.urls import include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -19,5 +20,6 @@ urlpatterns = [
     path('obtener_id_alumno/', obtener_id_alumno, name='obtener_id_alumno'), #ready
     path('registrar_asistencias/', registrar_asistencias, name='registrar_asistencias'),
     path('obtener_clases_agendadas/', obtener_clases_agendadas, name='obtener_clases_agendadas'), #donezo
-    path('reprogramar_clase/', reprogramar_clase, name='reprogramar_clase')
+    path('reprogramar_clase/', reprogramar_clase, name='reprogramar_clase'),
+    path('panel/', include('Pilapp.urls_panel')),
 ]

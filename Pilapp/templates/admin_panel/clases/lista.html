@@ -1,0 +1,99 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Clases{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-journal-check me-2"></i>Clases</h2>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Desde</label>
+                <input type="date" name="desde" class="form-control" value="{{ fecha_desde|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Hasta</label>
+                <input type="date" name="hasta" class="form-control" value="{{ fecha_hasta|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de clases -->
+<div class="card">
+    <div class="card-body">
+        {% if clases %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Día</th>
+                        <th>Horario</th>
+                        <th>Inscriptos</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for clase in clases %}
+                    <tr>
+                        <td><strong>{{ clase.fecha|date:"d/m/Y" }}</strong></td>
+
+                        <td>{{ clase.id_turno.dia }}</td>
+
+                        <td>{{ clase.id_turno.horario|time:"H:i" }}</td>
+
+                        <td>
+                            <span class="badge 
+                                {% if clase.total >= 4 %}
+                                    bg-danger
+                                {% elif clase.total >= 2 %}
+                                    bg-warning
+                                {% else %}
+                                    bg-success
+                                {% endif %}
+                            ">
+                                {{ clase.total }}/4
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if clase.total >= 4 %}
+                                <span class="badge bg-danger badge-estado">Lleno</span>
+                            {% elif clase.total == 0 %}
+                                <span class="badge bg-secondary badge-estado">Vacío</span>
+                            {% else %}
+                                <span class="badge bg-success badge-estado">Disponible</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <a href="{% url 'panel_clase_detalle' clase.id_clase %}" 
+                            class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+            No hay clases en el rango seleccionado
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Dashboard</h2>
+    <span class="text-muted">{{ fecha_hoy|date:"l, d F Y" }}</span>
+</div>
+
+<!-- Estadísticas rápidas -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Alumnos Regulares</p>
+                        <p class="stat-number mb-0">{{ stats.alumnos_regulares }}</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Alumnos Ocasionales</p>
+                        <p class="stat-number mb-0">{{ stats.alumnos_ocasionales }}</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-person-check text-info" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Clases Hoy</p>
+                        <p class="stat-number mb-0">{{ stats.clases_hoy }}</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-calendar-event text-warning" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Pagos Pendientes</p>
+                        <p class="stat-number mb-0">{{ stats.pagos_pendientes }}</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Clases de hoy -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-calendar-day me-2"></i>Clases de Hoy</span>
+                <a href="{% url 'panel_calendario' %}" class="btn btn-sm btn-outline-primary">Ver calendario</a>
+            </div>
+            <div class="card-body">
+                {% if clases_hoy %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Horario</th>
+                                <th>Turno</th>
+                                <th>Inscriptos</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for clase in clases_hoy %}
+                            <tr>
+                                <td><strong>{{ clase.id_turno.horario|time:"H:i" }}</strong></td>
+                                <td>{{ clase.id_turno.dia }}</td>
+                                <td>
+                                    <span class="badge {% if clase.total_inscriptos >= 4 %}bg-danger{% elif clase.total_inscriptos >= 2 %}bg-warning{% else %}bg-success{% endif %}">
+                                        {{ clase.total_inscriptos }}/4
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if clase.total_inscriptos >= 4 %}
+                                    <span class="badge bg-danger badge-estado">Lleno</span>
+                                    {% elif clase.total_inscriptos == 0 %}
+                                    <span class="badge bg-secondary badge-estado">Vacío</span>
+                                    {% else %}
+                                    <span class="badge bg-success badge-estado">Disponible</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0 py-4">
+                    <i class="bi bi-calendar-x me-2"></i>No hay clases programadas para hoy
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos alumnos registrados -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-person-plus me-2"></i>Últimos Alumnos</span>
+                <a href="{% url 'panel_alumnos' %}" class="btn btn-sm btn-outline-primary">Ver todos</a>
+            </div>
+            <div class="card-body">
+                {% if ultimos_alumnos %}
+                <ul class="list-group list-group-flush">
+                    {% for alumno in ultimos_alumnos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <strong>{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</strong>
+                            <br>
+                            <small class="text-muted">{{ alumno.id_persona.telefono|default:"Sin teléfono" }}</small>
+                        </div>
+                        <span class="badge {% if alumno.estado == 'regular' %}bg-success{% elif alumno.estado == 'ocasional' %}bg-info{% else %}bg-secondary{% endif %}">
+                            {{ alumno.estado|title }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center mb-0 py-4">No hay alumnos registrados</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen semanal -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up me-2"></i>Resumen de la Semana
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col">
+                        <h4 class="text-primary">{{ stats.clases_semana }}</h4>
+                        <small class="text-muted">Clases programadas</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-success">{{ stats.asistencias_semana }}</h4>
+                        <small class="text-muted">Asistencias</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-danger">{{ stats.inasistencias_semana }}</h4>
+                        <small class="text-muted">Inasistencias</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-info">{{ stats.prospectos_nuevos }}</h4>
+                        <small class="text-muted">Prospectos nuevos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

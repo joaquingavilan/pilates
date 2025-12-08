@@ -1,0 +1,96 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Pagos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-cash-stack me-2"></i>Estado de Pagos</h2>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Estado de Pago</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if estado_pago == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="parcial" {% if estado_pago == 'parcial' %}selected{% endif %}>Parcial</option>
+                    <option value="pagado" {% if estado_pago == 'pagado' %}selected{% endif %}>Pagado</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de paquetes -->
+<div class="card">
+    <div class="card-body">
+        {% if paquetes %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Alumno</th>
+                        <th>Teléfono</th>
+                        <th>Paquete</th>
+                        <th>Fecha Inicio</th>
+                        <th>Estado Paquete</th>
+                        <th>Estado Pago</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for paquete in paquetes %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'panel_alumno_detalle' paquete.id_alumno.id_alumno %}">
+                                <strong>{{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }}</strong>
+                            </a>
+                        </td>
+                        <td>
+                            {% if paquete.id_alumno.id_persona.telefono %}
+                            <a href="https://wa.me/{{ paquete.id_alumno.id_persona.telefono }}" target="_blank">
+                                <i class="bi bi-whatsapp text-success"></i>
+                                {{ paquete.id_alumno.id_persona.telefono }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ paquete.id_paquete.cantidad_clases }} clases</td>
+                        <td>{{ paquete.fecha_inicio|date:"d/m/Y"|default:"-" }}</td>
+                        <td>
+                            <span class="badge {% if paquete.estado == 'activo' %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ paquete.estado|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {% if paquete.estado_pago == 'pagado' %}bg-success{% elif paquete.estado_pago == 'parcial' %}bg-warning{% else %}bg-danger{% endif %}">
+                                {{ paquete.estado_pago|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'panel_alumno_detalle' paquete.id_alumno.id_alumno %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+            No hay paquetes registrados
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

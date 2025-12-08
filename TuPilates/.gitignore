@@ -1,0 +1,40 @@
+# Entorno virtual
+venv/
+env/
+*.pyc
+__pycache__/
+
+# Archivos de entorno
+.env
+*.env
+
+# Archivos de configuración local
+*.sqlite3
+*.db
+
+# Archivos generados
+staticfiles/
+media/
+build/
+dist/
+
+# Archivos de cache
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.mo
+*.coverage
+coverage.xml
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# Entorno de producción Railway
+/.railway/

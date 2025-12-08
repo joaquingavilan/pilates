@@ -1,0 +1,116 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Alumnos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-people me-2"></i>Alumnos</h2>
+    <span class="badge bg-primary fs-6">{{ alumnos|length }} alumnos</span>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Buscar</label>
+                <input type="text" name="q" class="form-control" placeholder="Nombre, apellido o teléfono..." value="{{ filtros.q|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="regular" {% if filtros.estado == 'regular' %}selected{% endif %}>Regular</option>
+                    <option value="ocasional" {% if filtros.estado == 'ocasional' %}selected{% endif %}>Ocasional</option>
+                    <option value="inactivo" {% if filtros.estado == 'inactivo' %}selected{% endif %}>Inactivo</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ordenar por</label>
+                <select name="orden" class="form-select">
+                    <option value="nombre" {% if filtros.orden == 'nombre' %}selected{% endif %}>Nombre</option>
+                    <option value="-id_alumno" {% if filtros.orden == '-id_alumno' %}selected{% endif %}>Más recientes</option>
+                    <option value="ultima_clase" {% if filtros.orden == 'ultima_clase' %}selected{% endif %}>Última clase</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla de alumnos -->
+<div class="card">
+    <div class="card-body">
+        {% if alumnos %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Estado</th>
+                        <th>Paquete Activo</th>
+                        <th>Última Clase</th>
+                        <th>Canal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alumno in alumnos %}
+                    <tr>
+                        <td>
+                            <strong>{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</strong>
+                        </td>
+                        <td>
+                            {% if alumno.id_persona.telefono %}
+                            <a href="https://wa.me/{{ alumno.id_persona.telefono }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-whatsapp text-success me-1"></i>{{ alumno.id_persona.telefono }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {% if alumno.estado == 'regular' %}bg-success{% elif alumno.estado == 'ocasional' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ alumno.estado|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if alumno.paquete_activo %}
+                            <span class="badge bg-primary">{{ alumno.paquete_activo.id_paquete.cantidad_clases }} clases</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if alumno.ultima_clase %}
+                            {{ alumno.ultima_clase|date:"d/m/Y" }}
+                            {% else %}
+                            <span class="text-muted">Nunca</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ alumno.canal_captacion|default:"-" }}</small>
+                        </td>
+                        <td>
+                            <a href="{% url 'panel_alumno_detalle' alumno.id_alumno %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+            <i class="bi bi-search me-2"></i>No se encontraron alumnos con los filtros seleccionados
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

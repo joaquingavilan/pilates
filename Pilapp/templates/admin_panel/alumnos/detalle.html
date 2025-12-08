@@ -1,0 +1,224 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'panel_alumnos' %}">Alumnos</a></li>
+        <li class="breadcrumb-item active">{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+    <!-- Info principal -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-person me-2"></i>Información Personal
+            </div>
+            <div class="card-body">
+                <h4 class="mb-3">{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</h4>
+                
+                <p class="mb-2">
+                    <i class="bi bi-telephone me-2 text-muted"></i>
+                    {% if alumno.id_persona.telefono %}
+                    <a href="https://wa.me/{{ alumno.id_persona.telefono }}" target="_blank">
+                        {{ alumno.id_persona.telefono }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted">Sin teléfono</span>
+                    {% endif %}
+                </p>
+                
+                {% if alumno.id_persona.ruc %}
+                <p class="mb-2">
+                    <i class="bi bi-building me-2 text-muted"></i>
+                    RUC: {{ alumno.id_persona.ruc }}
+                </p>
+                {% endif %}
+                
+                <p class="mb-2">
+                    <i class="bi bi-flag me-2 text-muted"></i>
+                    Canal: {{ alumno.canal_captacion|default:"No especificado" }}
+                </p>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Estado:</span>
+                    <span class="badge fs-6 {% if alumno.estado == 'regular' %}bg-success{% elif alumno.estado == 'ocasional' %}bg-info{% else %}bg-secondary{% endif %}">
+                        {{ alumno.estado|title }}
+                    </span>
+                </div>
+                
+                {% if alumno.ultima_clase %}
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span>Última clase:</span>
+                    <span>{{ alumno.ultima_clase|date:"d/m/Y" }}</span>
+                </div>
+                {% endif %}
+                
+                {% if alumno.id_persona.observaciones %}
+                <hr>
+                <p class="mb-0"><strong>Observaciones:</strong></p>
+                <p class="text-muted mb-0">{{ alumno.id_persona.observaciones }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Paquetes -->
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-box me-2"></i>Paquetes
+            </div>
+            <div class="card-body">
+                {% if paquetes %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Paquete</th>
+                                <th>Fecha Inicio</th>
+                                <th>Estado</th>
+                                <th>Pago</th>
+                                <th>Clases Usadas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for paquete in paquetes %}
+                            <tr>
+                                <td><strong>{{ paquete.id_paquete.cantidad_clases }} clases</strong></td>
+                                <td>{{ paquete.fecha_inicio|date:"d/m/Y"|default:"-" }}</td>
+                                <td>
+                                    <span class="badge {% if paquete.estado == 'activo' %}bg-success{% else %}bg-secondary{% endif %}">
+                                        {{ paquete.estado|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if paquete.estado_pago == 'pagado' %}bg-success{% elif paquete.estado_pago == 'parcial' %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ paquete.estado_pago|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ paquete.clases_usadas }}/{{ paquete.id_paquete.cantidad_clases }}
+                                    <div class="progress" style="height: 5px; width: 100px;">
+                                        <div class="progress-bar" style="width: {{ paquete.porcentaje_uso }}%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">No tiene paquetes registrados</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Historial de clases -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-journal-check me-2"></i>Historial de Clases</span>
+                <span class="badge bg-secondary">{{ historial_clases|length }} clases</span>
+            </div>
+            <div class="card-body">
+                {% if historial_clases %}
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Horario</th>
+                                <th>Tipo</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for clase in historial_clases %}
+                            <tr>
+                                <td>{{ clase.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ clase.horario }}</td>
+                                <td>
+                                    <span class="badge {% if clase.tipo == 'regular' %}bg-success{% else %}bg-info{% endif %} badge-estado">
+                                        {{ clase.tipo|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if clase.estado == 'asistió' %}
+                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> Asistió</span>
+                                    {% elif clase.estado == 'faltó' %}
+                                    <span class="text-danger"><i class="bi bi-x-circle-fill"></i> Faltó</span>
+                                    {% elif clase.estado == 'pendiente' or clase.estado == 'reservado' %}
+                                    <span class="text-warning"><i class="bi bi-clock-fill"></i> Pendiente</span>
+                                    {% elif clase.estado == 'canceló' %}
+                                    <span class="text-secondary"><i class="bi bi-slash-circle-fill"></i> Canceló</span>
+                                    {% elif clase.estado == 'reprogramó' %}
+                                    <span class="text-info"><i class="bi bi-arrow-repeat"></i> Reprogramó</span>
+                                    {% elif clase.estado == 'recuperó' %}
+                                    <span class="text-primary"><i class="bi bi-arrow-counterclockwise"></i> Recuperó</span>
+                                    {% else %}
+                                    <span class="text-muted">{{ clase.estado|title }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">No tiene clases registradas</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pagos -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-cash-stack me-2"></i>Historial de Pagos
+            </div>
+            <div class="card-body">
+                {% if pagos %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Monto</th>
+                                <th>Método</th>
+                                <th>Estado</th>
+                                <th>Paquete</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pago in pagos %}
+                            <tr>
+                                <td>{{ pago.id_pago.fecha|date:"d/m/Y" }}</td>
+                                <td><strong>₲ {{ pago.id_pago.monto|floatformat:0 }}</strong></td>
+                                <td>{{ pago.id_pago.metodo_pago|title }}</td>
+                                <td>
+                                    <span class="badge {% if pago.id_pago.estado == 'pagado' %}bg-success{% elif pago.id_pago.estado == 'parcial' %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ pago.id_pago.estado|title }}
+                                    </span>
+                                </td>
+                                <td>{{ pago.id_alumno_paquete.id_paquete.cantidad_clases }} clases</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">No tiene pagos registrados</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

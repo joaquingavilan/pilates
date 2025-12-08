@@ -1,0 +1,188 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Calendario{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-calendar3 me-2"></i>Calendario Semanal</h2>
+    <div class="d-flex gap-2 align-items-center">
+        <a href="?semana={{ semana_anterior }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-chevron-left"></i> Anterior
+        </a>
+        <span class="badge bg-primary fs-6">{{ fecha_inicio|date:"d M" }} - {{ fecha_fin|date:"d M Y" }}</span>
+        <a href="?semana={{ semana_siguiente }}" class="btn btn-outline-secondary btn-sm">
+            Siguiente <i class="bi bi-chevron-right"></i>
+        </a>
+        {% if not es_semana_actual %}
+        <a href="{% url 'panel_calendario' %}" class="btn btn-outline-primary btn-sm">Hoy</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Leyenda -->
+<div class="mb-3">
+    <span class="badge bg-success me-2">Disponible</span>
+    <span class="badge bg-warning text-dark me-2">Parcial (2-3)</span>
+    <span class="badge bg-danger me-2">Lleno (4)</span>
+    <span class="badge bg-secondary">Sin clases</span>
+</div>
+
+<!-- CONTENEDOR DEL CALENDARIO (se llena vía JS) -->
+<div class="card">
+    <div class="card-body p-2">
+        <div id="calendario-container" class="calendario-grid text-center">
+
+            <!-- PLACEHOLDER DE CARGA -->
+            <div class="w-100 py-5 text-center">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Cargando calendario…</p>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal para ver detalle de clase -->
+<div class="modal fade" id="modalClase" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-event me-2"></i>
+                    <span id="modalTitulo">Detalle de Clase</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body" id="modalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <a href="#" id="modalVerDetalle" class="btn btn-primary">Ver detalle completo</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+
+    const cont = document.getElementById("calendario-container");
+
+    // Semana actual enviada desde Django
+    const semana = "{{ fecha_inicio|date:'Y-m-d' }}";
+
+    // === 1) Obtener calendario vía AJAX ===
+    const resp = await fetch(`/panel/api/calendario/?semana=${semana}`);
+    const data = await resp.json();
+
+    const dias = data.dias;          // ["2025-01-27", ...]
+    const horarios = data.horarios;  // ["08:00:00", ...]
+    const clases = data.clases;      // { "08:00:00": { "2025-01-27": { ... } } }
+
+    // Limpia placeholder
+    cont.innerHTML = "";
+
+    // === 2) HEADER ===
+    cont.innerHTML += `<div class="calendario-cell calendario-header">Hora</div>`;
+    dias.forEach(d => {
+        const dObj = new Date(d);
+        cont.innerHTML += `
+            <div class="calendario-cell calendario-header">
+                ${dObj.toLocaleDateString("es-ES", { weekday: "long" })}
+                <br>
+                <small>${dObj.toLocaleDateString("es-ES")}</small>
+            </div>
+        `;
+    });
+
+    // === 3) FILAS ===
+    horarios.forEach(h => {
+
+        cont.innerHTML += `
+            <div class="calendario-cell calendario-hora">
+                ${h.slice(0,5)}
+            </div>
+        `;
+
+        dias.forEach(fecha => {
+
+            const info = clases[h]?.[fecha] ?? null;
+
+            if (!info) {
+                cont.innerHTML += `
+                    <div class="calendario-cell bg-light text-muted">
+                        <small>-</small>
+                    </div>
+                `;
+            } else {
+                cont.innerHTML += `
+                <div class="calendario-cell calendario-clase ${info.color}"
+                     data-bs-toggle="modal"
+                     data-bs-target="#modalClase"
+                     data-clase-id="${info.id}"
+                     data-inscriptos="${info.total}">
+                     
+                     <strong>${info.total}/4</strong>
+                </div>`;
+            }
+        });
+    });
+});
+
+
+// ======================
+// MODAL DE DETALLE (sin cambios)
+// ======================
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalClase');
+
+    modal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const claseId = button.dataset.claseId;
+        const inscriptos = button.dataset.inscriptos;
+
+        document.getElementById('modalTitulo').textContent = `Clase #${claseId}`;
+        document.getElementById('modalVerDetalle').href = `/panel/clases/${claseId}/`;
+
+        fetch(`/panel/api/clase/${claseId}/alumnos/`)
+            .then(r => r.json())
+            .then(data => {
+                let html = `<p><strong>Inscriptos:</strong> ${inscriptos}/4</p>`;
+                if (data.alumnos?.length > 0) {
+                    html += '<ul class="list-group">';
+                    data.alumnos.forEach(a => {
+                        const badge = a.tipo === 'regular' ? 'bg-success' : 'bg-info';
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${a.nombre} ${a.apellido}
+                                <span class="badge ${badge}">${a.tipo}</span>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                } else {
+                    html += '<p class="text-muted">No hay alumnos inscriptos</p>';
+                }
+                document.getElementById('modalBody').innerHTML = html;
+            })
+            .catch(() => {
+                document.getElementById('modalBody').innerHTML =
+                    `<div class="alert alert-danger">Error al cargar los datos</div>`;
+            });
+    });
+});
+</script>
+
+{% endblock %}

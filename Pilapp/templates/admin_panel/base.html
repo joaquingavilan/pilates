@@ -1,0 +1,218 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel Admin{% endblock %} | TuPilates</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --primary-color: #6f42c1;
+            --secondary-color: #e9ecef;
+        }
+        body {
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+            padding-top: 1rem;
+            z-index: 1000;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1.5rem;
+            margin: 0.2rem 0.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+        .sidebar .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        .sidebar .nav-link.active {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .sidebar .nav-link i {
+            margin-right: 0.75rem;
+            width: 20px;
+            text-align: center;
+        }
+        .sidebar-brand {
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            border-radius: 0.5rem;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 600;
+        }
+        .stat-card {
+            border-left: 4px solid var(--primary-color);
+        }
+        .stat-card.success { border-left-color: #198754; }
+        .stat-card.warning { border-left-color: #ffc107; }
+        .stat-card.info { border-left-color: #0dcaf0; }
+        .stat-card.danger { border-left-color: #dc3545; }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        .table th {
+            font-weight: 600;
+            color: #6c757d;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+        .badge-estado {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+        .calendario-grid {
+            display: grid;
+            grid-template-columns: auto repeat(6, 1fr);
+            gap: 2px;
+        }
+        .calendario-cell {
+            padding: 0.5rem;
+            text-align: center;
+            background: #fff;
+            border-radius: 4px;
+            min-height: 60px;
+        }
+        .calendario-header {
+            background: #2c3e50;
+            color: #fff;
+            font-weight: 600;
+        }
+        .calendario-hora {
+            background: #e9ecef;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .calendario-clase {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .calendario-clase:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .calendario-clase.lleno {
+            background: #f8d7da;
+        }
+        .calendario-clase.disponible {
+            background: #d1e7dd;
+        }
+        .calendario-clase.parcial {
+            background: #fff3cd;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-heart-pulse"></i> TuPilates
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_dashboard' %}active{% endif %}" 
+                   href="{% url 'panel_dashboard' %}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_calendario' %}active{% endif %}" 
+                   href="{% url 'panel_calendario' %}">
+                    <i class="bi bi-calendar3"></i> Calendario
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'alumno' in request.resolver_match.url_name %}active{% endif %}" 
+                   href="{% url 'panel_alumnos' %}">
+                    <i class="bi bi-people"></i> Alumnos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'clase' in request.resolver_match.url_name %}active{% endif %}" 
+                   href="{% url 'panel_clases' %}">
+                    <i class="bi bi-journal-check"></i> Clases
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_turnos' %}active{% endif %}" 
+                   href="{% url 'panel_turnos' %}">
+                    <i class="bi bi-clock"></i> Turnos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_pagos' %}active{% endif %}" 
+                   href="{% url 'panel_pagos' %}">
+                    <i class="bi bi-cash-stack"></i> Pagos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_prospectos' %}active{% endif %}" 
+                   href="{% url 'panel_prospectos' %}">
+                    <i class="bi bi-person-plus"></i> Prospectos
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
