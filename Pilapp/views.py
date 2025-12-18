@@ -533,34 +533,29 @@ def registrar_asistencias(request):
 def obtener_fecha_proximo_dia(dia_nombre):
     """
     Calcula la próxima fecha (tipo date) correspondiente a un día de la semana dado.
-
-    Parámetros:
-    - dia_nombre (str): nombre del día ("Lunes".."Domingo"), que debe existir en el diccionario DAY_INDEX.
-
-    Lógica:
-    - Obtiene el día actual (weekday 0..6).
-    - Compara con el índice del día objetivo (DAY_INDEX[dia_nombre]).
-    - Si el día objetivo es hoy, devuelve la fecha del mismo día en la semana siguiente.
-    - De lo contrario, devuelve la próxima ocurrencia de ese día.
-
-    Retorna:
-    - datetime.date → fecha del próximo día solicitado.
-
-    Ejemplo:
-    >>> obtener_fecha_proximo_dia("Viernes")
-    datetime.date(2025, 11, 14)  # suponiendo que hoy sea 2025-11-07
     """
+    logging.info(f"[obtener_fecha_proximo_dia] Calculando próxima fecha para día: {dia_nombre}")
+    
     hoy = datetime.now().date()
+    logging.debug(f"[obtener_fecha_proximo_dia] Fecha de hoy: {hoy}")
+    
     dia_actual = hoy.weekday()
+    logging.debug(f"[obtener_fecha_proximo_dia] Día actual (weekday): {dia_actual}")
+    
     dia_objetivo = DAY_INDEX[dia_nombre]
-
+    logging.debug(f"[obtener_fecha_proximo_dia] Día objetivo (weekday): {dia_objetivo} para '{dia_nombre}'")
+    
     dias_hasta_objetivo = (dia_objetivo - dia_actual + 7) % 7
+    logging.debug(f"[obtener_fecha_proximo_dia] Días hasta objetivo (inicial): {dias_hasta_objetivo}")
+    
     if dias_hasta_objetivo == 0:
         dias_hasta_objetivo = 7  # Si es hoy, te vas al próximo mismo día (no hoy mismo)
-
+        logging.debug(f"[obtener_fecha_proximo_dia] Es hoy, ajustando a próxima semana: {dias_hasta_objetivo} días")
+    
     fecha_objetivo = hoy + timedelta(days=dias_hasta_objetivo)
+    logging.info(f"[obtener_fecha_proximo_dia] Fecha calculada: {fecha_objetivo} ({dia_nombre})")
+    
     return fecha_objetivo
-
 
 @csrf_exempt
 def obtener_id_alumno(request):
@@ -907,56 +902,38 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
 def registrar_alumno_datos(data):
     """
     Procesa los datos recibidos en /registrar_alumno/ y realiza las validaciones y registros en base de datos.
-
-    Parámetros:
-    - data (dict): Diccionario con los datos del alumno, paquete y turnos.  
-    Claves esperadas:
-        - nombre, apellido, telefono, paquete, turnos (obligatorios)
-        - fecha_inicio, canal_captacion, ruc, observaciones (opcionales)
-
-    Validaciones:
-    - Verifica que los turnos existan (`Turno.objects.get(dia, horario)`).
-    - Si el turno tiene estado "Ocupado", lo descarta y agrega error.
-    - Verifica que el paquete (`Paquete.cantidad_clases`) exista.
-    - Calcula las fechas de clases por turno, usando `obtener_fechas_turno_normal`.
-    - Comprueba que existan las clases (`Clase`) y tengan cupo (`total_inscriptos < 4`).
-    - Si se acumulan errores, lanza `ValueError` con todos los mensajes concatenados.
-
-    Acciones ejecutadas:
-    1. Crea `Persona` con los datos básicos.
-    2. Crea `Alumno` asociado (`estado="regular"`).
-    3. Crea `AlumnoPaquete` (`estado='activo'`, `fecha_inicio` calculada o enviada).
-    4. Para cada turno:
-    - Crea (si no existe) `AlumnoPaqueteTurno`.
-    - Crea un registro en `AlumnoClase` (`estado="pendiente"`).
-
-    Retorna:
-    - dict → {"message": "Alumno registrado exitosamente"}
-
-    Excepciones:
-    - ValueError → cuando hay errores de validación (devueltos por la vista con status 400).
     """
-
+    logging.info(f"[registrar_alumno_datos] Iniciando con data: {data}")
+    
     errores = []
     turnos_asignados = []
     clases_a_reservar = []  # Nuevo: para preparar las clases validadas
 
     # 📌 Validar turnos
+    logging.info(f"[registrar_alumno_datos] Validando turnos: {data.get('turnos')}")
     for turno_str in data["turnos"]:
         try:
             dia, horario = turno_str.split()
+            logging.debug(f"[registrar_alumno_datos] Buscando turno: dia={dia}, horario={horario}")
             turno = Turno.objects.get(dia=dia, horario=horario)
+            logging.debug(f"[registrar_alumno_datos] Turno encontrado: {turno}, estado={turno.estado}")
             if turno.estado == "Ocupado":
+                logging.warning(f"[registrar_alumno_datos] Turno {turno_str} ocupado")
                 errores.append(f"El turno {turno_str} ya tiene su cupo general completo.")
             else:
                 turnos_asignados.append(turno)
+                logging.info(f"[registrar_alumno_datos] Turno {turno_str} asignado correctamente")
         except Turno.DoesNotExist:
+            logging.error(f"[registrar_alumno_datos] Turno {turno_str} no existe")
             errores.append(f"El turno {turno_str} no existe.")
 
     # 📌 Validar paquete
+    logging.info(f"[registrar_alumno_datos] Validando paquete: {data.get('paquete')} clases")
     try:
         paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
+        logging.info(f"[registrar_alumno_datos] Paquete encontrado: {paquete}")
     except Paquete.DoesNotExist:
+        logging.error(f"[registrar_alumno_datos] Paquete con {data['paquete']} clases no existe")
         errores.append(f"Paquete con {data['paquete']} clases no existe.")
 
     # 📌 Validar clases específicas
@@ -964,34 +941,52 @@ def registrar_alumno_datos(data):
         cantidad_clases = paquete.cantidad_clases
         cantidad_turnos = len(turnos_asignados)
         clases_por_turno = cantidad_clases // cantidad_turnos
+        logging.info(f"[registrar_alumno_datos] Distribución: {cantidad_clases} clases / {cantidad_turnos} turnos = {clases_por_turno} clases por turno")
 
         for turno in turnos_asignados:
+            logging.info(f"[registrar_alumno_datos] Procesando turno: {turno.dia} {turno.horario}")
+            
             fecha_inicio = data.get("fecha_inicio")
+            logging.debug(f"[registrar_alumno_datos] fecha_inicio recibida en data: {fecha_inicio}")
+            
             if not fecha_inicio:
-                fecha_inicio = str(obtener_fecha_proximo_dia(turno.dia))  # Buscamos automáticamente el próximo día de ese turno
-
+                logging.info(f"[registrar_alumno_datos] No hay fecha_inicio, calculando próxima fecha para día: {turno.dia}")
+                fecha_calculada = obtener_fecha_proximo_dia(turno.dia)
+                logging.info(f"[registrar_alumno_datos] Fecha calculada (date): {fecha_calculada}")
+                fecha_inicio = str(fecha_calculada)
+                logging.info(f"[registrar_alumno_datos] Fecha convertida a string: {fecha_inicio}")
+            
+            logging.info(f"[registrar_alumno_datos] Obteniendo fechas para turno_id={turno.id_turno}, fecha_inicio={fecha_inicio}, clases={clases_por_turno}")
             fechas_clases = obtener_fechas_turno_normal(turno.id_turno, fecha_inicio, clases_por_turno)["fechas"]
+            logging.info(f"[registrar_alumno_datos] Fechas obtenidas: {fechas_clases}")
 
             for fecha in fechas_clases:
                 fecha_clase = datetime.strptime(fecha, "%Y-%m-%d").date()
+                logging.debug(f"[registrar_alumno_datos] Validando clase para fecha: {fecha_clase}")
                 try:
                     clase = Clase.objects.get(
                         id_instructor=Instructor.objects.get(id_instructor=1),
                         id_turno=turno,
                         fecha=fecha_clase
                     )
+                    logging.debug(f"[registrar_alumno_datos] Clase encontrada: id={clase.id_clase}, inscriptos={clase.total_inscriptos}")
                     if clase.total_inscriptos >= 4:
+                        logging.warning(f"[registrar_alumno_datos] Clase llena: {fecha_clase} {turno.horario}")
                         errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya está llena.")
                     else:
-                        clases_a_reservar.append((turno, clase))  # Lo guardamos para después
+                        clases_a_reservar.append((turno, clase))
+                        logging.info(f"[registrar_alumno_datos] Clase reservada: {fecha_clase} {turno.horario}")
                 except Clase.DoesNotExist:
+                    logging.error(f"[registrar_alumno_datos] No existe clase para {fecha_clase} en turno {turno.dia} {turno.horario}")
                     errores.append(f"No existe clase programada para {fecha_clase} en el turno {turno.dia} {turno.horario}.")
 
     # 📌 Si hay errores, devolverlos todos juntos
     if errores:
+        logging.error(f"[registrar_alumno_datos] Errores acumulados: {errores}")
         raise ValueError("Errores encontrados: " + "; ".join(errores))
 
     # 📌 Crear objetos (solo si todo está validado)
+    logging.info(f"[registrar_alumno_datos] Creando persona: {data['nombre']} {data['apellido']}")
     persona = Persona.objects.create(
         nombre=data["nombre"],
         apellido=data["apellido"],
@@ -999,25 +994,34 @@ def registrar_alumno_datos(data):
         ruc=data.get("ruc"),
         observaciones=data.get("observaciones")
     )
+    logging.info(f"[registrar_alumno_datos] Persona creada: id={persona.id_persona}")
 
     alumno = Alumno.objects.create(
         id_persona=persona,
         canal_captacion=data.get("canal_captacion"),
         estado="regular"
     )
+    logging.info(f"[registrar_alumno_datos] Alumno creado: id={alumno.id_alumno}")
 
+    logging.info(f"[registrar_alumno_datos] Creando AlumnoPaquete con fecha_inicio={fecha_inicio}")
     alumno_paquete = AlumnoPaquete.objects.create(
         id_alumno=alumno,
         id_paquete=paquete,
         estado='activo',
-        fecha_inicio= fecha_inicio
+        fecha_inicio=fecha_inicio
     )
+    logging.info(f"[registrar_alumno_datos] AlumnoPaquete creado: id={alumno_paquete.id_alumno_paquete}")
 
     for turno, clase in clases_a_reservar:
+        logging.debug(f"[registrar_alumno_datos] Creando AlumnoPaqueteTurno para turno {turno.dia} {turno.horario}")
         AlumnoPaqueteTurno.objects.get_or_create(id_alumno_paquete=alumno_paquete, id_turno=turno)
+        
+        logging.debug(f"[registrar_alumno_datos] Creando AlumnoClase para clase fecha={clase.fecha}")
         AlumnoClase.objects.create(id_alumno_paquete=alumno_paquete, id_clase=clase, estado="pendiente")
 
+    logging.info(f"[registrar_alumno_datos] Proceso completado exitosamente")
     return {"message": "Alumno registrado exitosamente"}
+
 
 
 
