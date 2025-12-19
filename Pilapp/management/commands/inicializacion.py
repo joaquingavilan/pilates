@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
         # 3) Clases para 30 días
         hoy = date.today()
-        rango_fin = hoy + timedelta(days=30)
+        rango_fin = hoy + timedelta(days=365)
 
         self.stdout.write(f"Generando clases desde {hoy} hasta {rango_fin}...")
         result_clases = crear_clases_rango_fechas(hoy, rango_fin)
