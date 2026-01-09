@@ -2003,7 +2003,8 @@ def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
         "Martes": 1,
         "Miércoles": 2,
         "Jueves": 3,
-        "Viernes": 4
+        "Viernes": 4,
+        "Sábado": 5,
     }
 
     if turno.dia not in dias_map:
