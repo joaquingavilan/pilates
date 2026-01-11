@@ -100,10 +100,20 @@
                         <td>
                             <small class="text-muted">{{ alumno.canal_captacion|default:"-" }}</small>
                         </td>
-                        <td>
+                        <td class="text-end">
                             <a href="{% url 'panel_alumno_detalle' alumno.id_alumno %}" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-eye"></i>
                             </a>
+
+                            <form method="post"
+                                action="{% url 'panel_alumno_eliminar' alumno.id_alumno %}"
+                                class="d-inline"
+                                onsubmit="return confirm('Seguro que deseas eliminar al alumno {{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}? Esta acción eliminará paquetes, reservas/asistencias y pagos asociados.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar alumno">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}

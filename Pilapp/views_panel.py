@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from collections import defaultdict
 from django.db.models import Q, Count
@@ -10,6 +10,16 @@ from .models import (
 import time 
 from django.http import HttpResponse
 from django.template import loader
+from django.views.decorators.http import require_POST
+from django.db import transaction
+
+from .models import (
+    Alumno, Persona, Instructor,
+    AlumnoPaquete, AlumnoPaqueteTurno,
+    AlumnoClase, AlumnoClaseOcasional,
+    Pago, PagoAlumno, PagoInstructor,
+    ClienteProspecto
+)
 
 
 def panel_dashboard(request):
@@ -493,3 +503,60 @@ def api_turno_alumnos(request, id_turno):
         })
     
     return JsonResponse({'alumnos': alumnos})
+
+
+
+## Eliminar alumno
+@require_POST
+def panel_alumno_eliminar(request, id_alumno):
+    """
+    Elimina un alumno y todos sus vínculos operativos:
+    - AlumnoPaquete, AlumnoPaqueteTurno, AlumnoClase, AlumnoClaseOcasional, PagoAlumno.
+    Además, elimina los Pagos (Pago) asociados si no están vinculados a otros objetos.
+    También elimina Persona si ya no está usada por Alumno/Instructor.
+    Opcional: elimina ClienteProspecto por teléfono (aquí lo hago).
+    """
+    alumno = get_object_or_404(Alumno.objects.select_related("id_persona"), id_alumno=id_alumno)
+    persona = alumno.id_persona
+    telefono = (persona.telefono or "").strip() if persona else ""
+
+    # Capturar IDs antes del delete para poder limpiar "Pago"
+    paquete_ids = list(
+        AlumnoPaquete.objects.filter(id_alumno=alumno).values_list("id_alumno_paquete", flat=True)
+    )
+
+    pago_ids = list(
+        PagoAlumno.objects.filter(id_alumno_paquete_id__in=paquete_ids)
+        .values_list("id_pago_id", flat=True)
+        .distinct()
+    )
+
+    with transaction.atomic():
+        # 1) Borrado principal (cascade elimina: AlumnoPaquete*, AlumnoClase*, AlumnoClaseOcasional, PagoAlumno, etc.)
+        alumno.delete()
+
+        # 2) Borrar pagos (Pago) si ya no están usados por otros vínculos
+        #    (Evita borrar pagos que por algún motivo estén compartidos con otra entidad)
+        for pid in pago_ids:
+            existe_otro_pago_alumno = PagoAlumno.objects.filter(id_pago_id=pid).exists()
+            existe_pago_instructor = PagoInstructor.objects.filter(id_pago_id=pid).exists()
+
+            if (not existe_otro_pago_alumno) and (not existe_pago_instructor):
+                Pago.objects.filter(id_pago_id=pid).delete()
+
+        # 3) Borrar persona si no quedó referenciada por nadie
+        #    (Protege el caso raro de que Persona sea también Instructor)
+        if persona:
+            persona_sigue_en_alumno = Alumno.objects.filter(id_persona=persona).exists()
+            persona_sigue_en_instructor = Instructor.objects.filter(id_persona=persona).exists()
+            if (not persona_sigue_en_alumno) and (not persona_sigue_en_instructor):
+                persona.delete()
+
+        # 4) (Opcional) Borrar prospecto por teléfono para evitar residuos de registros erróneos
+        #    Si preferís conservar prospectos históricos, se puede quitar esto.
+        if telefono:
+            ClienteProspecto.objects.filter(telefono=telefono).delete()
+
+    # Volver a la lista (si querés volver al referer, también se puede)
+    return redirect("panel_alumnos")
+

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views_panel
 
 urlpatterns = [
@@ -31,5 +31,7 @@ urlpatterns = [
     path("api/calendario/", views_panel.api_calendario, name="api_calendario"),
 
     path('api/turno/<int:id_turno>/alumnos/', views_panel.api_turno_alumnos, name='api_turno_alumnos'),
+
+    path("alumnos/<int:id_alumno>/eliminar/", views_panel.panel_alumno_eliminar, name="panel_alumno_eliminar"),
 
 ]
