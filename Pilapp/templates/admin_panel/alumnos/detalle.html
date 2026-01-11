@@ -3,12 +3,22 @@
 {% block title %}{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'panel_alumnos' %}">Alumnos</a></li>
-        <li class="breadcrumb-item active">{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</li>
-    </ol>
+<nav class="d-flex justify-content-between align-items-center mb-3" aria-label="breadcrumb">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{% url 'panel_alumnos' %}">Alumnos</a></li>
+    <li class="breadcrumb-item active">{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</li>
+  </ol>
+
+  <button
+    type="button"
+    class="btn btn-danger"
+    data-bs-toggle="modal"
+    data-bs-target="#modalEliminarAlumno"
+  >
+    <i class="bi bi-trash me-1"></i> Eliminar alumno
+  </button>
 </nav>
+
 
 <div class="row g-4">
     <!-- Info principal -->
@@ -245,4 +255,33 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="modalEliminarAlumno" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirmar eliminación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-0">
+          Seguro que deseas eliminar al alumno
+          <strong>{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</strong>?
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">No</button>
+
+        <form method="post" action="{% url 'panel_alumno_eliminar' alumno.id_alumno %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">
+            Sí, eliminar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
