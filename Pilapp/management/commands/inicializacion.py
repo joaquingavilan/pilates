@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from datetime import date, timedelta
-
+from django.utils import timezone
 from Pilapp.models import Persona, Instructor
 from Pilapp.utils import crear_turnos, crear_clases_rango_fechas
 
@@ -33,7 +33,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"✓ {result_turnos['mensaje']}"))
 
         # 3) Clases para 30 días
-        hoy = date.today()
+        hoy = timezone.localdate()
         rango_fin = hoy + timedelta(days=365)
 
         self.stdout.write(f"Generando clases desde {hoy} hasta {rango_fin}...")

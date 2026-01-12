@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, timezone
 from Pilapp.models import Turno, Clase, Instructor, HorarioDisponible
+
 
 def crear_turnos():
     """
@@ -51,7 +52,8 @@ def crear_clases_para_fecha(fecha=None):
     """
     # Si no se proporciona fecha, usar la fecha actual
     if fecha is None:
-        fecha = date.today()
+        fecha = timezone.localdate()
+
     
     # Mapeo de índice de día de la semana (0=lunes, 6=domingo) a nombre del día
     dias_semana = {

@@ -6,10 +6,12 @@ import json
 import logging
 from datetime import datetime, timedelta
 from django.db import transaction
+from django.utils import timezone
 from django.utils.timezone import now  # Para fecha de hoy respetando timezone
 from datetime import date
 import unicodedata
 from difflib import get_close_matches
+
 
 DAY_INDEX = {
     "Lunes": 0,
@@ -265,7 +267,7 @@ def obtener_clases_agendadas(request):
             errores.append("Falta el campo 'id_alumno'.")
 
         # Validar y convertir fecha
-        fecha_minima = date.today()
+        fecha_minima = timezone.localdate()
         if fecha_minima_str:
             try:
                 fecha_minima = datetime.strptime(fecha_minima_str, "%Y-%m-%d").date()
@@ -447,12 +449,12 @@ def registrar_asistencias(request):
         if fecha_str:
             try:
                 fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                if fecha > date.today():
+                if fecha > timezone.localdate():
                     errores.append("No se puede registrar asistencia para fechas futuras.")
             except ValueError:
                 errores.append("Formato de fecha inválido, debe ser YYYY-MM-DD.")
         else:
-            fecha = date.today()
+            fecha = timezone.localdate()
 
         if errores:
             return JsonResponse({"errores": errores}, status=400)
@@ -1152,7 +1154,7 @@ def obtener_alumnos_turno(request):
                 turno = Turno.objects.get(dia=dia, horario=horario)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": f"No existe turno para {dia} a las {horario}."})
-            hoy = date.today()
+            hoy = timezone.localdate()
             dia_a_numero = {
                 "Lunes": 0,
                 "Martes": 1,
@@ -1277,7 +1279,7 @@ def obtener_alumnos_clase(request):
                 fecha_objetivo = datetime.strptime(fecha, "%Y-%m-%d").date()
             else:
                 # Buscar la próxima fecha de ese día
-                hoy = date.today()
+                hoy = timezone.localdate()
                 dias_semana = {
                     "Lunes": 0,
                     "Martes": 1,
@@ -1381,7 +1383,7 @@ def obtener_alumnos_dia(request):
 
 
             # Calcular fecha correcta según el día solicitado
-            hoy = date.today()
+            hoy = timezone.localdate()
             dia_a_numero = {
                 "Lunes": 0,
                 "Martes": 1,

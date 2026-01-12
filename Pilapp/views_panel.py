@@ -28,7 +28,8 @@ from .models import (
 
 def panel_dashboard(request):
     """Vista principal del dashboard con estadísticas."""
-    hoy = date.today()
+    hoy = timezone.localdate()
+    ahora = timezone.localtime()
     inicio_semana = hoy - timedelta(days=hoy.weekday())
     fin_semana = inicio_semana + timedelta(days=6)
     
@@ -65,6 +66,7 @@ def panel_dashboard(request):
         'clases_hoy': clases_hoy,
         'ultimos_alumnos': ultimos_alumnos,
         'fecha_hoy': hoy,
+        'hora_actual': ahora,
     })
 
 
@@ -76,9 +78,11 @@ def panel_calendario(request):
         try:
             fecha_ref = datetime.strptime(semana_param, "%Y-%m-%d").date()
         except ValueError:
-            fecha_ref = date.today()
+            fecha_ref = timezone.localdate()
+
     else:
-        fecha_ref = date.today()
+        fecha_ref = timezone.localdate()
+
 
     # Calcular lunes de esa semana
     inicio_semana = fecha_ref - timedelta(days=fecha_ref.weekday())
@@ -87,7 +91,7 @@ def panel_calendario(request):
     semana_anterior = (inicio_semana - timedelta(days=7)).strftime("%Y-%m-%d")
     semana_siguiente = (inicio_semana + timedelta(days=7)).strftime("%Y-%m-%d")
 
-    hoy = date.today()
+    hoy = timezone.localdate()
     lunes_actual = hoy - timedelta(days=hoy.weekday())
     es_semana_actual = (inicio_semana == lunes_actual)
 
@@ -111,9 +115,9 @@ def api_calendario(request):
         try:
             fecha_ref = datetime.strptime(semana_param, "%Y-%m-%d").date()
         except ValueError:
-            fecha_ref = date.today()
+            fecha_ref = timezone.localdate()
     else:
-        fecha_ref = date.today()
+        fecha_ref = timezone.localdate()
 
     inicio_semana = fecha_ref - timedelta(days=fecha_ref.weekday())
     fin_semana = inicio_semana + timedelta(days=5)
@@ -352,7 +356,8 @@ def panel_clases(request):
     fecha_desde = request.GET.get('desde')
     fecha_hasta = request.GET.get('hasta')
     
-    hoy = date.today()
+    hoy = timezone.localdate()
+
     
     if not fecha_desde:
         fecha_desde = hoy - timedelta(days=7)
@@ -679,7 +684,7 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
     nro_pago = f"APQ-{alumno_paquete.id_alumno_paquete}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
 
     pago = Pago.objects.create(
-        fecha=date.today(),
+        fecha=timezone.localdate(),
         monto=monto,
         nro_pago=nro_pago,
         estado=estado_pago_creado,

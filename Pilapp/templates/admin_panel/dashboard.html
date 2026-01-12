@@ -5,7 +5,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">Dashboard</h2>
-    <span class="text-muted">{{ fecha_hoy|date:"l, d F Y" }}</span>
+    <span class="text-muted">
+        {{ fecha_hoy|date:"l, d F Y" }} · {{ hora_actual|time:"H:i" }}
+    </span>
 </div>
 
 <!-- Estadísticas rápidas -->
