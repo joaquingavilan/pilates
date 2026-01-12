@@ -737,5 +737,11 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
         alumno_paquete.estado_pago = "pendiente"
 
     alumno_paquete.save()
-
-    return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+    # CAMBIO AQUÍ: Usar el parámetro next
+    next_page = request.GET.get('next', 'detalle')
+    
+    if next_page == 'pagos':
+        return redirect("panel_pagos")
+    else:
+        return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+         

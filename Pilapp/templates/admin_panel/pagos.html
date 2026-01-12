@@ -213,8 +213,7 @@
     const pagado = button.dataset.pagado;
 
     // Construir la URL usando la misma estructura de Django
-    form.action = `/panel/alumnos/${alumnoId}/paquetes/${paqueteId}/registrar_pago/`;
-
+    form.action = `/panel/alumnos/${alumnoId}/paquetes/${paqueteId}/registrar_pago/?next=pagos`;
     // Mostrar información del alumno
     modalAlumnoNombre.textContent = alumnoNombre;
 
