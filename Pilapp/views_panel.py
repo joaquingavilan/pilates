@@ -364,15 +364,14 @@ def panel_clases(request):
     fecha_hasta = request.GET.get('hasta')
     
     hoy = timezone.localdate()
-
     
     if not fecha_desde:
-        fecha_desde = hoy - timedelta(days=7)
+        fecha_desde = hoy  # ← Cambiar a HOY
     else:
         fecha_desde = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
     
     if not fecha_hasta:
-        fecha_hasta = hoy + timedelta(days=7)
+        fecha_hasta = hoy + timedelta(days=14)  # ← Mostrar 2 semanas futuras
     else:
         fecha_hasta = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
 
@@ -388,12 +387,12 @@ def panel_clases(request):
     for c in clases:
         c.total = c.total_regulares + c.total_ocasionales
 
-
     return render(request, "admin_panel/clases/lista.html", {
         "clases": clases,
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
     })
+
 
 def panel_clase_detalle(request, id_clase):
     """Detalle de una clase específica."""
