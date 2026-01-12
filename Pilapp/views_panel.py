@@ -8,12 +8,14 @@ from datetime import date, timedelta, datetime
 #imports de django
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, DecimalField
+from django.db.models.functions import Coalesce
 from django.template import loader
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.contrib import messages
 from django.utils import timezone
+
 
 
 #imports del proyecto
@@ -467,11 +469,31 @@ def panel_pagos(request):
     if estado_pago:
         paquetes = paquetes.filter(estado_pago=estado_pago)
     
+    # Calcular restante y total_pagado para cada paquete
+    paquetes_con_info = []
+    for paquete in paquetes:
+        costo = paquete.id_paquete.costo or Decimal("0")
+        
+        # Calcular total pagado
+        total_pagado = (
+            PagoAlumno.objects
+            .filter(id_alumno_paquete=paquete, id_pago__estado__in=["pagado", "parcial"])
+            .aggregate(total=Sum("id_pago__monto"))
+            .get("total") or Decimal("0")
+        )
+        
+        # Calcular restante
+        restante = max(Decimal("0"), costo - total_pagado)
+        
+        # Agregar los campos calculados al objeto paquete
+        paquete.restante = restante
+        paquete.total_pagado = total_pagado
+        paquetes_con_info.append(paquete)
+    
     return render(request, 'admin_panel/pagos.html', {
-        'paquetes': paquetes,
+        'paquetes': paquetes_con_info,
         'estado_pago': estado_pago,
     })
-
 
 def panel_prospectos(request):
     """Lista de prospectos."""
