@@ -167,10 +167,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.alumnos.forEach(a => {
                         const badge = a.tipo === 'regular' ? 'bg-success' : 'bg-info';
                         html += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                ${a.nombre} ${a.apellido}
-                                <span class="badge ${badge}">${a.tipo}</span>
-                            </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="/panel/alumnos/${a.id_alumno}/" class="text-decoration-none">
+                            ${a.nombre} ${a.apellido}
+                            </a>
+                            <span class="badge ${badge}">${a.tipo}</span>
+                        </li>
                         `;
                     });
                     html += '</ul>';

@@ -481,30 +481,45 @@ def panel_prospectos(request):
 def api_clase_alumnos(request, id_clase):
     """API para obtener alumnos de una clase (usado en modal del calendario)."""
     clase = get_object_or_404(Clase, id_clase=id_clase)
-    
+
     alumnos = []
-    
+
     # Regulares
-    for ac in AlumnoClase.objects.filter(id_clase=clase).select_related('id_alumno_paquete__id_alumno__id_persona'):
-        persona = ac.id_alumno_paquete.id_alumno.id_persona
+    for ac in (
+        AlumnoClase.objects
+        .filter(id_clase=clase)
+        .select_related('id_alumno_paquete__id_alumno__id_persona')
+    ):
+        alumno = ac.id_alumno_paquete.id_alumno
+        persona = alumno.id_persona
+
         alumnos.append({
+            'id_alumno': alumno.id_alumno,   # 👈 CLAVE
             'nombre': persona.nombre,
             'apellido': persona.apellido,
             'tipo': 'regular',
             'estado': ac.estado,
         })
-    
+
     # Ocasionales
-    for ao in AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related('id_alumno__id_persona'):
-        persona = ao.id_alumno.id_persona
+    for ao in (
+        AlumnoClaseOcasional.objects
+        .filter(id_clase=clase)
+        .select_related('id_alumno__id_persona')
+    ):
+        alumno = ao.id_alumno
+        persona = alumno.id_persona
+
         alumnos.append({
+            'id_alumno': alumno.id_alumno,   # 👈 CLAVE
             'nombre': persona.nombre,
             'apellido': persona.apellido,
             'tipo': 'ocasional',
             'estado': ao.estado,
         })
-    
+
     return JsonResponse({'alumnos': alumnos})
+
 
 
 def api_turno_alumnos(request, id_turno):

@@ -251,7 +251,7 @@
                             {% for pago in pagos %}
                             <tr>
                                 <td>{{ pago.id_pago.fecha|date:"d/m/Y" }}</td>
-                                <td><strong>₲ <span data-money="{{ pago.id_pago.monto|floatformat:0 }}">{{ pago.id_pago.monto|floatformat:0 }}</span></strong></td>
+                                <td><strong>₲ <span data-money="{{ pago.id_pago.monto }}">{{ pago.id_pago.monto|floatformat:0 }}</span></strong></td>
                                 <td>{{ pago.id_pago.metodo_pago|title }}</td>
                                 <td>
                                     <span class="badge {% if pago.id_pago.estado == 'pagado' %}bg-success{% elif pago.id_pago.estado == 'parcial' %}bg-warning{% else %}bg-danger{% endif %}">
@@ -317,7 +317,7 @@
                 <div><strong>Restante estimado:</strong> ₲
                     <span
                     id="restante_ultimo_fmt"
-                    data-value="{{ restante_ultimo|default_if_none:'' }}">
+                    data-value="{{ restante_ultimo }}">
                     </span>
                 </div>
 
@@ -325,7 +325,7 @@
                 <div class="text-muted small">Pagado acumulado: ₲
                     <span
                     id="pagado_ultimo_fmt"
-                    data-value="{{ total_pagado_ultimo|default_if_none:'' }}">
+                    data-value="{{ total_pagado_ultimo }}">
                     </span>
                 </div>
                 {% endif %}
@@ -347,7 +347,7 @@
             type="hidden"
             name="monto"
             id="monto_hidden"
-            value="{{ restante_ultimo|default_if_none:'' }}"
+            value="{{ restante_ultimo }}"
             >
           </div>
 
@@ -389,15 +389,16 @@
 (function () {
   const nf = new Intl.NumberFormat('es-PY');
 
-  function toIntDigits(value) {
-    const digits = String(value || '').replace(/[^\d]/g, '');
-    return digits ? parseInt(digits, 10) : null;
+  function toInt(value) {
+    // Convertir directamente a número entero
+    const num = parseInt(value, 10);
+    return isNaN(num) ? null : num;
   }
 
   function formatSpanByDataValue(id) {
     const el = document.getElementById(id);
     if (!el) return;
-    const n = toIntDigits(el.dataset.value);
+    const n = toInt(el.dataset.value);
     if (n === null) return;
     el.textContent = nf.format(n);
   }
@@ -406,9 +407,9 @@
   formatSpanByDataValue('restante_ultimo_fmt');
   formatSpanByDataValue('pagado_ultimo_fmt');
 
-  // Historial pagos
+  // Historial pagos - ahora recibe el valor sin formatear
   document.querySelectorAll('[data-money]').forEach(el => {
-    const n = toIntDigits(el.dataset.money);
+    const n = toInt(el.dataset.money);
     if (n !== null) el.textContent = nf.format(n);
   });
 
@@ -420,7 +421,7 @@
   const form = modal.querySelector('form');
 
   modal.addEventListener('shown.bs.modal', function () {
-    const n = toIntDigits(hidden.value);
+    const n = toInt(hidden.value);
     if (n !== null) {
       display.value = nf.format(n);
       hidden.value = String(n);
@@ -431,14 +432,16 @@
     display.focus();
   });
 
-  // Mejor UX: no formatear en cada tecla, solo al salir del campo
+  // Extraer solo dígitos mientras se escribe
   display.addEventListener('input', function () {
-    const n = toIntDigits(display.value);
+    const digits = display.value.replace(/[^\d]/g, '');
+    const n = digits ? parseInt(digits, 10) : null;
     hidden.value = (n === null) ? '' : String(n);
   });
 
   display.addEventListener('blur', function () {
-    const n = toIntDigits(display.value);
+    const digits = display.value.replace(/[^\d]/g, '');
+    const n = digits ? parseInt(digits, 10) : null;
     if (n === null) {
       display.value = '';
       hidden.value = '';
@@ -449,7 +452,8 @@
   });
 
   form.addEventListener('submit', function (e) {
-    const n = toIntDigits(display.value);
+    const digits = display.value.replace(/[^\d]/g, '');
+    const n = digits ? parseInt(digits, 10) : null;
     if (n === null || n <= 0) {
       e.preventDefault();
       display.focus();
