@@ -71,7 +71,6 @@ def panel_dashboard(request):
 
 
 def panel_calendario(request):
-
     semana_param = request.GET.get("semana")
 
     if semana_param:
@@ -79,34 +78,36 @@ def panel_calendario(request):
             fecha_ref = datetime.strptime(semana_param, "%Y-%m-%d").date()
         except ValueError:
             fecha_ref = timezone.localdate()
-
     else:
         fecha_ref = timezone.localdate()
 
-
-    # Calcular lunes de esa semana
-    inicio_semana = fecha_ref - timedelta(days=fecha_ref.weekday())
-    fin_semana = inicio_semana + timedelta(days=5)  # lunes a sábado
+    # Si es domingo, usar el lunes de la PRÓXIMA semana
+    dia_semana = fecha_ref.weekday()
+    if dia_semana == 6:  # Domingo
+        inicio_semana = fecha_ref + timedelta(days=1)  # Próximo lunes
+    else:
+        inicio_semana = fecha_ref - timedelta(days=dia_semana)
+    
+    fin_semana = inicio_semana + timedelta(days=5)  # Sábado
 
     semana_anterior = (inicio_semana - timedelta(days=7)).strftime("%Y-%m-%d")
     semana_siguiente = (inicio_semana + timedelta(days=7)).strftime("%Y-%m-%d")
 
     hoy = timezone.localdate()
-    lunes_actual = hoy - timedelta(days=hoy.weekday())
+    if hoy.weekday() == 6:
+        lunes_actual = hoy + timedelta(days=1)
+    else:
+        lunes_actual = hoy - timedelta(days=hoy.weekday())
+    
     es_semana_actual = (inicio_semana == lunes_actual)
 
-    return render(
-        request,
-        "admin_panel/calendario.html",
-        {
-            "semana_anterior": semana_anterior,
-            "semana_siguiente": semana_siguiente,
-            "fecha_inicio": inicio_semana,
-            "fecha_fin": fin_semana,
-            "es_semana_actual": es_semana_actual,
-        },
-    )
-
+    return render(request, "admin_panel/calendario.html", {
+        "semana_anterior": semana_anterior,
+        "semana_siguiente": semana_siguiente,
+        "fecha_inicio": inicio_semana,
+        "fecha_fin": fin_semana,
+        "es_semana_actual": es_semana_actual,
+    })
 
 def api_calendario(request):
     semana_param = request.GET.get("semana")
@@ -119,10 +120,16 @@ def api_calendario(request):
     else:
         fecha_ref = timezone.localdate()
 
-    inicio_semana = fecha_ref - timedelta(days=fecha_ref.weekday())
-    fin_semana = inicio_semana + timedelta(days=5)
+    # Si es domingo, usar el lunes de la PRÓXIMA semana
+    dia_semana = fecha_ref.weekday()
+    if dia_semana == 6:  # Domingo
+        inicio_semana = fecha_ref + timedelta(days=1)
+    else:
+        inicio_semana = fecha_ref - timedelta(days=dia_semana)
+    
+    fin_semana = inicio_semana + timedelta(days=5)  # Sábado
 
-    # Días
+    # Días (lunes a sábado = 6 días)
     dias = [
         (inicio_semana + timedelta(days=i)).isoformat()
         for i in range(6)
