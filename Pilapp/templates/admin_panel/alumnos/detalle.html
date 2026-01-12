@@ -315,15 +315,17 @@
           {% if restante_ultimo != None %}
             <div class="alert alert-light border mb-3">
                 <div><strong>Restante estimado:</strong> ₲
-                <span id="restante_ultimo_fmt" data-value="{{ restante_ultimo|default_if_none:'' }}">
-                    {{ restante_ultimo|default_if_none:''|floatformat:0|intcomma }}
-                </span>
+                    <span
+                    id="restante_ultimo_fmt"
+                    data-value="{{ restante_ultimo|default_if_none:'' }}">
+                    </span>
                 </div>
 
                 {% if total_pagado_ultimo != None %}
                 <div class="text-muted small">Pagado acumulado: ₲
-                    <span id="pagado_ultimo_fmt" data-value="{{ total_pagado_ultimo|default_if_none:'' }}">
-                    {{ total_pagado_ultimo|default_if_none:''|floatformat:0|intcomma }}
+                    <span
+                    id="pagado_ultimo_fmt"
+                    data-value="{{ total_pagado_ultimo|default_if_none:'' }}">
                     </span>
                 </div>
                 {% endif %}
