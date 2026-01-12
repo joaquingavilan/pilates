@@ -1,25 +1,29 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
-from collections import defaultdict
-from django.db.models import Q, Count
-from datetime import date, timedelta, datetime
-from .models import (
-    Alumno, Persona, Clase, Turno, AlumnoClase, AlumnoClaseOcasional,
-    AlumnoPaquete, Paquete, Pago, PagoAlumno, ClienteProspecto
-)
+#imports de python
 import time 
-from django.http import HttpResponse
+from decimal import Decimal, InvalidOperation
+from collections import defaultdict
+from datetime import date, timedelta, datetime
+
+
+#imports de django
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse
+from django.db.models import Q, Count, Sum
 from django.template import loader
 from django.views.decorators.http import require_POST
 from django.db import transaction
+from django.contrib import messages
+from django.utils import timezone
+
+
+#imports del proyecto
 
 from .models import (
-    Alumno, Persona, Instructor,
-    AlumnoPaquete, AlumnoPaqueteTurno,
-    AlumnoClase, AlumnoClaseOcasional,
-    Pago, PagoAlumno, PagoInstructor,
-    ClienteProspecto
+    Alumno, Persona, Clase, Turno, AlumnoClase, AlumnoClaseOcasional,
+    AlumnoPaquete, Paquete, Pago, PagoAlumno, ClienteProspecto,
+    AlumnoPaqueteTurno, PagoInstructor, Instructor
 )
+
 
 
 def panel_dashboard(request):
@@ -247,15 +251,41 @@ def panel_alumnos(request):
         'filtros': filtros,
     })
 
-
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""
     from .models import AlumnoPaqueteTurno
-    
-    alumno = get_object_or_404(Alumno.objects.select_related('id_persona'), id_alumno=id_alumno)
-    
-    # Paquetes del alumno
-    paquetes = AlumnoPaquete.objects.filter(id_alumno=alumno).select_related('id_paquete')
+
+    alumno = get_object_or_404(
+        Alumno.objects.select_related('id_persona'),
+        id_alumno=id_alumno
+    )
+
+    # Paquetes del alumno (ordenados por "más reciente" usando el PK)
+    paquetes = (
+        AlumnoPaquete.objects
+        .filter(id_alumno=alumno)
+        .select_related('id_paquete')
+        .order_by('-id_alumno_paquete')
+    )
+
+    # Definir último paquete (si existe)
+    ultimo_paquete = paquetes.first()
+    ultimo_paquete_id = ultimo_paquete.id_alumno_paquete if ultimo_paquete else None
+
+    # Calcular pagado/restante solo para el último paquete
+    total_pagado_ultimo = None
+    restante_ultimo = None
+    if ultimo_paquete:
+        total_pagado_ultimo = (
+            PagoAlumno.objects
+            .filter(id_alumno_paquete=ultimo_paquete, id_pago__estado__in=['pagado', 'parcial'])
+            .aggregate(total=Sum('id_pago__monto'))
+            .get('total') or Decimal('0')
+        )
+        costo = ultimo_paquete.id_paquete.costo or Decimal('0')
+        restante_ultimo = max(Decimal('0'), costo - total_pagado_ultimo)
+
+    # Enriquecer cada paquete con clases usadas + porcentaje
     for paquete in paquetes:
         paquete.clases_usadas = AlumnoClase.objects.filter(
             id_alumno_paquete=paquete,
@@ -263,21 +293,20 @@ def panel_alumno_detalle(request, id_alumno):
         ).count()
         total = paquete.id_paquete.cantidad_clases
         paquete.porcentaje_uso = (paquete.clases_usadas / total * 100) if total > 0 else 0
-    
+
     # Turnos asignados (solo paquetes activos)
     turnos = AlumnoPaqueteTurno.objects.filter(
         id_alumno_paquete__id_alumno=alumno,
         id_alumno_paquete__estado='activo'
     ).select_related('id_turno')
-    
+
     # Historial de clases (regulares + ocasionales)
     historial_clases = []
-    
-    # Clases regulares
+
     clases_regulares = AlumnoClase.objects.filter(
         id_alumno_paquete__id_alumno=alumno
     ).select_related('id_clase', 'id_clase__id_turno').order_by('-id_clase__fecha')
-    
+
     for ac in clases_regulares:
         historial_clases.append({
             'fecha': ac.id_clase.fecha,
@@ -285,12 +314,11 @@ def panel_alumno_detalle(request, id_alumno):
             'tipo': 'regular',
             'estado': ac.estado,
         })
-    
-    # Clases ocasionales
+
     clases_ocasionales = AlumnoClaseOcasional.objects.filter(
         id_alumno=alumno
     ).select_related('id_clase', 'id_clase__id_turno').order_by('-id_clase__fecha')
-    
+
     for ao in clases_ocasionales:
         historial_clases.append({
             'fecha': ao.id_clase.fecha,
@@ -298,23 +326,26 @@ def panel_alumno_detalle(request, id_alumno):
             'tipo': 'ocasional',
             'estado': ao.estado,
         })
-    
-    # Ordenar por fecha descendente
+
     historial_clases.sort(key=lambda x: x['fecha'], reverse=True)
-    
-    # Pagos
+
+    # Pagos (ya lo tenías bien)
     pagos = PagoAlumno.objects.filter(
         id_alumno_paquete__id_alumno=alumno
     ).select_related('id_pago', 'id_alumno_paquete__id_paquete').order_by('-id_pago__fecha')
-    
+
     return render(request, 'admin_panel/alumnos/detalle.html', {
         'alumno': alumno,
         'paquetes': paquetes,
         'turnos': turnos,
         'historial_clases': historial_clases,
         'pagos': pagos,
-    })
 
+        # NUEVO
+        'ultimo_paquete_id': ultimo_paquete_id,
+        'total_pagado_ultimo': total_pagado_ultimo,
+        'restante_ultimo': restante_ultimo,
+    })
 
 def panel_clases(request):
     """Lista de clases con filtros."""
@@ -560,3 +591,103 @@ def panel_alumno_eliminar(request, id_alumno):
     # Volver a la lista (si querés volver al referer, también se puede)
     return redirect("panel_alumnos")
 
+##registrar pago de paquete para alumno desde su detalle
+
+
+def _generar_nro_pago(alumno_paquete: AlumnoPaquete) -> str:
+    # Obligatorio en tu modelo. Lo hacemos único y trazable.
+    ts = timezone.now().strftime("%Y%m%d-%H%M%S")
+  # ej: APQ-123-20260111-193010
+    return f"APQ-{alumno_paquete.id_alumno_paquete}-{ts}"
+
+
+def _total_pagado_paquete(alumno_paquete: AlumnoPaquete) -> Decimal:
+    # Suma de pagos asociados al paquete.
+    # Tomamos pagos 'pagado' y 'parcial'. Si tuvieras 'pendiente' en pagos reales, podrías excluirlo.
+    qs = PagoAlumno.objects.filter(id_alumno_paquete=alumno_paquete).select_related("id_pago")
+    total = Decimal("0")
+    for pa in qs:
+        if pa.id_pago and pa.id_pago.estado in ("pagado", "parcial"):
+            total += (pa.id_pago.monto or Decimal("0"))
+    return total
+
+
+@require_POST
+@transaction.atomic
+def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    alumno_paquete = get_object_or_404(
+        AlumnoPaquete,
+        id_alumno_paquete=id_alumno_paquete,
+        id_alumno=alumno
+    )
+
+    monto_raw = (request.POST.get("monto") or "").strip()
+    metodo_pago = (request.POST.get("metodo_pago") or "").strip()
+    comprobante = (request.POST.get("comprobante") or "").strip()
+    observaciones = (request.POST.get("observaciones") or "").strip()
+
+    errores = []
+
+    if not monto_raw:
+        errores.append("Debes ingresar un monto.")
+    if metodo_pago not in ("efectivo", "tarjeta", "transferencia"):
+        errores.append("Debes seleccionar un método de pago válido.")
+
+    try:
+        monto = Decimal(monto_raw)
+        if monto <= 0:
+            errores.append("El monto debe ser mayor que 0.")
+    except (InvalidOperation, ValueError):
+        errores.append("El monto no tiene un formato válido.")
+
+    if errores:
+        # Si no usas messages, puedes devolver un HttpResponse o guardar en session.
+        # Por simplicidad, redirigimos al detalle.
+        return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+
+    # Costo del paquete y acumulado anterior
+    costo = alumno_paquete.id_paquete.costo or Decimal("0")
+
+    total_pagado_antes = (
+        PagoAlumno.objects
+        .filter(id_alumno_paquete=alumno_paquete, id_pago__estado__in=["pagado", "parcial"])
+        .aggregate(total=Sum("id_pago__monto"))
+        .get("total") or Decimal("0")
+    )
+
+    restante_antes = max(Decimal("0"), costo - total_pagado_antes)
+
+    # Estado del pago creado (según lo que faltaba en ese momento)
+    estado_pago_creado = "pagado" if monto >= restante_antes else "parcial"
+
+    nro_pago = f"APQ-{alumno_paquete.id_alumno_paquete}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
+
+    pago = Pago.objects.create(
+        fecha=date.today(),
+        monto=monto,
+        nro_pago=nro_pago,
+        estado=estado_pago_creado,
+        metodo_pago=metodo_pago,
+        comprobante=comprobante or None,
+        id_factura=None
+    )
+
+    PagoAlumno.objects.create(
+        id_pago=pago,
+        id_alumno_paquete=alumno_paquete,
+        observaciones=observaciones or None
+    )
+
+    # Actualizar estado_pago del paquete según acumulado total
+    total_pagado_despues = total_pagado_antes + monto
+    if costo > 0 and total_pagado_despues >= costo:
+        alumno_paquete.estado_pago = "pagado"
+    elif total_pagado_despues > 0:
+        alumno_paquete.estado_pago = "parcial"
+    else:
+        alumno_paquete.estado_pago = "pendiente"
+
+    alumno_paquete.save()
+
+    return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)

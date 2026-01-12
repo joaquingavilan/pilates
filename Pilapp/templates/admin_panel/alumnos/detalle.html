@@ -119,6 +119,7 @@
                                 <th>Estado</th>
                                 <th>Pago</th>
                                 <th>Clases Usadas</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -141,6 +142,20 @@
                                     <div class="progress" style="height: 5px; width: 100px;">
                                         <div class="progress-bar" style="width: {{ paquete.porcentaje_uso }}%"></div>
                                     </div>
+                                </td>
+                                <td class="text-end">
+                                    {% if paquete.id_alumno_paquete == ultimo_paquete_id and paquete.estado_pago != 'pagado' %}
+                                        <button
+                                        type="button"
+                                        class="btn btn-sm btn-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalRegistrarPago"
+                                        >
+                                        <i class="bi bi-cash-coin me-1"></i> Registrar pago
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -283,5 +298,63 @@
     </div>
   </div>
 </div>
+{% if ultimo_paquete_id %}
+<div class="modal fade" id="modalRegistrarPago" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'panel_registrar_pago_alumno' alumno.id_alumno ultimo_paquete_id %}">
+        {% csrf_token %}
+
+        <div class="modal-header">
+          <h5 class="modal-title">Registrar pago (último paquete)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          {% if restante_ultimo != None %}
+            <div class="alert alert-light border mb-3">
+              <div><strong>Restante estimado:</strong> ₲ {{ restante_ultimo|floatformat:0 }}</div>
+              {% if total_pagado_ultimo != None %}
+                <div class="text-muted small">Pagado acumulado: ₲ {{ total_pagado_ultimo|floatformat:0 }}</div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">Monto</label>
+            <input type="number" step="1" min="1" name="monto" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Método de pago</label>
+            <select name="metodo_pago" class="form-select" required>
+              <option value="" selected>Seleccionar...</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Comprobante (opcional)</label>
+            <input type="text" name="comprobante" class="form-control" placeholder="Nro, referencia o URL">
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label">Observaciones (opcional)</label>
+            <textarea name="observaciones" class="form-control" rows="3"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 
 {% endblock %}
