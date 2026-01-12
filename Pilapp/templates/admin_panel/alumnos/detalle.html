@@ -1,4 +1,5 @@
 {% extends 'admin_panel/base.html' %}
+{% load humanize %}
 
 {% block title %}{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}{% endblock %}
 
@@ -250,7 +251,7 @@
                             {% for pago in pagos %}
                             <tr>
                                 <td>{{ pago.id_pago.fecha|date:"d/m/Y" }}</td>
-                                <td><strong>₲ {{ pago.id_pago.monto|floatformat:0 }}</strong></td>
+                                <td><strong>₲ <span data-money="{{ pago.id_pago.monto|floatformat:0 }}">{{ pago.id_pago.monto|floatformat:0 }}</span></strong></td>
                                 <td>{{ pago.id_pago.metodo_pago|title }}</td>
                                 <td>
                                     <span class="badge {% if pago.id_pago.estado == 'pagado' %}bg-success{% elif pago.id_pago.estado == 'parcial' %}bg-warning{% else %}bg-danger{% endif %}">
@@ -306,32 +307,55 @@
         {% csrf_token %}
 
         <div class="modal-header">
-          <h5 class="modal-title">Registrar pago (último paquete)</h5>
+          <h5 class="modal-title">Registrar pago</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
 
         <div class="modal-body">
           {% if restante_ultimo != None %}
             <div class="alert alert-light border mb-3">
-              <div><strong>Restante estimado:</strong> ₲ {{ restante_ultimo|floatformat:0 }}</div>
-              {% if total_pagado_ultimo != None %}
-                <div class="text-muted small">Pagado acumulado: ₲ {{ total_pagado_ultimo|floatformat:0 }}</div>
-              {% endif %}
+                <div><strong>Restante estimado:</strong> ₲
+                <span id="restante_ultimo_fmt" data-value="{{ restante_ultimo|default_if_none:'' }}">
+                    {{ restante_ultimo|default_if_none:''|floatformat:0|intcomma }}
+                </span>
+                </div>
+
+                {% if total_pagado_ultimo != None %}
+                <div class="text-muted small">Pagado acumulado: ₲
+                    <span id="pagado_ultimo_fmt" data-value="{{ total_pagado_ultimo|default_if_none:'' }}">
+                    {{ total_pagado_ultimo|default_if_none:''|floatformat:0|intcomma }}
+                    </span>
+                </div>
+                {% endif %}
             </div>
           {% endif %}
 
           <div class="mb-3">
             <label class="form-label">Monto</label>
-            <input type="number" step="1" min="1" name="monto" class="form-control" required>
+            <input
+            type="text"
+            id="monto_display"
+            class="form-control"
+            inputmode="numeric"
+            autocomplete="off"
+            required
+            >
+
+            <input
+            type="hidden"
+            name="monto"
+            id="monto_hidden"
+            value="{{ restante_ultimo|default_if_none:'' }}"
+            >
           </div>
 
           <div class="mb-3">
             <label class="form-label">Método de pago</label>
             <select name="metodo_pago" class="form-select" required>
-              <option value="" selected>Seleccionar...</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="transferencia">Transferencia</option>
+            <option value="">Seleccionar...</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia" selected>Transferencia</option>
             </select>
           </div>
 
@@ -357,4 +381,80 @@
 {% endif %}
 
 
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const nf = new Intl.NumberFormat('es-PY');
+
+  function toIntDigits(value) {
+    const digits = String(value || '').replace(/[^\d]/g, '');
+    return digits ? parseInt(digits, 10) : null;
+  }
+
+  function formatSpanByDataValue(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const n = toIntDigits(el.dataset.value);
+    if (n === null) return;
+    el.textContent = nf.format(n);
+  }
+
+  // Modal: restante/pagado
+  formatSpanByDataValue('restante_ultimo_fmt');
+  formatSpanByDataValue('pagado_ultimo_fmt');
+
+  // Historial pagos
+  document.querySelectorAll('[data-money]').forEach(el => {
+    const n = toIntDigits(el.dataset.money);
+    if (n !== null) el.textContent = nf.format(n);
+  });
+
+  const modal = document.getElementById('modalRegistrarPago');
+  if (!modal) return;
+
+  const display = document.getElementById('monto_display');
+  const hidden = document.getElementById('monto_hidden');
+  const form = modal.querySelector('form');
+
+  modal.addEventListener('shown.bs.modal', function () {
+    const n = toIntDigits(hidden.value);
+    if (n !== null) {
+      display.value = nf.format(n);
+      hidden.value = String(n);
+    } else {
+      display.value = '';
+      hidden.value = '';
+    }
+    display.focus();
+  });
+
+  // Mejor UX: no formatear en cada tecla, solo al salir del campo
+  display.addEventListener('input', function () {
+    const n = toIntDigits(display.value);
+    hidden.value = (n === null) ? '' : String(n);
+  });
+
+  display.addEventListener('blur', function () {
+    const n = toIntDigits(display.value);
+    if (n === null) {
+      display.value = '';
+      hidden.value = '';
+      return;
+    }
+    display.value = nf.format(n);
+    hidden.value = String(n);
+  });
+
+  form.addEventListener('submit', function (e) {
+    const n = toIntDigits(display.value);
+    if (n === null || n <= 0) {
+      e.preventDefault();
+      display.focus();
+      return;
+    }
+    hidden.value = String(n);
+  });
+})();
+</script>
 {% endblock %}
