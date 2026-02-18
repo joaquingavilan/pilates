@@ -339,6 +339,86 @@ def obtener_clases_agendadas(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+@csrf_exempt
+@transaction.atomic
+def registrar_pago(request):
+    """
+    POST /registrar_pago/
+    ---------------------
+    Registra el pago de un alumno, vinculándolo a un paquete específico y actualizando su estado.
+
+    Entradas (JSON):
+    - id_alumno_paquete (int) [obligatorio]: ID del paquete que se está pagando.
+    - monto (decimal/float)   [obligatorio]: Monto abonado.
+    - metodo_pago (str)       [obligatorio]: 'Efectivo', 'Transferencia', etc.
+    - comprobante (str)       [opcional]: Referencia o número de operación.
+
+    Respuesta 200 OK:
+    {
+        "status": "success",
+        "message": "Pago registrado correctamente.",
+        "pago_id": 15
+    }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        id_paquete = data.get("id_alumno_paquete")
+        monto = data.get("monto")
+        metodo = data.get("metodo_pago")
+        comprobante = data.get("comprobante", "")
+
+        # Validaciones de entrada
+        errores = []
+        if not id_paquete: errores.append("Falta 'id_alumno_paquete'.")
+        if not monto: errores.append("Falta 'monto'.")
+        if not metodo: errores.append("Falta 'metodo_pago'.")
+
+        if errores:
+            return JsonResponse({"status": "fail", "errores": errores}, status=400)
+
+        # Buscar el paquete del alumno
+        try:
+            alumno_paquete = AlumnoPaquete.objects.get(id_alumno_paquete=id_paquete)
+        except AlumnoPaquete.DoesNotExist:
+            return JsonResponse({"status": "fail", "message": "El paquete de alumno especificado no existe."}, status=404)
+
+        # 1. Crear el registro en la tabla Pago
+        nuevo_pago = Pago.objects.create(
+            fecha=timezone.localdate(),
+            monto=monto,
+            nro_pago=f"IA-{now().strftime('%m%d%H%M')}", # Genera un nro de referencia único
+            estado="pagado",
+            metodo_pago=metodo,
+            comprobante=comprobante
+        )
+
+        # 2. Vincular el pago con el AlumnoPaquete en la tabla intermedia PagoAlumno
+        PagoAlumno.objects.create(
+            id_pago=nuevo_pago,
+            id_alumno_paquete=alumno_paquete,
+            observaciones="Registrado vía Asistente IA"
+        )
+
+        # 3. Actualizar el estado en AlumnoPaquete
+        alumno_paquete.estado_pago = "pagado"
+        alumno_paquete.save()
+
+        logging.info(f"[registrar_pago] Éxito: Pago {nuevo_pago.id_pago} para Paquete {id_paquete}")
+
+        return JsonResponse({
+            "status": "success",
+            "message": "Pago registrado correctamente.",
+            "pago_id": nuevo_pago.id_pago
+        })
+
+    except Exception as e:
+        logging.error(f"[registrar_pago] Error inesperado: {str(e)}")
+        return JsonResponse({"status": "fail", "error": str(e)}, status=500)
+
+
 
 def normalizar(texto):
     if not texto:
