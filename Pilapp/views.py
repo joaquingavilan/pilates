@@ -339,6 +339,88 @@ def obtener_clases_agendadas(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+@csrf_exempt
+@transaction.atomic
+def registrar_pago(request):
+    """
+    POST /registrar_pago/
+    ---------------------
+    Registra el pago de un alumno, buscando automáticamente su paquete pendiente 
+    y actualizando su estado a 'pagado'.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        id_alumno = data.get("id_alumno")
+        monto = data.get("monto")
+        metodo = data.get("metodo_pago")
+        cant_clases_input = data.get("cant_clases") # Lo que viene de la IA
+        comprobante = data.get("comprobante", "")
+
+        # Validaciones de entrada
+        errores = []
+        if not id_alumno: errores.append("Falta 'id_alumno'.")
+        if not monto: errores.append("Falta 'monto'.")
+        if not metodo: errores.append("Falta 'metodo_pago'.")
+
+        if errores:
+            return JsonResponse({"status": "fail", "errores": errores}, status=400)
+
+        # --- Lógica de búsqueda del paquete pendiente ---
+        filtros = {
+            'id_alumno': id_alumno,
+            'estado_pago': 'pendiente'
+        }
+        
+        # CORRECCIÓN 1: Usar 'cantidad_clases' que es el nombre real en el modelo Paquete
+        if cant_clases_input:
+            filtros['id_paquete__cantidad_clases'] = cant_clases_input
+
+        paquetes_pendientes = AlumnoPaquete.objects.filter(**filtros).order_by('-id_alumno_paquete')
+
+        if not paquetes_pendientes.exists():
+            return JsonResponse({
+                "status": "fail", 
+                "message": f"No se encontró un paquete pendiente para el alumno ID {id_alumno}."
+            }, status=404)
+
+        alumno_paquete = paquetes_pendientes.first()
+
+        # 1. Crear el registro en la tabla Pago
+        nuevo_pago = Pago.objects.create(
+            fecha=timezone.localdate(),
+            monto=monto,
+            nro_pago=f"IA-{now().strftime('%m%d%H%M')}", 
+            estado="pagado",
+            metodo_pago=metodo,
+            comprobante=comprobante
+        )
+
+        # 2. Vincular el pago
+        PagoAlumno.objects.create(
+            id_pago=nuevo_pago,
+            id_alumno_paquete=alumno_paquete,
+            observaciones="Registrado vía Asistente IA - Búsqueda Automática"
+        )
+
+        # 3. Actualizar el estado
+        alumno_paquete.estado_pago = "pagado"
+        alumno_paquete.save()
+
+        logging.info(f"[registrar_pago] Éxito: Pago {nuevo_pago.id_pago} para Alumno {id_alumno}")
+
+        # CORRECCIÓN 2: Usar 'cantidad_clases' aquí también para evitar el Error 500
+        return JsonResponse({
+            "status": "success",
+            "message": f"Pago registrado correctamente para el paquete de {alumno_paquete.id_paquete.cantidad_clases} clases.",
+            "pago_id": nuevo_pago.id_pago
+        })
+
+    except Exception as e:
+        logging.error(f"[registrar_pago] Error inesperado: {str(e)}")
+        return JsonResponse({"status": "fail", "error": str(e)}, status=500)
 
 def normalizar(texto):
     if not texto:
