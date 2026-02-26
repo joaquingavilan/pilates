@@ -402,7 +402,7 @@ def registrar_pago(request):
         PagoAlumno.objects.create(
             id_pago=nuevo_pago,
             id_alumno_paquete=alumno_paquete,
-            observaciones="Registrado vía Asistente IA - Búsqueda Automática"
+            observaciones="Registrado- Búsqueda Automática"
         )
 
         # 3. Actualizar el estado

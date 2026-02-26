@@ -3,19 +3,14 @@ from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
-
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Detectar entorno
-ENVIRONMENT = os.environ.get("ENVIRONMENT", "local")  # "local" o "production"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "local")
 IS_LOCAL = ENVIRONMENT == "local"
-
 
 # Seguridad
 SECRET_KEY = os.environ.get("SECRET_KEY", "clave-insegura-para-local")
@@ -35,11 +30,10 @@ if IS_LOCAL:
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Solo activar cookies seguras en producción
 SESSION_COOKIE_SECURE = not IS_LOCAL
 CSRF_COOKIE_SECURE = not IS_LOCAL
 
-# Aplicaciones instaladas - AGREGAR corsheaders
+# Aplicaciones instaladas
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -52,9 +46,9 @@ INSTALLED_APPS = [
     'Pilapp',
 ]
 
-# Middleware - AGREGAR CorsMiddleware AL PRINCIPIO
+# Middleware
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # ← NUEVO - DEBE IR PRIMERO
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -65,29 +59,16 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# CONFIGURACIÓN CORS - AGREGAR AL FINAL
+# CONFIGURACIÓN CORS
 CORS_ALLOWED_ORIGINS = [
-    "https://mcp-pilates-production.up.railway.app",  # Tu servidor MCP
-    "https://pilatesmacp-client-production.up.railway.app",  # Tu cliente
+    "https://mcp-pilates-production.up.railway.app",
+    "https://pilatesmacp-client-production.up.railway.app",
 ]
 
-# Alternativamente, para desarrollo puedes usar (MENOS SEGURO):
 if IS_LOCAL:
     CORS_ALLOW_ALL_ORIGINS = True
 
-# Configurar headers CORS específicos
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
 
 # Configuración de URLs
 ROOT_URLCONF = 'TuPilates.urls'
@@ -96,7 +77,7 @@ ROOT_URLCONF = 'TuPilates.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],  # Para templates globales si los necesitás
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -109,35 +90,30 @@ TEMPLATES = [
     },
 ]
 
-# WSGI
 WSGI_APPLICATION = 'TuPilates.wsgi.application'
 
-# Base de Datos - Railway en ambos casos, pero con SSL solo en producción
+# --- SECCIÓN DE BASE DE DATOS HÍBRIDA ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
+    # PRIORIDAD 1: Si existe DATABASE_URL (Railway o .env), usar Postgres
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
-            ssl_require=not IS_LOCAL  # SSL solo en producción
+            ssl_require=not IS_LOCAL
         )
     }
 else:
-    # Fallback para desarrollo sin variable de entorno
+    # PRIORIDAD 2: Si no hay URL (Caso de hoy), usar SQLite local para que Postman funcione
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'railway',
-            'USER': 'postgres',
-            'PASSWORD': os.environ.get("DB_PASSWORD", ""),
-            'HOST': os.environ.get("DB_HOST", ""),
-            'PORT': os.environ.get("DB_PORT", "5432"),
-            'OPTIONS': {} if IS_LOCAL else {'sslmode': 'require'},
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+# ------------------------------------------
 
-# Validaciones de contraseñas
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -145,18 +121,16 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-LANGUAGE_CODE = 'es-py'  # Cambiado a español Paraguay
-TIME_ZONE = 'America/Asuncion'  # Tu timezone
+LANGUAGE_CODE = 'es-py'
+TIME_ZONE = 'America/Asuncion'
 USE_I18N = True
 USE_TZ = True
 
-# Archivos estáticos
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -172,6 +146,4 @@ LOGGING = {
     },
 }
 
-
-# Auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
