@@ -345,82 +345,108 @@ def registrar_pago(request):
     """
     POST /registrar_pago/
     ---------------------
-    Registra el pago de un alumno, buscando automáticamente su paquete pendiente 
-    y actualizando su estado a 'pagado'.
+    Permite registrar un pago procesando lenguaje natural del cliente (Nombre, Comprobante, Cantidad de Clases).
+    El sistema identifica al alumno y vincula el pago al paquete correcto.
+
+    Entradas (JSON):
+    - monto (int)                 [obligatorio]
+    - metodo_pago (str)           [obligatorio]
+    - nombre / apellido (str)      [opcional; para búsqueda]
+    - telefono / ruc (str)         [opcional; para búsqueda precisa]
+    - cant_clases (int)            [opcional; ej: 12. Ayuda a encontrar el paquete exacto]
+    - comprobante (str)            [opcional; nro de transacción o URL de imagen]
     """
+
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
-        id_alumno = data.get("id_alumno")
+        
+        # 1. Extraer datos del "Mensaje del Cliente"
         monto = data.get("monto")
         metodo = data.get("metodo_pago")
-        cant_clases_input = data.get("cant_clases") # Lo que viene de la IA
-        comprobante = data.get("comprobante", "")
+        comprobante = data.get("comprobante", "Sin comprobante adjunto")
+        cant_clases_mencionadas = data.get("cant_clases")
 
-        # Validaciones de entrada
-        errores = []
-        if not id_alumno: errores.append("Falta 'id_alumno'.")
-        if not monto: errores.append("Falta 'monto'.")
-        if not metodo: errores.append("Falta 'metodo_pago'.")
+        # Datos para identificar quién es
+        nombre = data.get("nombre")
+        apellido = data.get("apellido")
+        telefono = data.get("telefono")
+        ruc = data.get("ruc")
+        id_alumno = data.get("id_alumno")
 
-        if errores:
-            return JsonResponse({"status": "fail", "errores": errores}, status=400)
+        # 2. Validaciones básicas
+        if not monto or not metodo:
+            return JsonResponse({"errores": ["Faltan datos financieros (monto/método)."]}, status=400)
 
-        # --- Lógica de búsqueda del paquete pendiente ---
-        filtros = {
-            'id_alumno': id_alumno,
-            'estado_pago': 'pendiente'
-        }
+        # 3. MOTOR DE BÚSQUEDA DE ALUMNO (Identificar quién paga)
+        alumno = None
+        if id_alumno:
+            alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         
-        # CORRECCIÓN 1: Usar 'cantidad_clases' que es el nombre real en el modelo Paquete
-        if cant_clases_input:
-            filtros['id_paquete__cantidad_clases'] = cant_clases_input
+        if not alumno and (telefono or ruc):
+            persona = Persona.objects.filter(Q(telefono=telefono) | Q(ruc=ruc)).first()
+            if persona:
+                alumno = Alumno.objects.filter(id_persona=persona).first()
 
-        paquetes_pendientes = AlumnoPaquete.objects.filter(**filtros).order_by('-id_alumno_paquete')
+        if not alumno and nombre and apellido:
+            persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
+            if persona:
+                alumno = Alumno.objects.filter(id_persona=persona).first()
 
-        if not paquetes_pendientes.exists():
-            return JsonResponse({
-                "status": "fail", 
-                "message": f"No se encontró un paquete pendiente para el alumno ID {id_alumno}."
-            }, status=404)
+        if not alumno:
+            return JsonResponse({"errores": ["No pude encontrar al alumno. ¿Podrías darme su nombre completo o teléfono?"]}, status=404)
 
-        alumno_paquete = paquetes_pendientes.first()
+        # 4. MOTOR DE BÚSQUEDA DE PAQUETE (¿Qué está pagando?)
+        # Buscamos paquetes pendientes de ese alumno
+        filtros_p = {'id_alumno': alumno, 'estado_pago': 'pendiente'}
+        
+        # SI EL CLIENTE DIJO "PAGUÉ LAS 12 CLASES", FILTRAMOS POR ESO
+        if cant_clases_mencionadas:
+            filtros_p['id_paquete__cantidad_clases'] = cant_clases_mencionadas
 
-        # 1. Crear el registro en la tabla Pago
+        paquetes_candidatos = AlumnoPaquete.objects.filter(**filtros_p).order_by('-id_alumno_paquete')
+
+        if not paquetes_candidatos.exists():
+            msg = f"No encontré un paquete pendiente de {cant_clases_mencionadas if cant_clases_mencionadas else ''} clases para este alumno."
+            return JsonResponse({"errores": [msg]}, status=404)
+
+        alumno_paquete = paquetes_candidatos.first()
+
+        # 5. REGISTRO OFICIAL DEL PAGO
         nuevo_pago = Pago.objects.create(
             fecha=timezone.localdate(),
             monto=monto,
-            nro_pago=f"IA-{now().strftime('%m%d%H%M')}", 
+            nro_pago=f"IA-{timezone.now().strftime('%d%H%M')}",
             estado="pagado",
             metodo_pago=metodo,
             comprobante=comprobante
         )
 
-        # 2. Vincular el pago
         PagoAlumno.objects.create(
             id_pago=nuevo_pago,
             id_alumno_paquete=alumno_paquete,
-            observaciones="Registrado- Búsqueda Automática"
+            observaciones=f"Pago registrado vía Chat/MCP. Ref: {comprobante}"
         )
 
-        # 3. Actualizar el estado
+        # Actualizar el paquete a PAGADO
         alumno_paquete.estado_pago = "pagado"
         alumno_paquete.save()
 
-        logging.info(f"[registrar_pago] Éxito: Pago {nuevo_pago.id_pago} para Alumno {id_alumno}")
-
-        # CORRECCIÓN 2: Usar 'cantidad_clases' aquí también para evitar el Error 500
         return JsonResponse({
             "status": "success",
-            "message": f"Pago registrado correctamente para el paquete de {alumno_paquete.id_paquete.cantidad_clases} clases.",
-            "pago_id": nuevo_pago.id_pago
-        })
+            "message": f"¡Entendido! Registré el pago de {monto} para {alumno.id_persona.nombre} por el paquete de {alumno_paquete.id_paquete.cantidad_clases} clases.",
+            "data": {
+                "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
+                "comprobante_registrado": comprobante,
+                "pago_id": nuevo_pago.id_pago
+            }
+        }, status=200)
 
     except Exception as e:
-        logging.error(f"[registrar_pago] Error inesperado: {str(e)}")
-        return JsonResponse({"status": "fail", "error": str(e)}, status=500)
+        return JsonResponse({"error": "Hubo un problema al procesar el pago", "detalle": str(e)}, status=500)
+
 
 def normalizar(texto):
     if not texto:
