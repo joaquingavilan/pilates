@@ -621,7 +621,7 @@ def panel_alumno_eliminar(request, id_alumno):
             existe_pago_instructor = PagoInstructor.objects.filter(id_pago_id=pid).exists()
 
             if (not existe_otro_pago_alumno) and (not existe_pago_instructor):
-                Pago.objects.filter(id_pago_id=pid).delete()
+                Pago.objects.filter(id_pago=pid).delete()
 
         # 3) Borrar persona si no quedó referenciada por nadie
         #    (Protege el caso raro de que Persona sea también Instructor)

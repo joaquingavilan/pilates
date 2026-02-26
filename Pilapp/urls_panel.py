@@ -24,6 +24,7 @@ urlpatterns = [
     
     # Prospectos
     path('prospectos/', views_panel.panel_prospectos, name='panel_prospectos'),
+
     
     # API endpoints
     path('api/clase/<int:id_clase>/alumnos/', views_panel.api_clase_alumnos, name='api_clase_alumnos'),
@@ -35,6 +36,7 @@ urlpatterns = [
     path("alumnos/<int:id_alumno>/eliminar/", views_panel.panel_alumno_eliminar, name="panel_alumno_eliminar"),
 
     path("alumnos/<int:id_alumno>/paquetes/<int:id_alumno_paquete>/registrar_pago/", views_panel.panel_registrar_pago_alumno,name="panel_registrar_pago_alumno"),
+
 
     
 ]
