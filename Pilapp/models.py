@@ -164,13 +164,18 @@ class Clase(models.Model):
     id_instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)
     id_turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
     fecha = models.DateField()
+    
+    # Campo de la base de datos
+    total_inscriptos = models.IntegerField(default=0)
 
     def __str__(self):
         return f"Clase {self.id_clase} - {self.fecha}"
 
+    # Renombramos la propiedad para evitar el conflicto
+
     @property
-    def total_inscriptos(self):
-        from .models import AlumnoClase, AlumnoClaseOcasional  # Evitar import circular
+    def obtener_total_inscriptos(self):
+        from .models import AlumnoClase, AlumnoClaseOcasional
         cantidad_regulares = AlumnoClase.objects.filter(id_clase_id=self.id_clase).count()
         cantidad_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase_id=self.id_clase).count()
         return cantidad_regulares + cantidad_ocasionales
