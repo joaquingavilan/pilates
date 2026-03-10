@@ -245,7 +245,7 @@ def renovar_paquete(request):
         nombre = data.get("nombre")
         apellido = data.get("apellido")
         telefono = data.get("telefono") or data.get("numero")
-        tipo_paquete_str = data.get("tipo_paquete") # Ej: "8 clases"
+        tipo_paquete_str = data.get("tipo_paquete")
         precio = data.get("precio")
 
         # 2. Búsqueda de Alumno
@@ -260,8 +260,6 @@ def renovar_paquete(request):
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
-        # 3. Búsqueda del Paquete (Extrayendo el número del string "8 clases" -> 8)
-        # Asumimos que el formato siempre es "X clases"
         try:
             cantidad = int(tipo_paquete_str.split()[0])
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
@@ -271,7 +269,6 @@ def renovar_paquete(request):
         if not paquete_base:
             return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
 
-        # 4. Creación del Contrato (AlumnoPaquete)
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
