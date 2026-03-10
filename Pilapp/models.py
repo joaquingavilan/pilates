@@ -226,30 +226,40 @@ class AlumnoPaquete(models.Model):
     fecha_inicio = models.DateField(null=True)
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
-        
-    @classmethod  
-    @transaction.atomic 
-    def renovar(cls, alumno, id_paquete_nuevo):
+  
+    @staticmethod
+    def renovar(alumno, id_paquete_nuevo):
         """
-        Método inteligente para renovar paquetes.
+        Renueva el paquete del alumno: expira el anterior y crea uno nuevo.
         """
-        # 1. Cerramos el anterior
-        paquete_anterior = cls.objects.filter(id_alumno=alumno, estado="activo").first()
-        if paquete_anterior:
-            paquete_anterior.estado = "expirado"
-            paquete_anterior.save()
+        # Importamos aquí dentro para evitar errores de importación circular
+        from .models import Paquete
+        from django.db import transaction
 
-        # 2. Creamos el nuevo
-        paquete_base = Paquete.objects.get(pk=id_paquete_nuevo)
-        
-        return cls.objects.create(
-            id_alumno=alumno,
-            id_paquete=paquete_base,
-            estado="activo",
-            estado_pago="pendiente",
-            fecha_inicio=timezone.now().date()
-        )
+        with transaction.atomic():
+            # 1. Buscar y cerrar el paquete activo actual
+            paquete_anterior = AlumnoPaquete.objects.filter(
+                id_alumno=alumno, 
+                estado="activo"
+            ).first()
 
+            if paquete_anterior:
+                paquete_anterior.estado = "expirado"
+                paquete_anterior.save()
+
+            # 2. Obtener el paquete base nuevo
+            paquete_base = Paquete.objects.get(pk=id_paquete_nuevo)
+
+            # 3. Crear el nuevo registro de AlumnoPaquete
+            nuevo_paquete = AlumnoPaquete.objects.create(
+                id_alumno=alumno,
+                id_paquete=paquete_base,
+                estado="activo",
+                estado_pago="pendiente",
+                fecha_inicio=timezone.now().date()
+            )
+            
+            return nuevo_paquete
 
 # models.py
 class AlumnoPaqueteTurno(models.Model):
