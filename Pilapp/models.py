@@ -227,6 +227,7 @@ class AlumnoPaquete(models.Model):
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
 
+ 
 
 # models.py
 class AlumnoPaqueteTurno(models.Model):
