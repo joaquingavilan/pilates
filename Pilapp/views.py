@@ -245,7 +245,7 @@ def renovar_paquete(request):
         nombre = data.get("nombre")
         apellido = data.get("apellido")
         telefono = data.get("telefono") or data.get("numero")
-        tipo_paquete_str = data.get("tipo_paquete")
+        tipo_paquete_str = data.get("tipo_paquete") 
         precio = data.get("precio")
 
         # 2. Búsqueda de Alumno
@@ -260,26 +260,43 @@ def renovar_paquete(request):
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
+        # 3. Búsqueda del Paquete
         try:
             cantidad = int(tipo_paquete_str.split()[0])
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, AttributeError):
             return JsonResponse({"error": "Formato de paquete inválido. Use 'X clases'."}, status=400)
 
         if not paquete_base:
             return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
 
+        # --- NUEVO: LÓGICA DE CIERRE DEL PAQUETE ANTERIOR ---
+        # Antes de crear el nuevo, buscamos cualquier paquete "activo" y lo pasamos a "expirado"
+        AlumnoPaquete.objects.filter(
+            id_alumno=alumno, 
+            estado="activo"
+        ).update(estado="expirado")
+        # ----------------------------------------------------
+
+        # 4. Creación del nuevo Contrato
+        # Cambiamos estado_pago a "pagado" porque en tu flujo de WhatsApp ya validaste el pago
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
             estado="activo",
-            estado_pago="pendiente",
+            estado_pago="pagado", 
             fecha_inicio=timezone.now().date()
         )
 
+        # --- NUEVO: CAMBIAR ESTADO DEL ALUMNO ---
+        # Si el alumno estaba como "inactivo" u "ocasional", ahora es "regular"
+        if alumno.estado != 'regular':
+            alumno.estado = 'regular'
+            alumno.save()
+
         return JsonResponse({
             "status": "success",
-            "message": "Paquete renovado correctamente.",
+            "message": "Paquete anterior finalizado y nuevo paquete activado correctamente.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",

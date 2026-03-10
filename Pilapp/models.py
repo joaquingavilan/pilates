@@ -448,11 +448,14 @@ class RenovadorPaqueteService:
 
     def ejecutar(self):
         with transaction.atomic():
+            # 1. DAR DE BAJA EL ANTERIOR (Esto limpia tu tabla de la imagen)
+            # Buscamos todos los paquetes activos de este alumno y los pasamos a expirado
             AlumnoPaquete.objects.filter(
                 id_alumno=self.alumno, 
                 estado="activo"
             ).update(estado="expirado")
 
+            # 2. CREAR EL NUEVO PAQUETE
             nuevo_paquete = AlumnoPaquete.objects.create(
                 id_alumno=self.alumno,
                 id_paquete=self.paquete_base,
@@ -461,15 +464,16 @@ class RenovadorPaqueteService:
                 fecha_inicio=timezone.now().date()
             )
 
+            # 3. REGISTRAR EL PAGO (Usando tu modelo Pago)
             nuevo_pago = Pago.objects.create(
                 fecha=timezone.now().date(),
                 monto=self.monto,
                 metodo_pago=self.metodo,
                 estado="pagado",
-                nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}" 
+                nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}" # Un nro de referencia
             )
 
-
+            # 4. VINCULAR PAGO CON PAQUETE (Usando tu modelo PagoAlumno)
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
                 id_alumno_paquete=nuevo_paquete,
@@ -477,4 +481,3 @@ class RenovadorPaqueteService:
             )
 
             return nuevo_paquete
-
