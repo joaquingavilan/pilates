@@ -227,6 +227,8 @@ class AlumnoPaquete(models.Model):
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
         
+    @classmethod  
+    @transaction.atomic 
     def renovar(cls, alumno, id_paquete_nuevo):
         """
         Método inteligente para renovar paquetes.
@@ -238,7 +240,6 @@ class AlumnoPaquete(models.Model):
             paquete_anterior.save()
 
         # 2. Creamos el nuevo
-        # Asumimos que 'Paquete' ya está importado arriba
         paquete_base = Paquete.objects.get(pk=id_paquete_nuevo)
         
         return cls.objects.create(
