@@ -659,6 +659,23 @@ def _total_pagado_paquete(alumno_paquete: AlumnoPaquete) -> Decimal:
             total += (pa.id_pago.monto or Decimal("0"))
     return total
 
+@require_POST
+@transaction.atomic
+def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
+    # Obtenemos al alumno y los datos del POST
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    id_paquete_nuevo = request.POST.get("id_paquete_nuevo")
+
+    try:
+        # Llamamos al método que creamos en el modelo
+        AlumnoPaquete.renovar(alumno, id_paquete_nuevo)
+        messages.success(request, "Paquete renovado con éxito.")
+        
+    except Exception as e:
+        messages.error(request, f"Error al renovar: {str(e)}")
+
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 
 @require_POST
 @transaction.atomic
