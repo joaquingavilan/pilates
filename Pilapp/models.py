@@ -226,6 +226,28 @@ class AlumnoPaquete(models.Model):
     fecha_inicio = models.DateField(null=True)
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
+        
+    def renovar(cls, alumno, id_paquete_nuevo):
+        """
+        Método inteligente para renovar paquetes.
+        """
+        # 1. Cerramos el anterior
+        paquete_anterior = cls.objects.filter(id_alumno=alumno, estado="activo").first()
+        if paquete_anterior:
+            paquete_anterior.estado = "expirado"
+            paquete_anterior.save()
+
+        # 2. Creamos el nuevo
+        # Asumimos que 'Paquete' ya está importado arriba
+        paquete_base = Paquete.objects.get(pk=id_paquete_nuevo)
+        
+        return cls.objects.create(
+            id_alumno=alumno,
+            id_paquete=paquete_base,
+            estado="activo",
+            estado_pago="pendiente",
+            fecha_inicio=timezone.now().date()
+        )
 
 
 # models.py
