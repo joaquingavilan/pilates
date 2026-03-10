@@ -35,8 +35,9 @@ urlpatterns = [
 
     path("alumnos/<int:id_alumno>/eliminar/", views_panel.panel_alumno_eliminar, name="panel_alumno_eliminar"),
 
-    path("alumnos/<int:id_alumno>/paquetes/<int:id_alumno_paquete>/registrar_pago/", views_panel.panel_registrar_pago_alumno,name="panel_registrar_pago_alumno"),
+    path("alumnos/<int:id_alumno>/paquetes/<int:id_alumno_paquete>/registrar_pago/", views_panel.panel_registrar_pago_alumno, name="panel_registrar_pago_alumno"),
 
+    path("alumnos/<int:id_alumno>/paquetes/<int:id_alumno_paquete>/renovar_paquete/", views_panel.panel_renovar_paquete_alumno, name="panel_renovar_paquete_alumno"),
 
     
 ]

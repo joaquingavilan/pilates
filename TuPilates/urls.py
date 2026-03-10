@@ -24,6 +24,7 @@ urlpatterns = [
     path('obtener_clases_agendadas/', obtener_clases_agendadas, name='obtener_clases_agendadas'), #donezo
     path('reprogramar_clase/', reprogramar_clase, name='reprogramar_clase'),
     path('panel/', include('Pilapp.urls_panel')),
-    path('registrar_pago/', registrar_pago, name='registrar_pago')
+    path('registrar_pago/', registrar_pago, name='registrar_pago'),
+    path('renovar_paquete/', renovar_paquete, name='renovar_paquete')
     
 ]

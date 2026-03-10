@@ -208,6 +208,95 @@ def reprogramar_clase(request):
 
 @csrf_exempt
 @transaction.atomic
+def renovar_paquete(request):
+    """
+    POST /renovar_paquete/
+    ---------------------
+    Registra la renovación de un paquete de clases para un alumno.
+    Si el alumno no tiene un paquete activo, este endpoint inicia uno nuevo.
+
+    Entradas (JSON):
+    - id_alumno (int)           [Opcional; si no se envía, busca por nombre/teléfono]
+    - nombre (str)              [Opcional; para búsqueda]
+    - apellido (str)            [Opcional; para búsqueda]
+    - telefono (str)            [Opcional; para búsqueda]
+    - tipo_paquete (str)        [Obligatorio; ej: "8 clases"]
+    - precio (int)              [Obligatorio; monto abonado]
+
+    Respuesta 200 OK:
+    {
+        "status": "success",
+        "message": "Paquete renovado correctamente.",
+        "data": { 
+            "alumno": "Nombre Completo", 
+            "paquete": "X clases", 
+            "id_alumno_paquete": ID 
+        }
+    }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        
+        # 1. Extracción de datos
+        id_alumno = data.get("id_alumno")
+        nombre = data.get("nombre")
+        apellido = data.get("apellido")
+        telefono = data.get("telefono") or data.get("numero")
+        tipo_paquete_str = data.get("tipo_paquete") # Ej: "8 clases"
+        precio = data.get("precio")
+
+        # 2. Búsqueda de Alumno
+        alumno = None
+        if id_alumno:
+            alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
+        elif nombre and apellido:
+            persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
+            if persona:
+                alumno = Alumno.objects.filter(id_persona=persona).first()
+        
+        if not alumno:
+            return JsonResponse({"error": "Alumno no encontrado."}, status=404)
+
+        # 3. Búsqueda del Paquete (Extrayendo el número del string "8 clases" -> 8)
+        # Asumimos que el formato siempre es "X clases"
+        try:
+            cantidad = int(tipo_paquete_str.split()[0])
+            paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
+        except (ValueError, IndexError):
+            return JsonResponse({"error": "Formato de paquete inválido. Use 'X clases'."}, status=400)
+
+        if not paquete_base:
+            return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
+
+        # 4. Creación del Contrato (AlumnoPaquete)
+        nuevo_paquete = AlumnoPaquete.objects.create(
+            id_alumno=alumno,
+            id_paquete=paquete_base,
+            estado="activo",
+            estado_pago="pendiente",
+            fecha_inicio=timezone.now().date()
+        )
+
+        return JsonResponse({
+            "status": "success",
+            "message": "Paquete renovado correctamente.",
+            "data": {
+                "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
+                "paquete": f"{paquete_base.cantidad_clases} clases",
+                "id_alumno_paquete": nuevo_paquete.id_alumno_paquete
+            }
+        }, status=200)
+
+    except Exception as e:
+        logging.error(f"[renovar_paquete] Error: {str(e)}")
+        return JsonResponse({"error": "Error interno del servidor", "detalle": str(e)}, status=500)
+
+
+@csrf_exempt
+@transaction.atomic
 def obtener_clases_agendadas(request):
     """
     POST /obtener_clases_agendadas/
