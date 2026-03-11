@@ -205,6 +205,58 @@ def reprogramar_clase(request):
         logging.error(f"[reprogramar_clase] Error: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
+###Funcion auxiliar renovar paquete
+
+def asignar_clases_automaticas(alumno_paquete):
+    """
+    Busca los turnos que tenía el alumno y crea los registros en AlumnoClase
+    para el nuevo paquete, proyectando las fechas hacia el futuro.
+    """
+    from .models import AlumnoPaqueteTurno, AlumnoClase, Clase
+    
+    # Buscamos qué días y horas tiene asignados este paquete
+    turnos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
+    cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
+    
+    dias_map = {
+        'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 
+        'Viernes': 4, 'Sábado': 5, 'Domingo': 6
+    }
+    
+    clases_creadas = 0
+    fecha_busqueda = alumno_paquete.fecha_inicio
+    
+    # Buscamos en los próximos
+    for i in range(60): 
+        if clases_creadas >= cantidad_clases:
+            break
+            
+        fecha_actual = fecha_busqueda + timedelta(days=i)
+        
+        # Obtenemos el nombre del día en español para la fecha que estamos evaluando
+        dia_semana_num = fecha_actual.weekday()
+        dia_nombre = [k for k, v in dias_map.items() if v == dia_semana_num][0]
+        
+        # ¿El alumno tiene un turno fijo este día?
+        turnos_hoy = turnos.filter(id_turno__dia=dia_nombre)
+        
+        for t in turnos_hoy:
+            if clases_creadas >= cantidad_clases:
+                break
+            
+            # Buscamos si el administrador ya creó la Clase física en ese horario
+            clase_fisica = Clase.objects.filter(fecha=fecha_actual, id_turno=t.id_turno).first()
+            
+            if clase_fisica:
+                # Registramos al alumno en la clase
+                AlumnoClase.objects.get_or_create(
+                    id_alumno_paquete=alumno_paquete,
+                    id_clase=clase_fisica,
+                    defaults={'estado': 'reservado'}
+                )
+                clases_creadas += 1
+
+
 
 @csrf_exempt
 @transaction.atomic
@@ -240,7 +292,7 @@ def renovar_paquete(request):
     try:
         data = json.loads(request.body)
         
-        # 1. Extracción de datos
+        # Extracción de datos
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
@@ -248,7 +300,7 @@ def renovar_paquete(request):
         tipo_paquete_str = data.get("tipo_paquete") 
         precio = data.get("precio")
 
-        # 2. Búsqueda de Alumno
+        # Búsqueda de Alumno
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
@@ -260,7 +312,6 @@ def renovar_paquete(request):
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
-        # 3. Búsqueda del Paquete
         try:
             cantidad = int(tipo_paquete_str.split()[0])
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
@@ -270,16 +321,17 @@ def renovar_paquete(request):
         if not paquete_base:
             return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
 
-        # --- NUEVO: LÓGICA DE CIERRE DEL PAQUETE ANTERIOR ---
-        # Antes de crear el nuevo, buscamos cualquier paquete "activo" y lo pasamos a "expirado"
-        AlumnoPaquete.objects.filter(
+        # --- LÓGICA DE CIERRE Y MIGRACIÓN ---
+        # 1. Buscamos el último paquete activo
+        paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, 
             estado="activo"
-        ).update(estado="expirado")
-        # ----------------------------------------------------
+        ).order_by('-id_alumno_paquete').first()
 
-        # 4. Creación del nuevo Contrato
-        # Cambiamos estado_pago a "pagado" porque en tu flujo de WhatsApp ya validaste el pago
+        # 2. Marcamos el viejo como expirado
+        AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").update(estado="expirado")
+
+        # 3. Creamos el nuevo paquete
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
@@ -288,15 +340,26 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # --- NUEVO: CAMBIAR ESTADO DEL ALUMNO ---
-        # Si el alumno estaba como "inactivo" u "ocasional", ahora es "regular"
+        # 4. COPIAR TURNOS
+        if paquete_anterior:
+            turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
+            for t_old in turnos_anteriores:
+                AlumnoPaqueteTurno.objects.create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_turno=t_old.id_turno
+                )
+
+        # 5. GENERAR CALENDARIO
+        asignar_clases_automaticas(nuevo_paquete)
+
+        # Actualizar estado del alumno a regular
         if alumno.estado != 'regular':
             alumno.estado = 'regular'
             alumno.save()
 
         return JsonResponse({
             "status": "success",
-            "message": "Paquete anterior finalizado y nuevo paquete activado correctamente.",
+            "message": "Renovación exitosa",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
@@ -306,8 +369,7 @@ def renovar_paquete(request):
 
     except Exception as e:
         logging.error(f"[renovar_paquete] Error: {str(e)}")
-        return JsonResponse({"error": "Error interno del servidor", "detalle": str(e)}, status=500)
-
+        return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
 
 @csrf_exempt
 @transaction.atomic
