@@ -37,6 +37,17 @@ with connection.cursor() as cursor:
         print(f"Aviso de DB: {e}")
 
 
+from django.db import connection
+with connection.cursor() as cursor:
+    try:
+        # Intentamos agregar la columna. Si ya existe, el 'try' fallará y pasará al 'except'.
+        cursor.execute('ALTER TABLE "Pilapp_alumnopaquete" ADD COLUMN "clases_usadas" INTEGER DEFAULT 0;')
+        print("¡Columna 'clases_usadas' creada con éxito!")
+    except Exception as e:
+        # Si la columna ya existe, simplemente no hace nada
+        print(f"Aviso de DB: {e}")
+
+
 
 def panel_dashboard(request):
     """Vista principal del dashboard con estadísticas."""
