@@ -218,44 +218,42 @@ def asignar_clases_automaticas(alumno_paquete):
     turnos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
     cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
     
-    dias_map = {
-        'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 
-        'Viernes': 4, 'Sábado': 5, 'Domingo': 6
-    }
-    
+    dias_map = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4, 'Sábado': 5, 'Domingo': 6}
     clases_creadas = 0
     fecha_busqueda = alumno_paquete.fecha_inicio
     
-    # Buscamos en los próximos
     for i in range(60): 
         if clases_creadas >= cantidad_clases:
             break
             
         fecha_actual = fecha_busqueda + timedelta(days=i)
-        
-        # Obtenemos el nombre del día en español para la fecha que estamos evaluando
         dia_semana_num = fecha_actual.weekday()
         dia_nombre = [k for k, v in dias_map.items() if v == dia_semana_num][0]
         
-        # ¿El alumno tiene un turno fijo este día?
         turnos_hoy = turnos.filter(id_turno__dia=dia_nombre)
         
         for t in turnos_hoy:
             if clases_creadas >= cantidad_clases:
                 break
             
-            # Buscamos si el administrador ya creó la Clase física en ese horario
             clase_fisica = Clase.objects.filter(fecha=fecha_actual, id_turno=t.id_turno).first()
             
             if clase_fisica:
-                # Registramos al alumno en la clase
-                AlumnoClase.objects.get_or_create(
-                    id_alumno_paquete=alumno_paquete,
-                    id_clase=clase_fisica,
-                    defaults={'estado': 'reservado'}
-                )
-                clases_creadas += 1
+                # --- MEJORA ANTI-DUPLICADOS ---
+                # Verificamos si el alumno YA tiene una clase este día a esta hora
+                # (en cualquier paquete, para evitar duplicados por re-ejecución)
+                ya_existe = AlumnoClase.objects.filter(
+                    id_alumno_paquete__id_alumno=alumno_paquete.id_alumno,
+                    id_clase=clase_fisica
+                ).exists()
 
+                if not ya_existe:
+                    AlumnoClase.objects.create(
+                        id_alumno_paquete=alumno_paquete,
+                        id_clase=clase_fisica,
+                        estado='reservado'
+                    )
+                    clases_creadas += 1
 
 
 @csrf_exempt
