@@ -287,22 +287,21 @@ def renovar_paquete(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    try:
+   try:
         data = json.loads(request.body)
         
-        # Extracción de datos
+        # 1. Extracción con validación mínima
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
-        telefono = data.get("telefono") or data.get("numero")
-        tipo_paquete_str = data.get("tipo_paquete") 
-        precio = data.get("precio")
-
-        # Búsqueda de Alumno
+        tipo_paquete_str = data.get("tipo_paquete", "")
+        
+        # 2. Búsqueda de Alumno optimizada
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         elif nombre and apellido:
+            
             persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
@@ -311,25 +310,33 @@ def renovar_paquete(request):
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
         try:
-            cantidad = int(tipo_paquete_str.split()[0])
+            import re
+            cantidad = int(re.search(r'\d+', tipo_paquete_str).group())
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
-        except (ValueError, IndexError, AttributeError):
+        except (ValueError, AttributeError, IndexError):
             return JsonResponse({"error": "Formato de paquete inválido. Use 'X clases'."}, status=400)
 
         if not paquete_base:
-            return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
-
-        # --- LÓGICA DE CIERRE Y MIGRACIÓN ---
-        # 1. Buscamos el último paquete activo
+            return JsonResponse({"error": f"No existe paquete de {cantidad} clases."}, status=404)
+        
+        # 4. Localizar paquete anterior
         paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, 
             estado="activo"
         ).order_by('-id_alumno_paquete').first()
 
-        # 2. Marcamos el viejo como expirado
-        AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").update(estado="expirado")
+        if paquete_anterior:
+            # A) LIMPIEZA DE CLASES PASADAS PENDIENTES
+            AlumnoClase.objects.filter(
+                id_alumno_paquete=paquete_anterior,
+                estado='reservado' 
+            ).update(estado='expirado')
 
-        # 3. Creamos el nuevo paquete
+            
+            paquete_anterior.estado = "expirado"
+            paquete_anterior.save()
+
+        # 5. Crear nuevo paquete
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
@@ -338,26 +345,25 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. COPIAR TURNOS
+        # 6. MIGRACIÓN DE TURNOS
         if paquete_anterior:
-            turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
-            for t_old in turnos_anteriores:
-                AlumnoPaqueteTurno.objects.create(
-                    id_alumno_paquete=nuevo_paquete,
-                    id_turno=t_old.id_turno
-                )
+            turnos_viejos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
+            nuevos_turnos = [
+                AlumnoPaqueteTurno(id_alumno_paquete=nuevo_paquete, id_turno=t.id_turno)
+                for t in turnos_viejos
+            ]
+            AlumnoPaqueteTurno.objects.bulk_create(nuevos_turnos)
 
-        # 5. GENERAR CALENDARIO
+        # 7. GENERAR CALENDARIO Y ESTADO
         asignar_clases_automaticas(nuevo_paquete)
 
-        # Actualizar estado del alumno a regular
         if alumno.estado != 'regular':
             alumno.estado = 'regular'
-            alumno.save()
+            alumno.save(update_fields=['estado']) # Update fields es más rápido
 
         return JsonResponse({
             "status": "success",
-            "message": "Renovación exitosa",
+            "message": "Paquete renovado y clases pasadas limpiadas.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
