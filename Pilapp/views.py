@@ -289,15 +289,13 @@ def renovar_paquete(request):
     
     try:
         data = json.loads(request.body)
-        
-        # 1. Extracción con validación mínima
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
         tipo_paquete_str = data.get("tipo_paquete", "")
         hoy = timezone.localdate()
         
-        # 2. Búsqueda de Alumno optimizada
+        # 1. Búsqueda de Alumno
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
@@ -309,46 +307,29 @@ def renovar_paquete(request):
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
-        # 3. Procesamiento de cantidad de clases
+        # 2. Procesamiento de cantidad de clases
         try:
             import re
             cantidad = int(re.search(r'\d+', tipo_paquete_str).group())
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
         except (ValueError, AttributeError, IndexError):
-            return JsonResponse({"error": "Formato de paquete inválido. Use 'X clases'."}, status=400)
+            return JsonResponse({"error": "Formato de paquete inválido."}, status=400)
 
         if not paquete_base:
             return JsonResponse({"error": f"No existe paquete de {cantidad} clases."}, status=404)
         
-        # 4. GESTIÓN DE HISTORIAL Y CIERRE DE PAQUETE ANTERIOR
+        # 3. IDENTIFICAR PAQUETE ANTERIOR Y SUS TURNOS (ANTES DE BORRAR)
         paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, 
             estado="activo"
         ).order_by('-id_alumno_paquete').first()
 
+        # Obtenemos la lista de turnos antes de cualquier modificación
+        turnos_a_migrar = []
         if paquete_anterior:
-            # A) Clases que ya pasaron de fecha y seguían 'reservado' -> 'completado'
-            AlumnoClase.objects.filter(
-                id_alumno_paquete=paquete_anterior,
-                id_clase__fecha__lt=hoy,
-                estado='reservado'
-            ).update(estado='completado')
+            turnos_a_migrar = list(AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior))
 
-            # B) Clases de hoy o futuro que eran del paquete viejo -> 'expirado'
-            AlumnoClase.objects.filter(
-                id_alumno_paquete=paquete_anterior,
-                id_clase__fecha__gte=hoy,
-                estado='reservado'
-            ).update(estado='expirado')
-
-            AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior).delete()
-
-            # C) Cierre formal del paquete anterior
-            paquete_anterior.estado = "expirado"
-            paquete_anterior.save(update_fields=['estado'])
-            logging.info(f"Paquete {paquete_anterior.id_alumno_paquete} cerrado por renovación.")
-
-        # 5. Crear nuevo paquete
+        # 4. CREAR EL NUEVO PAQUETE
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
@@ -357,25 +338,45 @@ def renovar_paquete(request):
             fecha_inicio=hoy
         )
 
-        # 6. MIGRACIÓN DE TURNOS
+        # 5. SI HAY PAQUETE ANTERIOR, LIMPIAR Y CERRAR
         if paquete_anterior:
-            turnos_viejos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
-            if turnos_viejos.exists():
+            # A) Actualizar estados de clases individuales
+            AlumnoClase.objects.filter(
+                id_alumno_paquete=paquete_anterior,
+                id_clase__fecha__lt=hoy,
+                estado='reservado'
+            ).update(estado='completado')
+
+            AlumnoClase.objects.filter(
+                id_alumno_paquete=paquete_anterior,
+                id_clase__fecha__gte=hoy,
+                estado='reservado'
+            ).update(estado='expirado')
+
+            # B) Migrar los turnos al nuevo paquete
+            if turnos_a_migrar:
                 AlumnoPaqueteTurno.objects.bulk_create([
                     AlumnoPaqueteTurno(id_alumno_paquete=nuevo_paquete, id_turno=t.id_turno)
-                    for t in turnos_viejos
+                    for t in turnos_a_migrar
                 ])
+                # C) RECIÉN AHORA borramos los turnos del paquete viejo para liberar ocupación
+                AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior).delete()
 
-        # 7. GENERAR CALENDARIO Y ACTUALIZAR ALUMNO
+            # D) Cierre formal del paquete anterior
+            paquete_anterior.estado = "expirado"
+            paquete_anterior.save(update_fields=['estado'])
+
+        # 6. GENERAR CALENDARIO (Ahora sí tiene turnos el nuevo_paquete)
         asignar_clases_automaticas(nuevo_paquete)
 
+        # 7. Actualizar estado Alumno
         if alumno.estado != 'regular':
             alumno.estado = 'regular'
             alumno.save(update_fields=['estado'])
 
         return JsonResponse({
             "status": "success",
-            "message": "Paquete renovado. El historial anterior ha sido cerrado y actualizado.",
+            "message": "Paquete renovado y turnos migrados correctamente.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
@@ -386,7 +387,6 @@ def renovar_paquete(request):
     except Exception as e:
         logging.error(f"[renovar_paquete] Error: {str(e)}")
         return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
-
 
 @csrf_exempt
 @transaction.atomic
