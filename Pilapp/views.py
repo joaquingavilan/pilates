@@ -286,8 +286,8 @@ def renovar_paquete(request):
     """
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
-
-   try:
+    
+    try:
         data = json.loads(request.body)
         
         # 1. Extracción con validación mínima
