@@ -295,13 +295,13 @@ def renovar_paquete(request):
         nombre = data.get("nombre")
         apellido = data.get("apellido")
         tipo_paquete_str = data.get("tipo_paquete", "")
+        hoy = timezone.localdate()
         
         # 2. Búsqueda de Alumno optimizada
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         elif nombre and apellido:
-            
             persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
@@ -309,6 +309,7 @@ def renovar_paquete(request):
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
+        # 3. Procesamiento de cantidad de clases
         try:
             import re
             cantidad = int(re.search(r'\d+', tipo_paquete_str).group())
@@ -319,22 +320,31 @@ def renovar_paquete(request):
         if not paquete_base:
             return JsonResponse({"error": f"No existe paquete de {cantidad} clases."}, status=404)
         
-        # 4. Localizar paquete anterior
+        # 4. GESTIÓN DE HISTORIAL Y CIERRE DE PAQUETE ANTERIOR
         paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, 
             estado="activo"
         ).order_by('-id_alumno_paquete').first()
 
         if paquete_anterior:
-            # A) LIMPIEZA DE CLASES PASADAS PENDIENTES
+            # A) Clases que ya pasaron de fecha y seguían 'reservado' -> 'completado'
             AlumnoClase.objects.filter(
                 id_alumno_paquete=paquete_anterior,
-                estado='reservado' 
+                id_clase__fecha__lt=hoy,
+                estado='reservado'
+            ).update(estado='completado')
+
+            # B) Clases de hoy o futuro que eran del paquete viejo -> 'expirado'
+            AlumnoClase.objects.filter(
+                id_alumno_paquete=paquete_anterior,
+                id_clase__fecha__gte=hoy,
+                estado='reservado'
             ).update(estado='expirado')
 
-            
+            # C) Cierre formal del paquete anterior
             paquete_anterior.estado = "expirado"
-            paquete_anterior.save()
+            paquete_anterior.save(update_fields=['estado'])
+            logging.info(f"Paquete {paquete_anterior.id_alumno_paquete} cerrado por renovación.")
 
         # 5. Crear nuevo paquete
         nuevo_paquete = AlumnoPaquete.objects.create(
@@ -342,28 +352,28 @@ def renovar_paquete(request):
             id_paquete=paquete_base,
             estado="activo",
             estado_pago="pagado", 
-            fecha_inicio=timezone.now().date()
+            fecha_inicio=hoy
         )
 
         # 6. MIGRACIÓN DE TURNOS
         if paquete_anterior:
             turnos_viejos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
-            nuevos_turnos = [
-                AlumnoPaqueteTurno(id_alumno_paquete=nuevo_paquete, id_turno=t.id_turno)
-                for t in turnos_viejos
-            ]
-            AlumnoPaqueteTurno.objects.bulk_create(nuevos_turnos)
+            if turnos_viejos.exists():
+                AlumnoPaqueteTurno.objects.bulk_create([
+                    AlumnoPaqueteTurno(id_alumno_paquete=nuevo_paquete, id_turno=t.id_turno)
+                    for t in turnos_viejos
+                ])
 
-        # 7. GENERAR CALENDARIO Y ESTADO
+        # 7. GENERAR CALENDARIO Y ACTUALIZAR ALUMNO
         asignar_clases_automaticas(nuevo_paquete)
 
         if alumno.estado != 'regular':
             alumno.estado = 'regular'
-            alumno.save(update_fields=['estado']) # Update fields es más rápido
+            alumno.save(update_fields=['estado'])
 
         return JsonResponse({
             "status": "success",
-            "message": "Paquete renovado y clases pasadas limpiadas.",
+            "message": "Paquete renovado. El historial anterior ha sido cerrado y actualizado.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
@@ -374,6 +384,7 @@ def renovar_paquete(request):
     except Exception as e:
         logging.error(f"[renovar_paquete] Error: {str(e)}")
         return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
+
 
 @csrf_exempt
 @transaction.atomic
