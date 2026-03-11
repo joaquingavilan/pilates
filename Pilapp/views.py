@@ -341,6 +341,8 @@ def renovar_paquete(request):
                 estado='reservado'
             ).update(estado='expirado')
 
+            AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior).delete()
+
             # C) Cierre formal del paquete anterior
             paquete_anterior.estado = "expirado"
             paquete_anterior.save(update_fields=['estado'])
