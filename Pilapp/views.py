@@ -543,83 +543,44 @@ def registrar_pago(request):
     try:
         data = json.loads(request.body)
         
-        # 1. Extracción y normalización de datos
+        # 1. Extracción de datos
         monto = data.get("monto")
         metodo = data.get("metodo_pago")
         comprobante = data.get("comprobante", "Sin comprobante adjunto")
-        cant_clases_mencionadas = data.get("cant_clases")
         fecha_pago_str = data.get("fecha_pago")
-
-        # Priorizamos 'telefono', pero mantenemos 'numero' como fallback por compatibilidad
         telefono = data.get("telefono") or data.get("numero")
-        
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
-        ruc = data.get("ruc")
 
-        # --- VALIDACIONES BÁSICAS ---
-        if not monto:
-            errores.append("Falta el campo 'monto'.")
-        if not metodo:
-            errores.append("Falta el campo 'metodo_pago'.")
+        if not monto or not metodo:
+            return JsonResponse({"errores": ["Falta monto o metodo_pago"]}, status=400)
 
-        # Validación de fecha
-        fecha_pago = timezone.localdate()
-        if fecha_pago_str:
-            try:
-                fecha_pago = datetime.strptime(fecha_pago_str, "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                errores.append("La 'fecha_pago' debe tener el formato YYYY-MM-DD.")
-
-        if errores:
-            return JsonResponse({"errores": errores}, status=400)
-
-        # 2. MOTOR DE BÚSQUEDA
+        # 2. Búsqueda de Alumno
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         
-        # Búsqueda por contacto
-        if not alumno and (telefono or ruc):
-            from django.db.models import Q
-            persona = Persona.objects.filter(Q(telefono=telefono) | Q(ruc=ruc)).first()
+        if not alumno and telefono:
+            persona = Persona.objects.filter(telefono=telefono).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
 
-        # Búsqueda por nombre
         if not alumno and nombre and apellido:
             persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
 
         if not alumno:
-            return JsonResponse({"errores": ["No pude encontrar al alumno. Verifique datos."]}, status=404)
+            return JsonResponse({"errores": ["Alumno no encontrado."]}, status=404)
 
-        # 3. GESTIÓN DE PAQUETE (Red de seguridad)
-        filtros_p = {'id_alumno': alumno, 'estado_pago': 'pendiente'}
-        if cant_clases_mencionadas:
-            filtros_p['id_paquete__cantidad_clases'] = cant_clases_mencionadas
+        # 3. REGISTRO DEL PAGO
+        fecha_pago = timezone.localdate()
+        if fecha_pago_str:
+            try:
+                fecha_pago = datetime.strptime(fecha_pago_str, "%Y-%m-%d").date()
+            except: pass
 
-        alumno_paquete = AlumnoPaquete.objects.filter(**filtros_p).order_by('-id_alumno_paquete').first()
-
-        if not alumno_paquete:
-            cantidad = cant_clases_mencionadas if cant_clases_mencionadas else 12
-            paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
-            
-            # NOTA: Asegúrate de que Paquete tenga el campo 'costo' o valor por defecto
-            if not paquete_base:
-                paquete_base = Paquete.objects.create(cantidad_clases=cantidad, costo=0)
-
-            alumno_paquete = AlumnoPaquete.objects.create(
-                id_alumno=alumno,
-                id_paquete=paquete_base,
-                fecha_inicio=fecha_pago,
-                estado_pago='pendiente'
-            )
-            logging.info(f"[registrar_pago] Creado paquete de emergencia ({cantidad} clases) para ID {alumno.id_alumno}")
-
-        # 4. REGISTRO OFICIAL
         nuevo_pago = Pago.objects.create(
             fecha=fecha_pago,
             monto=monto,
@@ -629,28 +590,29 @@ def registrar_pago(request):
             comprobante=comprobante
         )
 
-        PagoAlumno.objects.create(
-            id_pago=nuevo_pago,
-            id_alumno_paquete=alumno_paquete,
-            observaciones=f"Pago automático. Ref: {comprobante}"
-        )
-
-        alumno_paquete.estado_pago = "pagado"
-        alumno_paquete.save()
+        # 4. VINCULACIÓN
+        alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").order_by('-id_alumno_paquete').first()
+        
+        if alumno_paquete:
+            PagoAlumno.objects.create(
+                id_pago=nuevo_pago,
+                id_alumno_paquete=alumno_paquete,
+                observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
+            )
 
         return JsonResponse({
             "status": "success",
-            "message": f"Pago de {monto} registrado.",
+            "message": f"Pago de {monto} registrado exitosamente.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
-                "paquete_actualizado": f"{alumno_paquete.id_paquete.cantidad_clases} clases",
+                "paquete_actualizado": f"{alumno_paquete.id_paquete.cantidad_clases if alumno_paquete else 'Sin paquete activo'}",
                 "pago_id": nuevo_pago.id_pago
             }
         }, status=200)
 
     except Exception as e:
         logging.error(f"[registrar_pago] Error: {str(e)}")
-        return JsonResponse({"error": "Hubo un problema al procesar el pago", "detalle": str(e)}, status=500)
+        return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
 
 def normalizar(texto):
     if not texto:
