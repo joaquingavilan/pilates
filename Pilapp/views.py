@@ -893,7 +893,7 @@ def obtener_id_alumno(request):
                     for p in personas:
                         if p.nombre.strip().lower == nombre and p.apellido.strip().lower() == apellido:
                             personas_filtradas.append(p)      
-                 if len(personas_filtradas) != 1:
+                if len(personas_filtradas) != 1:
                      lista_nombres = [f"{p.nombre} {p.apellido}" for p in personas]
                      return JsonResponse({
                          "error": "Se encontro mas de una persona con ese telefono.",
@@ -905,8 +905,6 @@ def obtener_id_alumno(request):
                 persona=personas.first()
                 
                # persona = personas.first()
-            else:
-                persona = personas.first()
 
            # try: 
             #    alumno = Alumno.objects.get(id_persona=persona)
