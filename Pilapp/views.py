@@ -884,56 +884,44 @@ def obtener_id_alumno(request):
             if not personas.exists():
                 return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
 
-            if personas.count() == 0:
-                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
+            persona = None
 
+            # Manejo de múltiples personas (Familias/Parejas)
             if personas.count() > 1:
                 personas_filtradas = []
                 if nombre or apellido:
                     for p in personas:
-                        if p.nombre.strip().lower == nombre and p.apellido.strip().lower() == apellido:
-                            personas_filtradas.append(p)      
+                        # Corregido: añadidos paréntesis a .lower()
+                        if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
+                            personas_filtradas.append(p)
+                
+                # Si no hay un filtro exacto que deje 1 sola persona, enviamos las opciones
                 if len(personas_filtradas) != 1:
-                     lista_nombres = [f"{p.nombre} {p.apellido}" for p in personas]
-                     return JsonResponse({
-                         "error": "Se encontro mas de una persona con ese telefono.",
-                         "detalle": "Ambiguedad detectada.",
-                         "opciones": lista_nombres
-                     }, status =400)
-                  persona = personas_filtradas[0]
+                    lista_nombres = [f"{p.nombre} {p.apellido}" for p in personas]
+                    return JsonResponse({
+                        "error": "Se encontro mas de una persona con ese telefono.",
+                        "detalle": "Ambiguedad detectada.",
+                        "opciones": lista_nombres
+                    }, status=400)
+                
+                # Si llegamos aquí, es porque el filtro de nombre/apellido funcionó
+                persona = personas_filtradas[0]
             else:
-                persona=personas.first()
-                
-               # persona = personas.first()
-
-           # try: 
-            #    alumno = Alumno.objects.get(id_persona=persona)
-                
-                # Más de una persona con ese teléfono, aplicar comparación con nombre y apellido
-              #  for p in personas:
-               #     if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
-                #        personas_filtradas.append(p)
-
-                #if len(personas_filtradas) == 0:
-                 #   return JsonResponse({
-                 #       "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
-                 #   }, status=400)
-                #if len(personas_filtradas) > 1:
-                #    return JsonResponse({
-                 #       "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
-                 #   }, status=400)
-
-                #persona = personas_filtradas[0]
+                # Caso simple: solo hay una persona con ese teléfono
+                persona = personas.first()
 
             # Buscar Alumno asociado
             try:
                 alumno = Alumno.objects.get(id_persona=persona)
             except Alumno.DoesNotExist:
-                return JsonResponse({"error": "La persona existe pero no está registrada como alumno."}, status=404)
+                return JsonResponse({
+                    "error": f"La persona {persona.nombre} {persona.apellido} existe pero no está registrada como alumno."
+                }, status=404)
 
             return JsonResponse({
                 "id_alumno": alumno.id_alumno,
-                "estado": alumno.estado
+                "estado": alumno.estado,
+                "nombre_completo": f"{persona.nombre} {persona.apellido}"
             })
 
         except Exception as e:
