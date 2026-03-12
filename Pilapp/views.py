@@ -880,29 +880,52 @@ def obtener_id_alumno(request):
                 return JsonResponse({"error": "El campo 'telefono' es obligatorio."}, status=400)
 
             personas = Persona.objects.filter(telefono=telefono.strip())
-            personas_filtradas = []
+
+            if not personas.exists():
+                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
 
             if personas.count() == 0:
                 return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
 
-            if personas.count() == 1:
-                persona = personas.first()
+            if personas.count() > 1:
+                personas_filtradas = []
+                if nombre or apellido:
+                    for p in personas:
+                        if p.nombre.strip().lower == nombre and p.apellido.strip().lower() == apellido:
+                            personas_filtradas.append(p)      
+                 if len(personas_filtradas) != 1:
+                     lista_nombres = [f"{p.nombre} {p.apellido}" for p in personas]
+                     return JsonResponse({
+                         "error": "Se encontro mas de una persona con ese telefono.",
+                         "detalle": "Ambiguedad detectada.",
+                         "opciones": lista_nombres
+                     }, status =400)
+                  persona = personas_filtradas[0]
             else:
+                persona=personas.first()
+                
+               # persona = personas.first()
+            else:
+                persona = personas.first()
+
+           # try: 
+            #    alumno = Alumno.objects.get(id_persona=persona)
+                
                 # Más de una persona con ese teléfono, aplicar comparación con nombre y apellido
-                for p in personas:
-                    if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
-                        personas_filtradas.append(p)
+              #  for p in personas:
+               #     if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
+                #        personas_filtradas.append(p)
 
-                if len(personas_filtradas) == 0:
-                    return JsonResponse({
-                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
-                    }, status=400)
-                if len(personas_filtradas) > 1:
-                    return JsonResponse({
-                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
-                    }, status=400)
+                #if len(personas_filtradas) == 0:
+                 #   return JsonResponse({
+                 #       "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                 #   }, status=400)
+                #if len(personas_filtradas) > 1:
+                #    return JsonResponse({
+                 #       "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
+                 #   }, status=400)
 
-                persona = personas_filtradas[0]
+                #persona = personas_filtradas[0]
 
             # Buscar Alumno asociado
             try:
