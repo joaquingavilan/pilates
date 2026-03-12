@@ -456,7 +456,9 @@ def obtener_clases_agendadas(request):
 
         if alumno.estado == "regular":
             clases_regulares = AlumnoClase.objects.filter(
-                id_alumno_paquete__id_alumno=alumno
+                id_alumno_paquete__id_alumno=alumno,
+                id_alumno_paquete__estado = 'activo',
+                estado = 'reservado'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ac in clases_regulares:
@@ -473,7 +475,8 @@ def obtener_clases_agendadas(request):
         elif alumno.estado == "ocasional":
             clases_ocasionales = AlumnoClaseOcasional.objects.filter(
                 id_alumno=alumno,
-                id_clase__fecha__gte=fecha_minima
+                id_clase__fecha__gte=fecha_minima,
+                estado='reservado'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ao in clases_ocasionales:
