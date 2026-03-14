@@ -338,14 +338,39 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. COPIAR TURNOS
+        # 4. Traer la base
+
+        turnos_adicionales_ids = set()
+
         if paquete_anterior:
             turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
             for t_old in turnos_anteriores:
-                AlumnoPaqueteTurno.objects.create(
+                turnos_adicionales_ids.add(t_old.id_turno.id_turno)
+
+
+        # Adicionales
+        
+        adicionales = data.get("turnos_ids",[])
+        if isinstance(adicionales,list):
+            for t_id in adicionales:
+                turnos_adicionales_ids.add(t_id)
+
+
+        #Nuevo paquete
+
+        if not turnos_adicionales_ids:
+            return JsonResponse({
+                "error": "No se encontraron turnos previos ni se enviaron turnos nuevos."
+            }, status=400)
+
+        for t_id in turnos_adicionales_ids:
+            turno_obj = Turno.objects.filter(id_turno = t_id).first()
+            if turno_obj:
+               AlumnoPaqueteTurno.objects.create(
                     id_alumno_paquete=nuevo_paquete,
-                    id_turno=t_old.id_turno
+                    id_turno=turno_obj
                 )
+      
 
         # 5. GENERAR CALENDARIO
         asignar_clases_automaticas(nuevo_paquete)
@@ -2048,6 +2073,7 @@ def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
         lugares_disponibles = 4 - turno.lugares_ocupados
         if lugares_disponibles > 0:
             turnos_disponibles.append({
+                "id_turno": turno.id_turno,
                 "horario": turno.horario.strftime("%H:%M"),
                 "lugares_disponibles": lugares_disponibles
             })
