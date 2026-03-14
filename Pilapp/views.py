@@ -318,110 +318,85 @@ def renovar_paquete(request):
     try:
         data = json.loads(request.body)
 
-    # Extracción de datos
+        # -------------------------
+        # EXTRACCIÓN DE DATOS
+        # -------------------------
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
-        telefono = data.get("telefono") or data.get("numero")
         tipo_paquete_str = data.get("tipo_paquete")
         precio = data.get("precio")
 
-    # -------------------------
-    # BÚSQUEDA DE ALUMNO
-    # -------------------------
+        # -------------------------
+        # BUSCAR ALUMNO
+        # -------------------------
         alumno = None
-
         if id_alumno:
-         alumno = Alumno.objects.select_related('id_persona').filter(id_alumno=id_alumno).first()
-
+            alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         elif nombre and apellido:
-            persona = Persona.objects.filter(
-            nombre__icontains=nombre,
-            apellido__icontains=apellido
-        ).first()
-
-        if persona:
-            alumno = Alumno.objects.filter(id_persona=persona).first()
+            persona_obj = Persona.objects.filter(
+                nombre__icontains=nombre,
+                apellido__icontains=apellido
+            ).first()
+            if persona_obj:
+                alumno = Alumno.objects.filter(id_persona=persona_obj).first()
 
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
-    # -------------------------
-    # BUSCAR PAQUETE BASE
-    # -------------------------
+        # -------------------------
+        # VALIDAR PAQUETE
+        # -------------------------
         try:
             cantidad = int(tipo_paquete_str.split()[0])
-
-            paquete_base = Paquete.objects.filter(
-            cantidad_clases=cantidad
-        ).first()
-
+            paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
         except (ValueError, IndexError, AttributeError):
-            return JsonResponse(
-            {"error": "Formato de paquete inválido. Use 'X clases'."},
-            status=400
-        )
+            return JsonResponse({"error": "Formato de paquete inválido. Use 'X clases'."}, status=400)
 
         if not paquete_base:
-            return JsonResponse(
-            {"error": f"No se encontró un paquete de {cantidad} clases."},
-            status=404
-        )
+            return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
 
-    # -------------------------
-    # BUSCAR PAQUETE ACTIVO
-    # -------------------------
+        # -------------------------
+        # PAQUETE ANTERIOR
+        # -------------------------
         paquete_anterior = AlumnoPaquete.objects.filter(
-        id_alumno=alumno,
-        estado="activo"
-    ).order_by('-id_alumno_paquete').first()
+            id_alumno=alumno,
+            estado="activo"
+        ).order_by("-id_alumno_paquete").first()
 
-    # Expirar paquetes activos
+        # Expirar paquetes activos
         AlumnoPaquete.objects.filter(
-        id_alumno=alumno,
-        estado="activo"
-    ).update(estado="expirado")
+            id_alumno=alumno,
+            estado="activo"
+        ).update(estado="expirado")
 
-    # -------------------------
-    # CREAR NUEVO PAQUETE
-    # -------------------------
+        # -------------------------
+        # CREAR NUEVO PAQUETE
+        # -------------------------
         nuevo_paquete = AlumnoPaquete.objects.create(
-        id_alumno=alumno,
-        id_paquete=paquete_base,
-        estado="activo",
-        estado_pago="pagado",
-        fecha_inicio=timezone.now().date()
-    )
-
-    # -------------------------
-    # RECOLECTAR TURNOS
-    # -------------------------
-        turnos_adicionales_ids = set()
-
-    # Turnos del paquete anterior
-        if paquete_anterior:
-            turnos_anteriores = AlumnoPaqueteTurno.objects.filter(
-            id_alumno_paquete=paquete_anterior
+            id_alumno=alumno,
+            id_paquete=paquete_base,
+            estado="activo",
+            estado_pago="pagado",
+            fecha_inicio=timezone.now().date()
         )
 
-        for t_old in turnos_anteriores:
-            turnos_adicionales_ids.add(t_old.id_turno.id_turno)
-
-    # Turnos enviados como IDs
+        # -------------------------
+        # AGREGAR TURNOS SOLO SI SE PASAN
+        # -------------------------
+        turnos_adicionales_ids = set()
+        # Turnos enviados como IDs
         adicionales = data.get("turnos_ids", [])
-
         if isinstance(adicionales, str):
             adicionales = [adicionales]
-
         for t_id in adicionales:
             try:
                 turnos_adicionales_ids.add(int(t_id))
             except:
                 continue
 
-    # Turnos enviados como texto
+        # Turnos enviados como texto
         textos_nuevos = data.get("turnos", [])
-
         if isinstance(textos_nuevos, str):
             textos_nuevos = [textos_nuevos]
 
@@ -429,82 +404,54 @@ def renovar_paquete(request):
             try:
                 limpio = t_str.replace("hs", "").replace("HS", "").strip()
                 partes = limpio.split()
-
                 if len(partes) >= 2:
                     dia_c = partes[0]
                     hora_c = partes[1]
-
-                    hora_int = int(hora_c.split(':')[0])
+                    hora_int = int(hora_c.split(":")[0])
 
                     turno_obj = Turno.objects.filter(
-                    dia__icontains=dia_c,
-                    horario__hour=hora_int
-                ).first()
+                        dia__icontains=dia_c,
+                        horario__hour=hora_int
+                    ).first()
+                    if turno_obj:
+                        turnos_adicionales_ids.add(turno_obj.id_turno)
+            except:
+                continue
 
-                if turno_obj:
-                    turnos_adicionales_ids.add(turno_obj.id_turno)
-
-            except Exception:
-             continue
-
-    # -------------------------
-    # VALIDACIÓN
-    # -------------------------
-        if not turnos_adicionales_ids:
-            return JsonResponse(
-                {"error": "No se encontraron turnos."},
-                status=400
-        )
-
-    # -------------------------
-    # GUARDAR TURNOS
-    # -------------------------
+        # Guardar los turnos solo si hay
         for t_id in turnos_adicionales_ids:
+            turno_obj = Turno.objects.filter(id_turno=t_id).first()
+            if turno_obj:
+                AlumnoPaqueteTurno.objects.create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_turno=turno_obj
+                )
 
-            turno_obj = Turno.objects.filter(
-            id_turno=t_id
-        ).first()
-
-        if turno_obj:
-            AlumnoPaqueteTurno.objects.create(
-                id_alumno_paquete=nuevo_paquete,
-                id_turno=turno_obj
-            )
-
-    # -------------------------
-    # GENERAR CALENDARIO
-    # -------------------------
+        # -------------------------
+        # GENERAR CALENDARIO
+        # -------------------------
         asignar_clases_automaticas(nuevo_paquete)
 
-    # -------------------------
-    # ACTUALIZAR ESTADO ALUMNO
-    # -------------------------
+        # -------------------------
+        # ACTUALIZAR ESTADO ALUMNO
+        # -------------------------
         if alumno.estado != 'regular':
-           alumno.estado = 'regular'
-           alumno.save()
+            alumno.estado = 'regular'
+            alumno.save()
 
-    # -------------------------
-    # RESPUESTA
-    # -------------------------
         return JsonResponse({
-        "status": "success",
-        "message": "Renovación exitosa",
-        "data": {
-            "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
-            "paquete": f"{paquete_base.cantidad_clases} clases",
-            "id_alumno_paquete": nuevo_paquete.id_alumno_paquete
-        }
-    }, status=200)
+            "status": "success",
+            "message": "Paquete renovado exitosamente",
+            "data": {
+                "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
+                "paquete": f"{paquete_base.cantidad_clases} clases",
+                "id_alumno_paquete": nuevo_paquete.id_alumno_paquete
+            }
+        }, status=200)
 
     except Exception as e:
         logging.error(f"[renovar_paquete] Error: {str(e)}")
-
-        return JsonResponse({
-            "error": "Error interno",
-            "detalle": str(e)
-        }, status=500)
-
-
+        return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
 
 @csrf_exempt
 @transaction.atomic
