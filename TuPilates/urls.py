@@ -25,6 +25,6 @@ urlpatterns = [
     path('reprogramar_clase/', reprogramar_clase, name='reprogramar_clase'),
     path('panel/', include('Pilapp.urls_panel')),
     path('registrar_pago/', registrar_pago, name='registrar_pago'),
-    path('renovar_paquete/', renovar_paquete, name='renovar_paquete')
-    
+    path('renovar_paquete/', renovar_paquete, name='renovar_paquete'),
+    path("relacionar_alumnos/", relacionar_alumnos, name="relacionar_alumnos"),    
 ]
