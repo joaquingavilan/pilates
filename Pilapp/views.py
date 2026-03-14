@@ -813,7 +813,7 @@ def obtener_clases_agendadas(request):
             clases_regulares = AlumnoClase.objects.filter(
                 id_alumno_paquete__id_alumno=alumno,
                 id_alumno_paquete__estado = 'activo',
-                estado = 'reservado'
+                estado = 'pendiente'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ac in clases_regulares:
