@@ -87,6 +87,70 @@ class Alumno(models.Model):
     def __str__(self):
         return f"Alumno: {self.id_persona}"
 
+
+class RelacionAlumno(models.Model):
+    """
+    Representa un vínculo simétrico entre dos alumnos del sistema.
+
+    Aplica tanto para alumnos regulares como ocasionales, e incluso
+    inactivos, ya que la relación puede seguir siendo útil a nivel
+    histórico y administrativo.
+
+    Ejemplos:
+        - familiares
+        - amigos
+        - pareja
+
+    El orden del par se normaliza automáticamente para evitar
+    duplicados invertidos.
+    """
+
+    TIPOS_RELACION = [
+        ('familiares', 'Familiares'),
+        ('amigos', 'Amigos'),
+        ('pareja', 'Pareja'),
+        ('otro', 'Otro'),
+    ]
+
+    id_relacion_alumno = models.AutoField(primary_key=True)
+    id_alumno_1 = models.ForeignKey(
+        Alumno,
+        on_delete=models.CASCADE,
+        related_name='relaciones_como_alumno_1'
+    )
+    id_alumno_2 = models.ForeignKey(
+        Alumno,
+        on_delete=models.CASCADE,
+        related_name='relaciones_como_alumno_2'
+    )
+    tipo_relacion = models.CharField(max_length=20, choices=TIPOS_RELACION)
+    observaciones = models.TextField(blank=True, null=True)
+    activa = models.BooleanField(default=True)
+    fecha_alta = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(id_alumno_1=models.F('id_alumno_2')),
+                name='evitar_autorelacion_alumno'
+            ),
+            models.UniqueConstraint(
+                fields=['id_alumno_1', 'id_alumno_2'],
+                name='unique_par_alumnos'
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.id_alumno_1_id and self.id_alumno_2_id:
+            if self.id_alumno_1_id > self.id_alumno_2_id:
+                self.id_alumno_1, self.id_alumno_2 = self.id_alumno_2, self.id_alumno_1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.id_alumno_1} - {self.id_alumno_2} ({self.tipo_relacion})"
+
+
+
 class Instructor(models.Model):
     """
     Representa un instructor del estudio, asociado a una persona.

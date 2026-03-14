@@ -6,7 +6,7 @@ from .models import *
 import json
 import logging
 from datetime import datetime, timedelta
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.timezone import now  # Para fecha de hoy respetando timezone
 from datetime import date
@@ -289,27 +289,37 @@ def renovar_paquete(request):
 
     try:
         data = json.loads(request.body)
-        
+
         # Extracción de datos
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
-        telefono = data.get("telefono") or data.get("numero")
-        tipo_paquete_str = data.get("tipo_paquete") 
+        tipo_paquete_str = data.get("tipo_paquete")  # ej: "8 clases"
         precio = data.get("precio")
+        nuevos_turnos_ids = data.get("turnos_ids", [])
+        if isinstance(nuevos_turnos_ids, int):
+            nuevos_turnos_ids = [nuevos_turnos_ids]
 
-        # Búsqueda de Alumno
+        # -------------------------
+        # BUSCAR ALUMNO
+        # -------------------------
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         elif nombre and apellido:
-            persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
-            if persona:
-                alumno = Alumno.objects.filter(id_persona=persona).first()
-        
+            persona_obj = Persona.objects.filter(
+                nombre__icontains=nombre,
+                apellido__icontains=apellido
+            ).first()
+            if persona_obj:
+                alumno = Alumno.objects.filter(id_persona=persona_obj).first()
+
         if not alumno:
             return JsonResponse({"error": "Alumno no encontrado."}, status=404)
 
+        # -------------------------
+        # VALIDAR PAQUETE
+        # -------------------------
         try:
             cantidad = int(tipo_paquete_str.split()[0])
             paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
@@ -319,70 +329,68 @@ def renovar_paquete(request):
         if not paquete_base:
             return JsonResponse({"error": f"No se encontró un paquete de {cantidad} clases."}, status=404)
 
-        # --- LÓGICA DE CIERRE Y MIGRACIÓN ---
-        # 1. Buscamos el último paquete activo
+        # -------------------------
+        # PAQUETE ANTERIOR
+        # -------------------------
         paquete_anterior = AlumnoPaquete.objects.filter(
-            id_alumno=alumno, 
-            estado="activo"
+            id_alumno=alumno, estado="activo"
         ).order_by('-id_alumno_paquete').first()
 
-        # 2. Marcamos el viejo como expirado
-        AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").update(estado="expirado")
+        # Expirar paquetes activos
+        AlumnoPaquete.objects.filter(
+            id_alumno=alumno, estado="activo"
+        ).update(estado="expirado")
 
-        # 3. Creamos el nuevo paquete
+        # -------------------------
+        # CREAR NUEVO PAQUETE
+        # -------------------------
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
             id_paquete=paquete_base,
             estado="activo",
-            estado_pago="pagado", 
+            estado_pago="pagado",
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. Traer la base
+        # -------------------------
+        # COLECCIÓN DE TURNOS
+        # -------------------------
+        turnos_finales_ids = set()
 
-        turnos_adicionales_ids = set()
-
+        # 1️⃣ Copiar los turnos del paquete anterior por defecto
         if paquete_anterior:
             turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
             for t_old in turnos_anteriores:
-                turnos_adicionales_ids.add(t_old.id_turno.id_turno)
+                turnos_finales_ids.add(t_old.id_turno.id_turno)
 
+        # 2️⃣ Agregar los turnos nuevos que envíe el alumno
+        for t_id in nuevos_turnos_ids:
+            turnos_finales_ids.add(t_id)
 
-        # Adicionales
-        
-        adicionales = data.get("turnos_ids",[])
-        if isinstance(adicionales,list):
-            for t_id in adicionales:
-                turnos_adicionales_ids.add(t_id)
-
-
-        #Nuevo paquete
-
-        if not turnos_adicionales_ids:
-            return JsonResponse({
-                "error": "No se encontraron turnos previos ni se enviaron turnos nuevos."
-            }, status=400)
-
-        for t_id in turnos_adicionales_ids:
-            turno_obj = Turno.objects.filter(id_turno = t_id).first()
+        # Guardar turnos
+        for t_id in turnos_finales_ids:
+            turno_obj = Turno.objects.filter(id_turno=t_id).first()
             if turno_obj:
-               AlumnoPaqueteTurno.objects.create(
+                AlumnoPaqueteTurno.objects.create(
                     id_alumno_paquete=nuevo_paquete,
                     id_turno=turno_obj
                 )
-      
 
-        # 5. GENERAR CALENDARIO
+        # -------------------------
+        # GENERAR CALENDARIO
+        # -------------------------
         asignar_clases_automaticas(nuevo_paquete)
 
-        # Actualizar estado del alumno a regular
+        # -------------------------
+        # ACTUALIZAR ESTADO ALUMNO
+        # -------------------------
         if alumno.estado != 'regular':
             alumno.estado = 'regular'
             alumno.save()
 
         return JsonResponse({
             "status": "success",
-            "message": "Renovación exitosa",
+            "message": "Paquete renovado exitosamente",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
@@ -394,6 +402,224 @@ def renovar_paquete(request):
         logging.error(f"[renovar_paquete] Error: {str(e)}")
         return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
 
+
+@csrf_exempt
+@transaction.atomic
+def relacionar_alumnos(request):
+    """
+    POST /relacionar_alumnos/
+    -------------------------
+    Crea o reactiva una relación simétrica entre dos alumnos.
+
+    Entradas (JSON):
+    - id_alumno_1 (int)         [obligatorio]
+    - id_alumno_2 (int)         [obligatorio]
+    - tipo_relacion (str)       [obligatorio]
+    - observaciones (str)       [opcional]
+
+    Reglas:
+    - No se puede relacionar un alumno consigo mismo.
+    - Ambos alumnos deben existir.
+    - Si la relación ya existe:
+        - si estaba inactiva, se reactiva
+        - se actualiza tipo_relacion
+        - se actualiza observaciones
+    - Si no existe, se crea.
+
+    Respuesta 200 OK:
+    {
+        "message": "Relación creada correctamente.",
+        "data": {
+            "id_relacion_alumno": 1,
+            "id_alumno_1": 3,
+            "id_alumno_2": 8,
+            "tipo_relacion": "familiares",
+            "observaciones": "Madre e hija",
+            "activa": true
+        }
+    }
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    errores = []
+
+    try:
+        data = json.loads(request.body)
+
+        id_alumno_1 = data.get("id_alumno_1")
+        id_alumno_2 = data.get("id_alumno_2")
+        tipo_relacion = data.get("tipo_relacion")
+        observaciones = data.get("observaciones")
+
+        if not id_alumno_1:
+            errores.append("Falta el campo 'id_alumno_1'.")
+        if not id_alumno_2:
+            errores.append("Falta el campo 'id_alumno_2'.")
+        if not tipo_relacion:
+            errores.append("Falta el campo 'tipo_relacion'.")
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        if id_alumno_1 == id_alumno_2:
+            return JsonResponse(
+                {"errores": ["No se puede crear una relación entre el mismo alumno."]},
+                status=400
+            )
+
+        try:
+            alumno_1 = Alumno.objects.get(id_alumno=id_alumno_1)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": [f"No existe el alumno con id {id_alumno_1}."]}, status=404)
+
+        try:
+            alumno_2 = Alumno.objects.get(id_alumno=id_alumno_2)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": [f"No existe el alumno con id {id_alumno_2}."]}, status=404)
+
+        tipos_validos = [choice[0] for choice in RelacionAlumno.TIPOS_RELACION]
+        if tipo_relacion not in tipos_validos:
+            return JsonResponse(
+                {"errores": [f"tipo_relacion inválido. Valores permitidos: {tipos_validos}"]},
+                status=400
+            )
+
+        # Normalizamos el orden igual que el modelo
+        if alumno_1.id_alumno > alumno_2.id_alumno:
+            alumno_1, alumno_2 = alumno_2, alumno_1
+
+        relacion = RelacionAlumno.objects.filter(
+            id_alumno_1=alumno_1,
+            id_alumno_2=alumno_2
+        ).first()
+
+        creada = False
+
+        if relacion:
+            relacion.tipo_relacion = tipo_relacion
+            relacion.observaciones = observaciones
+            relacion.activa = True
+            relacion.save()
+            message = "La relación ya existía y fue actualizada/reactivada correctamente."
+        else:
+            relacion = RelacionAlumno.objects.create(
+                id_alumno_1=alumno_1,
+                id_alumno_2=alumno_2,
+                tipo_relacion=tipo_relacion,
+                observaciones=observaciones,
+                activa=True
+            )
+            creada = True
+            message = "Relación creada correctamente."
+
+        return JsonResponse({
+            "message": message,
+            "data": {
+                "id_relacion_alumno": relacion.id_relacion_alumno,
+                "id_alumno_1": relacion.id_alumno_1.id_alumno,
+                "id_alumno_2": relacion.id_alumno_2.id_alumno,
+                "tipo_relacion": relacion.tipo_relacion,
+                "observaciones": relacion.observaciones,
+                "activa": relacion.activa,
+                "creada": creada
+            }
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+
+    except Exception as e:
+        logging.error(f"[relacionar_alumnos] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+def obtener_relacionados(request):
+    """
+    POST /obtener_relacionados/
+    ---------------------------
+    Devuelve todos los alumnos relacionados con un alumno dado.
+
+    Entradas (JSON):
+    - id_alumno (int)          [obligatorio]
+    - solo_activas (bool)      [opcional, default=True]
+
+    Respuesta 200 OK:
+    {
+        "id_alumno": 12,
+        "relacionados": [
+            {
+                "id_relacion_alumno": 3,
+                "id_alumno_relacionado": 25,
+                "nombre": "Laura",
+                "apellido": "Gómez",
+                "estado": "regular",
+                "tipo_relacion": "familiares",
+                "observaciones": "Madre e hija",
+                "activa": true
+            }
+        ]
+    }
+    }
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        id_alumno = data.get("id_alumno")
+        solo_activas = data.get("solo_activas", True)
+
+        if not id_alumno:
+            return JsonResponse({"errores": ["Falta el campo 'id_alumno'."]}, status=400)
+
+        try:
+            alumno = Alumno.objects.get(id_alumno=id_alumno)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": [f"No existe el alumno con id {id_alumno}."]}, status=404)
+
+        relaciones_qs = RelacionAlumno.objects.filter(
+            models.Q(id_alumno_1=alumno) | models.Q(id_alumno_2=alumno)
+        ).select_related(
+            "id_alumno_1__id_persona",
+            "id_alumno_2__id_persona"
+        )
+
+        if solo_activas:
+            relaciones_qs = relaciones_qs.filter(activa=True)
+
+        relacionados = []
+
+        for relacion in relaciones_qs:
+            if relacion.id_alumno_1_id == alumno.id_alumno:
+                otro_alumno = relacion.id_alumno_2
+            else:
+                otro_alumno = relacion.id_alumno_1
+
+            relacionados.append({
+                "id_relacion_alumno": relacion.id_relacion_alumno,
+                "id_alumno_relacionado": otro_alumno.id_alumno,
+                "nombre": otro_alumno.id_persona.nombre,
+                "apellido": otro_alumno.id_persona.apellido,
+                "estado": otro_alumno.estado,
+                "tipo_relacion": relacion.tipo_relacion,
+                "observaciones": relacion.observaciones,
+                "activa": relacion.activa
+            })
+
+        return JsonResponse({
+            "id_alumno": alumno.id_alumno,
+            "relacionados": relacionados
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+
+    except Exception as e:
+        logging.error(f"[obtener_relacionados] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 @transaction.atomic
@@ -410,6 +636,7 @@ def obtener_clases_agendadas(request):
     Entradas (JSON):
     - id_alumno (int)                 [obligatorio]
     - fecha_minima (str, YYYY-MM-DD)  [opcional]
+
 
     Validaciones y posibles errores:
     - Falta 'id_alumno' → 400 {"errores": ["Falta el campo 'id_alumno'."]}
@@ -483,7 +710,7 @@ def obtener_clases_agendadas(request):
             clases_regulares = AlumnoClase.objects.filter(
                 id_alumno_paquete__id_alumno=alumno,
                 id_alumno_paquete__estado = 'activo',
-                estado = 'reservado'
+                estado = 'pendiente'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ac in clases_regulares:
@@ -1335,10 +1562,6 @@ def registrar_alumno_datos(data):
 
     logging.info(f"[registrar_alumno_datos] Proceso completado exitosamente")
     return {"message": "Alumno registrado exitosamente"}
-
-
-
-
 
 @csrf_exempt
 def listar_precios_paquetes(request):
