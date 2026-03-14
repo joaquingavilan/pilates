@@ -354,8 +354,7 @@ def renovar_paquete(request):
             turnos_adicionales_ids.add(t_id)
 
         textos_nuevos = data.get("turnos", [])
-        if isinstance(textos_nuevos, str): 
-            textos_nuevos = [textos_nuevos]
+        if isinstance(textos_nuevos, str): textos_nuevos = [textos_nuevos]
 
         for t_str in textos_nuevos:
             try:
