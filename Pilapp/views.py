@@ -1310,21 +1310,35 @@ def registrar_alumno_datos(data):
 
     # 📌 Crear objetos (solo si todo está validado)
     logging.info(f"[registrar_alumno_datos] Creando persona: {data['nombre']} {data['apellido']}")
-    persona = Persona.objects.create(
+    persona, persona_creada = Persona.objects.get_or_create(
         nombre=data["nombre"],
         apellido=data["apellido"],
         telefono=data.get("telefono"),
         ruc=data.get("ruc"),
         observaciones=data.get("observaciones")
     )
-    logging.info(f"[registrar_alumno_datos] Persona creada: id={persona.id_persona}")
+    if not persona_creada:
+                  logging.info(f"[registrar_alumno_datos] Persona ya existía: id={persona.id_persona}. Actualizando teléfono/RUC si aplica.")
+                 persona.telefono = data.get("telefono") or persona.telefono
+                 persona.ruc = data.get("ruc") or persona.ruc
+                 persona.save()
+        else:
+                 logging.info(f"[registrar_alumno_datos] Persona creada: id={persona.id_persona}")
+    #logging.info(f"[registrar_alumno_datos] Persona creada: id={persona.id_persona}")
 
-    alumno = Alumno.objects.create(
+    alumno, alumno_creado = Alumno.objects.get_or_create(
         id_persona=persona,
         canal_captacion=data.get("canal_captacion"),
         estado="regular"
     )
-    logging.info(f"[registrar_alumno_datos] Alumno creado: id={alumno.id_alumno}")
+
+    if not alumno_creado:
+                  logging.info(f"[registrar_alumno_datos] Alumno ya existía: id={alumno.id_alumno}")
+                  alumno.estado = "regular"
+                  alumno.save()
+         else:
+                 logging.info(f"[registrar_alumno_datos] Alumno nuevo creado: id={alumno.id_alumno}")
+    #logging.info(f"[registrar_alumno_datos] Alumno creado: id={alumno.id_alumno}")
 
     logging.info(f"[registrar_alumno_datos] Creando AlumnoPaquete con fecha_inicio={fecha_inicio}")
     alumno_paquete = AlumnoPaquete.objects.create(
