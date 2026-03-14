@@ -332,7 +332,7 @@ def renovar_paquete(request):
         alumno = None
 
         if id_alumno:
-         alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
+         alumno = Alumno.objects.select_related('id_persona').filter(id_alumno=id_alumno).first()
 
         elif nombre and apellido:
             persona = Persona.objects.filter(
@@ -739,6 +739,7 @@ def obtener_clases_agendadas(request):
     Entradas (JSON):
     - id_alumno (int)                 [obligatorio]
     - fecha_minima (str, YYYY-MM-DD)  [opcional]
+
 
     Validaciones y posibles errores:
     - Falta 'id_alumno' → 400 {"errores": ["Falta el campo 'id_alumno'."]}
