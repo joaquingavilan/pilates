@@ -6,7 +6,7 @@ from .models import *
 import json
 import logging
 from datetime import datetime, timedelta
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.timezone import now  # Para fecha de hoy respetando timezone
 from datetime import date
@@ -502,7 +502,92 @@ def relacionar_alumnos(request):
         logging.error(f"[relacionar_alumnos] Error: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
+@csrf_exempt
+def obtener_relacionados(request):
+    """
+    POST /obtener_relacionados/
+    ---------------------------
+    Devuelve todos los alumnos relacionados con un alumno dado.
 
+    Entradas (JSON):
+    - id_alumno (int)          [obligatorio]
+    - solo_activas (bool)      [opcional, default=True]
+
+    Respuesta 200 OK:
+    {
+        "id_alumno": 12,
+        "relacionados": [
+            {
+                "id_relacion_alumno": 3,
+                "id_alumno_relacionado": 25,
+                "nombre": "Laura",
+                "apellido": "Gómez",
+                "estado": "regular",
+                "tipo_relacion": "familiares",
+                "observaciones": "Madre e hija",
+                "activa": true
+            }
+        ]
+    }
+    }
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        id_alumno = data.get("id_alumno")
+        solo_activas = data.get("solo_activas", True)
+
+        if not id_alumno:
+            return JsonResponse({"errores": ["Falta el campo 'id_alumno'."]}, status=400)
+
+        try:
+            alumno = Alumno.objects.get(id_alumno=id_alumno)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": [f"No existe el alumno con id {id_alumno}."]}, status=404)
+
+        relaciones_qs = RelacionAlumno.objects.filter(
+            models.Q(id_alumno_1=alumno) | models.Q(id_alumno_2=alumno)
+        ).select_related(
+            "id_alumno_1__id_persona",
+            "id_alumno_2__id_persona"
+        )
+
+        if solo_activas:
+            relaciones_qs = relaciones_qs.filter(activa=True)
+
+        relacionados = []
+
+        for relacion in relaciones_qs:
+            if relacion.id_alumno_1_id == alumno.id_alumno:
+                otro_alumno = relacion.id_alumno_2
+            else:
+                otro_alumno = relacion.id_alumno_1
+
+            relacionados.append({
+                "id_relacion_alumno": relacion.id_relacion_alumno,
+                "id_alumno_relacionado": otro_alumno.id_alumno,
+                "nombre": otro_alumno.id_persona.nombre,
+                "apellido": otro_alumno.id_persona.apellido,
+                "estado": otro_alumno.estado,
+                "tipo_relacion": relacion.tipo_relacion,
+                "observaciones": relacion.observaciones,
+                "activa": relacion.activa
+            })
+
+        return JsonResponse({
+            "id_alumno": alumno.id_alumno,
+            "relacionados": relacionados
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+
+    except Exception as e:
+        logging.error(f"[obtener_relacionados] Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 @transaction.atomic
