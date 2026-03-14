@@ -218,44 +218,42 @@ def asignar_clases_automaticas(alumno_paquete):
     turnos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
     cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
     
-    dias_map = {
-        'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 
-        'Viernes': 4, 'Sábado': 5, 'Domingo': 6
-    }
-    
+    dias_map = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4, 'Sábado': 5, 'Domingo': 6}
     clases_creadas = 0
     fecha_busqueda = alumno_paquete.fecha_inicio
     
-    # Buscamos en los próximos
     for i in range(60): 
         if clases_creadas >= cantidad_clases:
             break
             
         fecha_actual = fecha_busqueda + timedelta(days=i)
-        
-        # Obtenemos el nombre del día en español para la fecha que estamos evaluando
         dia_semana_num = fecha_actual.weekday()
         dia_nombre = [k for k, v in dias_map.items() if v == dia_semana_num][0]
         
-        # ¿El alumno tiene un turno fijo este día?
         turnos_hoy = turnos.filter(id_turno__dia=dia_nombre)
         
         for t in turnos_hoy:
             if clases_creadas >= cantidad_clases:
                 break
             
-            # Buscamos si el administrador ya creó la Clase física en ese horario
             clase_fisica = Clase.objects.filter(fecha=fecha_actual, id_turno=t.id_turno).first()
             
             if clase_fisica:
-                # Registramos al alumno en la clase
-                AlumnoClase.objects.get_or_create(
-                    id_alumno_paquete=alumno_paquete,
-                    id_clase=clase_fisica,
-                    defaults={'estado': 'reservado'}
-                )
-                clases_creadas += 1
+                # --- MEJORA ANTI-DUPLICADOS ---
+                # Verificamos si el alumno YA tiene una clase este día a esta hora
+                # (en cualquier paquete, para evitar duplicados por re-ejecución)
+                ya_existe = AlumnoClase.objects.filter(
+                    id_alumno_paquete__id_alumno=alumno_paquete.id_alumno,
+                    id_clase=clase_fisica
+                ).exists()
 
+                if not ya_existe:
+                    AlumnoClase.objects.create(
+                        id_alumno_paquete=alumno_paquete,
+                        id_clase=clase_fisica,
+                        estado='reservado'
+                    )
+                    clases_creadas += 1
 
 
 @csrf_exempt
@@ -340,17 +338,51 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. COPIAR TURNOS
+
+        # 4. Traer la base
+        turnos_adicionales_ids = set()
+
+        # Cargar anteriores
         if paquete_anterior:
             turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
             for t_old in turnos_anteriores:
+                turnos_adicionales_ids.add(t_old.id_turno.id_turno)
+
+
+        adicionales = data.get("turnos_ids", [])
+        for t_id in adicionales:
+            turnos_adicionales_ids.add(t_id)
+
+        textos_nuevos = data.get("turnos", [])
+        if isinstance(textos_nuevos, str): textos_nuevos = [textos_nuevos]
+
+        for t_str in textos_nuevos:
+            try:
+                dia_c, hora_c = t_str.split()
+                # Buscamos el objeto para obtener su ID real
+                # Cambio sutil por si falla la coincidencia exacta de hora 
+                turno_obj = Turno.objects.filter(dia__icontains=dia_c, horario__hour=int(hora_c.split(':')[0])).first()
+                if turno_obj:
+                    turnos_adicionales_ids.add(turno_obj.id_turno)
+            except:
+                continue
+
+        # Validación
+        if not turnos_adicionales_ids:
+            return JsonResponse({"error": "No se encontraron turnos."}, status=400)
+
+        # 5. GUARDADO FINAL
+        for t_id in turnos_adicionales_ids:
+            turno_obj = Turno.objects.filter(id_turno=t_id).first()
+            if turno_obj:
                 AlumnoPaqueteTurno.objects.create(
                     id_alumno_paquete=nuevo_paquete,
-                    id_turno=t_old.id_turno
+                    id_turno=turno_obj
                 )
 
-        # 5. GENERAR CALENDARIO
+        # GENERAR CALENDARIO
         asignar_clases_automaticas(nuevo_paquete)
+
 
         # Actualizar estado del alumno a regular
         if alumno.estado != 'regular':
@@ -370,6 +402,7 @@ def renovar_paquete(request):
     except Exception as e:
         logging.error(f"[renovar_paquete] Error: {str(e)}")
         return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
+
 
 @csrf_exempt
 @transaction.atomic
@@ -675,7 +708,9 @@ def obtener_clases_agendadas(request):
 
         if alumno.estado == "regular":
             clases_regulares = AlumnoClase.objects.filter(
-                id_alumno_paquete__id_alumno=alumno
+                id_alumno_paquete__id_alumno=alumno,
+                id_alumno_paquete__estado = 'activo',
+                estado = 'reservado'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ac in clases_regulares:
@@ -692,7 +727,8 @@ def obtener_clases_agendadas(request):
         elif alumno.estado == "ocasional":
             clases_ocasionales = AlumnoClaseOcasional.objects.filter(
                 id_alumno=alumno,
-                id_clase__fecha__gte=fecha_minima
+                id_clase__fecha__gte=fecha_minima,
+                estado='reservado'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ao in clases_ocasionales:
@@ -763,83 +799,44 @@ def registrar_pago(request):
     try:
         data = json.loads(request.body)
         
-        # 1. Extracción y normalización de datos
+        # 1. Extracción de datos
         monto = data.get("monto")
         metodo = data.get("metodo_pago")
         comprobante = data.get("comprobante", "Sin comprobante adjunto")
-        cant_clases_mencionadas = data.get("cant_clases")
         fecha_pago_str = data.get("fecha_pago")
-
-        # Priorizamos 'telefono', pero mantenemos 'numero' como fallback por compatibilidad
         telefono = data.get("telefono") or data.get("numero")
-        
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
-        ruc = data.get("ruc")
 
-        # --- VALIDACIONES BÁSICAS ---
-        if not monto:
-            errores.append("Falta el campo 'monto'.")
-        if not metodo:
-            errores.append("Falta el campo 'metodo_pago'.")
+        if not monto or not metodo:
+            return JsonResponse({"errores": ["Falta monto o metodo_pago"]}, status=400)
 
-        # Validación de fecha
-        fecha_pago = timezone.localdate()
-        if fecha_pago_str:
-            try:
-                fecha_pago = datetime.strptime(fecha_pago_str, "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                errores.append("La 'fecha_pago' debe tener el formato YYYY-MM-DD.")
-
-        if errores:
-            return JsonResponse({"errores": errores}, status=400)
-
-        # 2. MOTOR DE BÚSQUEDA
+        # 2. Búsqueda de Alumno
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         
-        # Búsqueda por contacto
-        if not alumno and (telefono or ruc):
-            from django.db.models import Q
-            persona = Persona.objects.filter(Q(telefono=telefono) | Q(ruc=ruc)).first()
+        if not alumno and telefono:
+            persona = Persona.objects.filter(telefono=telefono).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
 
-        # Búsqueda por nombre
         if not alumno and nombre and apellido:
             persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
             if persona:
                 alumno = Alumno.objects.filter(id_persona=persona).first()
 
         if not alumno:
-            return JsonResponse({"errores": ["No pude encontrar al alumno. Verifique datos."]}, status=404)
+            return JsonResponse({"errores": ["Alumno no encontrado."]}, status=404)
 
-        # 3. GESTIÓN DE PAQUETE (Red de seguridad)
-        filtros_p = {'id_alumno': alumno, 'estado_pago': 'pendiente'}
-        if cant_clases_mencionadas:
-            filtros_p['id_paquete__cantidad_clases'] = cant_clases_mencionadas
+        # 3. REGISTRO DEL PAGO
+        fecha_pago = timezone.localdate()
+        if fecha_pago_str:
+            try:
+                fecha_pago = datetime.strptime(fecha_pago_str, "%Y-%m-%d").date()
+            except: pass
 
-        alumno_paquete = AlumnoPaquete.objects.filter(**filtros_p).order_by('-id_alumno_paquete').first()
-
-        if not alumno_paquete:
-            cantidad = cant_clases_mencionadas if cant_clases_mencionadas else 12
-            paquete_base = Paquete.objects.filter(cantidad_clases=cantidad).first()
-            
-            # NOTA: Asegúrate de que Paquete tenga el campo 'costo' o valor por defecto
-            if not paquete_base:
-                paquete_base = Paquete.objects.create(cantidad_clases=cantidad, costo=0)
-
-            alumno_paquete = AlumnoPaquete.objects.create(
-                id_alumno=alumno,
-                id_paquete=paquete_base,
-                fecha_inicio=fecha_pago,
-                estado_pago='pendiente'
-            )
-            logging.info(f"[registrar_pago] Creado paquete de emergencia ({cantidad} clases) para ID {alumno.id_alumno}")
-
-        # 4. REGISTRO OFICIAL
         nuevo_pago = Pago.objects.create(
             fecha=fecha_pago,
             monto=monto,
@@ -849,28 +846,29 @@ def registrar_pago(request):
             comprobante=comprobante
         )
 
-        PagoAlumno.objects.create(
-            id_pago=nuevo_pago,
-            id_alumno_paquete=alumno_paquete,
-            observaciones=f"Pago automático. Ref: {comprobante}"
-        )
-
-        alumno_paquete.estado_pago = "pagado"
-        alumno_paquete.save()
+        # 4. VINCULACIÓN
+        alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").order_by('-id_alumno_paquete').first()
+        
+        if alumno_paquete:
+            PagoAlumno.objects.create(
+                id_pago=nuevo_pago,
+                id_alumno_paquete=alumno_paquete,
+                observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
+            )
 
         return JsonResponse({
             "status": "success",
-            "message": f"Pago de {monto} registrado.",
+            "message": f"Pago de {monto} registrado exitosamente.",
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
-                "paquete_actualizado": f"{alumno_paquete.id_paquete.cantidad_clases} clases",
+                "paquete_actualizado": f"{alumno_paquete.id_paquete.cantidad_clases if alumno_paquete else 'Sin paquete activo'}",
                 "pago_id": nuevo_pago.id_pago
             }
         }, status=200)
 
     except Exception as e:
         logging.error(f"[registrar_pago] Error: {str(e)}")
-        return JsonResponse({"error": "Hubo un problema al procesar el pago", "detalle": str(e)}, status=500)
+        return JsonResponse({"error": "Error interno", "detalle": str(e)}, status=500)
 
 def normalizar(texto):
     if not texto:
@@ -1134,39 +1132,48 @@ def obtener_id_alumno(request):
                 return JsonResponse({"error": "El campo 'telefono' es obligatorio."}, status=400)
 
             personas = Persona.objects.filter(telefono=telefono.strip())
-            personas_filtradas = []
 
-            if personas.count() == 0:
+            if not personas.exists():
                 return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
 
-            if personas.count() == 1:
-                persona = personas.first()
-            else:
-                # Más de una persona con ese teléfono, aplicar comparación con nombre y apellido
-                for p in personas:
-                    if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
-                        personas_filtradas.append(p)
+            persona = None
 
-                if len(personas_filtradas) == 0:
+            # Manejo de múltiples personas (Familias/Parejas)
+            if personas.count() > 1:
+                personas_filtradas = []
+                if nombre or apellido:
+                    for p in personas:
+                        # Corregido: añadidos paréntesis a .lower()
+                        if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
+                            personas_filtradas.append(p)
+                
+                # Si no hay un filtro exacto que deje 1 sola persona, enviamos las opciones
+                if len(personas_filtradas) != 1:
+                    lista_nombres = [f"{p.nombre} {p.apellido}" for p in personas]
                     return JsonResponse({
-                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                        "error": "Se encontro mas de una persona con ese telefono.",
+                        "detalle": "Ambiguedad detectada.",
+                        "opciones": lista_nombres
                     }, status=400)
-                if len(personas_filtradas) > 1:
-                    return JsonResponse({
-                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
-                    }, status=400)
-
+                
+                # Si llegamos aquí, es porque el filtro de nombre/apellido funcionó
                 persona = personas_filtradas[0]
+            else:
+                # Caso simple: solo hay una persona con ese teléfono
+                persona = personas.first()
 
             # Buscar Alumno asociado
             try:
                 alumno = Alumno.objects.get(id_persona=persona)
             except Alumno.DoesNotExist:
-                return JsonResponse({"error": "La persona existe pero no está registrada como alumno."}, status=404)
+                return JsonResponse({
+                    "error": f"La persona {persona.nombre} {persona.apellido} existe pero no está registrada como alumno."
+                }, status=404)
 
             return JsonResponse({
                 "id_alumno": alumno.id_alumno,
-                "estado": alumno.estado
+                "estado": alumno.estado,
+                "nombre_completo": f"{persona.nombre} {persona.apellido}"
             })
 
         except Exception as e:
@@ -1435,129 +1442,123 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
 
 def registrar_alumno_datos(data):
     """
-    Procesa los datos recibidos en /registrar_alumno/ y realiza las validaciones y registros en base de datos.
+    Procesa los datos recibidos en /registrar_alumno/ y realiza las validaciones 
+    y registros en base de datos de forma inteligente (evita duplicados).
     """
     logging.info(f"[registrar_alumno_datos] Iniciando con data: {data}")
     
     errores = []
     turnos_asignados = []
-    clases_a_reservar = []  # Nuevo: para preparar las clases validadas
+    clases_a_reservar = []
 
-    # 📌 Validar turnos
+    # 📌 1. Validar turnos
     logging.info(f"[registrar_alumno_datos] Validando turnos: {data.get('turnos')}")
-    for turno_str in data["turnos"]:
+    for turno_str in data.get("turnos", []):
         try:
             dia, horario = turno_str.split()
-            logging.debug(f"[registrar_alumno_datos] Buscando turno: dia={dia}, horario={horario}")
             turno = Turno.objects.get(dia=dia, horario=horario)
-            logging.debug(f"[registrar_alumno_datos] Turno encontrado: {turno}, estado={turno.estado}")
             if turno.estado == "Ocupado":
-                logging.warning(f"[registrar_alumno_datos] Turno {turno_str} ocupado")
-                errores.append(f"El turno {turno_str} ya tiene su cupo general completo.")
+                errores.append(f"El turno {turno_str} ya tiene su cupo completo.")
             else:
                 turnos_asignados.append(turno)
-                logging.info(f"[registrar_alumno_datos] Turno {turno_str} asignado correctamente")
         except Turno.DoesNotExist:
-            logging.error(f"[registrar_alumno_datos] Turno {turno_str} no existe")
             errores.append(f"El turno {turno_str} no existe.")
+        except ValueError:
+            errores.append(f"Formato de turno inválido: {turno_str}. Use 'Dia HH:MM'.")
 
-    # 📌 Validar paquete
-    logging.info(f"[registrar_alumno_datos] Validando paquete: {data.get('paquete')} clases")
+    # 📌 2. Validar paquete
     try:
         paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
-        logging.info(f"[registrar_alumno_datos] Paquete encontrado: {paquete}")
     except Paquete.DoesNotExist:
-        logging.error(f"[registrar_alumno_datos] Paquete con {data['paquete']} clases no existe")
         errores.append(f"Paquete con {data['paquete']} clases no existe.")
 
-    # 📌 Validar clases específicas
+    # 📌 3. Validar clases específicas y disponibilidad
     if not errores:
         cantidad_clases = paquete.cantidad_clases
         cantidad_turnos = len(turnos_asignados)
-        clases_por_turno = cantidad_clases // cantidad_turnos
-        logging.info(f"[registrar_alumno_datos] Distribución: {cantidad_clases} clases / {cantidad_turnos} turnos = {clases_por_turno} clases por turno")
-
-        for turno in turnos_asignados:
-            logging.info(f"[registrar_alumno_datos] Procesando turno: {turno.dia} {turno.horario}")
+        if cantidad_turnos > 0:
+            clases_por_turno = cantidad_clases // cantidad_turnos
             
-            fecha_inicio = data.get("fecha_inicio")
-            logging.debug(f"[registrar_alumno_datos] fecha_inicio recibida en data: {fecha_inicio}")
-            
-            if not fecha_inicio:
-                logging.info(f"[registrar_alumno_datos] No hay fecha_inicio, calculando próxima fecha para día: {turno.dia}")
-                fecha_calculada = obtener_fecha_proximo_dia(turno.dia)
-                logging.info(f"[registrar_alumno_datos] Fecha calculada (date): {fecha_calculada}")
-                fecha_inicio = str(fecha_calculada)
-                logging.info(f"[registrar_alumno_datos] Fecha convertida a string: {fecha_inicio}")
-            
-            logging.info(f"[registrar_alumno_datos] Obteniendo fechas para turno_id={turno.id_turno}, fecha_inicio={fecha_inicio}, clases={clases_por_turno}")
-            fechas_clases = obtener_fechas_turno_normal(turno.id_turno, fecha_inicio, clases_por_turno)["fechas"]
-            logging.info(f"[registrar_alumno_datos] Fechas obtenidas: {fechas_clases}")
+            for turno in turnos_asignados:
+                fecha_inicio = data.get("fecha_inicio")
+                if not fecha_inicio:
+                    fecha_inicio = str(obtener_fecha_proximo_dia(turno.dia))
+                
+                res_fechas = obtener_fechas_turno_normal(turno.id_turno, fecha_inicio, clases_por_turno)
+                fechas_clases = res_fechas.get("fechas", [])
 
-            for fecha in fechas_clases:
-                fecha_clase = datetime.strptime(fecha, "%Y-%m-%d").date()
-                logging.debug(f"[registrar_alumno_datos] Validando clase para fecha: {fecha_clase}")
-                try:
-                    clase = Clase.objects.get(
-                        id_instructor=Instructor.objects.get(id_instructor=1),
-                        id_turno=turno,
-                        fecha=fecha_clase
-                    )
-                    logging.debug(f"[registrar_alumno_datos] Clase encontrada: id={clase.id_clase}, inscriptos={clase.total_inscriptos}")
-                    if clase.total_inscriptos >= 4:
-                        logging.warning(f"[registrar_alumno_datos] Clase llena: {fecha_clase} {turno.horario}")
-                        errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya está llena.")
-                    else:
-                        clases_a_reservar.append((turno, clase))
-                        logging.info(f"[registrar_alumno_datos] Clase reservada: {fecha_clase} {turno.horario}")
-                except Clase.DoesNotExist:
-                    logging.error(f"[registrar_alumno_datos] No existe clase para {fecha_clase} en turno {turno.dia} {turno.horario}")
-                    errores.append(f"No existe clase programada para {fecha_clase} en el turno {turno.dia} {turno.horario}.")
+                for fecha in fechas_clases:
+                    fecha_clase = datetime.strptime(fecha, "%Y-%m-%d").date()
+                    try:
+                        clase = Clase.objects.get(
+                            id_instructor=Instructor.objects.get(id_instructor=1),
+                            id_turno=turno,
+                            fecha=fecha_clase
+                        )
+                        if clase.total_inscriptos >= 4:
+                            errores.append(f"La clase del {fecha_clase} a las {turno.horario} está llena.")
+                        else:
+                            clases_a_reservar.append((turno, clase))
+                    except Clase.DoesNotExist:
+                        errores.append(f"No existe clase programada para {fecha_clase} en el turno {turno.dia}.")
+        else:
+            errores.append("Debe seleccionar al menos un turno.")
 
-    # 📌 Si hay errores, devolverlos todos juntos
     if errores:
-        logging.error(f"[registrar_alumno_datos] Errores acumulados: {errores}")
         raise ValueError("Errores encontrados: " + "; ".join(errores))
 
-    # 📌 Crear objetos (solo si todo está validado)
-    logging.info(f"[registrar_alumno_datos] Creando persona: {data['nombre']} {data['apellido']}")
-    persona = Persona.objects.create(
+    # 📌 4. CREACIÓN INTELIGENTE (Anti-duplicados)
+    # Buscamos si la persona ya existe por nombre y apellido
+    persona, persona_creada = Persona.objects.get_or_create(
         nombre=data["nombre"],
         apellido=data["apellido"],
-        telefono=data.get("telefono"),
-        ruc=data.get("ruc"),
-        observaciones=data.get("observaciones")
+        defaults={
+            'telefono': data.get("telefono"),
+            'ruc': data.get("ruc"),
+            'observaciones': data.get("observaciones")
+        }
     )
-    logging.info(f"[registrar_alumno_datos] Persona creada: id={persona.id_persona}")
 
-    alumno = Alumno.objects.create(
+    if not persona_creada:
+        logging.info(f"[registrar_alumno_datos] Persona detectada (ya existía): id={persona.id_persona}")
+        # Actualizamos datos de contacto si se enviaron nuevos
+        if data.get("telefono"): persona.telefono = data.get("telefono")
+        if data.get("ruc"): persona.ruc = data.get("ruc")
+        persona.save()
+    else:
+        logging.info(f"[registrar_alumno_datos] Nueva persona creada: id={persona.id_persona}")
+
+    # Buscamos o creamos el perfil de Alumno para esa persona
+    alumno, alumno_creado = Alumno.objects.get_or_create(
         id_persona=persona,
-        canal_captacion=data.get("canal_captacion"),
-        estado="regular"
+        defaults={
+            'canal_captacion': data.get("canal_captacion"),
+            'estado': "regular"
+        }
     )
-    logging.info(f"[registrar_alumno_datos] Alumno creado: id={alumno.id_alumno}")
 
-    logging.info(f"[registrar_alumno_datos] Creando AlumnoPaquete con fecha_inicio={fecha_inicio}")
+    if not alumno_creado:
+        alumno.estado = "regular" # Aseguramos que vuelva a ser regular si estaba inactivo
+        alumno.save()
+
+    # 📌 5. Registro del Paquete y Turnos
     alumno_paquete = AlumnoPaquete.objects.create(
         id_alumno=alumno,
         id_paquete=paquete,
         estado='activo',
-        fecha_inicio=fecha_inicio
+        fecha_inicio=data.get("fecha_inicio") or str(timezone.now().date())
     )
-    logging.info(f"[registrar_alumno_datos] AlumnoPaquete creado: id={alumno_paquete.id_alumno_paquete}")
 
     for turno, clase in clases_a_reservar:
-        logging.debug(f"[registrar_alumno_datos] Creando AlumnoPaqueteTurno para turno {turno.dia} {turno.horario}")
         AlumnoPaqueteTurno.objects.get_or_create(id_alumno_paquete=alumno_paquete, id_turno=turno)
-        
-        logging.debug(f"[registrar_alumno_datos] Creando AlumnoClase para clase fecha={clase.fecha}")
-        AlumnoClase.objects.create(id_alumno_paquete=alumno_paquete, id_clase=clase, estado="pendiente")
+        AlumnoClase.objects.create(
+            id_alumno_paquete=alumno_paquete, 
+            id_clase=clase, 
+            estado="pendiente"
+        )
 
-    logging.info(f"[registrar_alumno_datos] Proceso completado exitosamente")
-    return {"message": "Alumno registrado exitosamente"}
-
-
-
+    logging.info(f"[registrar_alumno_datos] Registro completado para Alumno ID: {alumno.id_alumno}")
+    return {"message": "Alumno procesado exitosamente", "id_alumno": alumno.id_alumno}
 
 
 @csrf_exempt
@@ -2293,6 +2294,7 @@ def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
         lugares_disponibles = 4 - turno.lugares_ocupados
         if lugares_disponibles > 0:
             turnos_disponibles.append({
+                "id_turno": turno.id_turno,
                 "horario": turno.horario.strftime("%H:%M"),
                 "lugares_disponibles": lugares_disponibles
             })

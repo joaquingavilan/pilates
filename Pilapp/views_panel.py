@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.contrib import messages
 from django.utils import timezone
+from django.db import connection
 
 
 
@@ -25,6 +26,15 @@ from .models import (
     AlumnoPaquete, Paquete, Pago, PagoAlumno, ClienteProspecto,
     AlumnoPaqueteTurno, PagoInstructor, Instructor
 )
+
+with connection.cursor() as cursor:
+    try:
+        # Intentamos agregar la columna. Si ya existe, el 'try' fallará y pasará al 'except'.
+        cursor.execute('ALTER TABLE "Pilapp_alumnopaquete" ADD COLUMN "clases_usadas" INTEGER DEFAULT 0;')
+        print("¡Columna 'clases_usadas' creada con éxito!")
+    except Exception as e:
+        # Si la columna ya existe, simplemente no hace nada
+        print(f"Aviso de DB: {e}")
 
 
 from django.db import connection
