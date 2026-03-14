@@ -338,42 +338,52 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. Traer la base
 
+        # 4. Traer la base
         turnos_adicionales_ids = set()
 
+        # Cargar anteriores
         if paquete_anterior:
             turnos_anteriores = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior)
             for t_old in turnos_anteriores:
                 turnos_adicionales_ids.add(t_old.id_turno.id_turno)
 
 
-        # Adicionales
-        
-        adicionales = data.get("turnos_ids",[])
-        if isinstance(adicionales,list):
-            for t_id in adicionales:
-                turnos_adicionales_ids.add(t_id)
+        adicionales = data.get("turnos_ids", [])
+        for t_id in adicionales:
+            turnos_adicionales_ids.add(t_id)
 
+        textos_nuevos = data.get("turnos", [])
+        if isinstance(textos_nuevos, str): 
+            textos_nuevos = [textos_nuevos]
 
-        #Nuevo paquete
+        for t_str in textos_nuevos:
+            try:
+                dia_c, hora_c = t_str.split()
+                # Buscamos el objeto para obtener su ID real
+                # Cambio sutil por si falla la coincidencia exacta de hora 
+                turno_obj = Turno.objects.filter(dia__icontains=dia_c, horario__hour=int(hora_c.split(':')[0])).first()
+                if turno_obj:
+                    turnos_adicionales_ids.add(turno_obj.id_turno)
+            except:
+                continue
 
+        # Validación
         if not turnos_adicionales_ids:
-            return JsonResponse({
-                "error": "No se encontraron turnos previos ni se enviaron turnos nuevos."
-            }, status=400)
+            return JsonResponse({"error": "No se encontraron turnos."}, status=400)
 
+        # 5. GUARDADO FINAL
         for t_id in turnos_adicionales_ids:
-            turno_obj = Turno.objects.filter(id_turno = t_id).first()
+            turno_obj = Turno.objects.filter(id_turno=t_id).first()
             if turno_obj:
-               AlumnoPaqueteTurno.objects.create(
+                AlumnoPaqueteTurno.objects.create(
                     id_alumno_paquete=nuevo_paquete,
                     id_turno=turno_obj
                 )
-      
 
-        # 5. GENERAR CALENDARIO
+        # GENERAR CALENDARIO
         asignar_clases_automaticas(nuevo_paquete)
+
 
         # Actualizar estado del alumno a regular
         if alumno.estado != 'regular':
