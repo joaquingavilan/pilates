@@ -261,15 +261,22 @@ def renovar_paquete(request):
         turnos_obj_nuevos = []
         for turno_str in turnos_nuevos:
             try:
-                dia, horario = turno_str.split()
+        # Separar día y horario correctamente
+                dia, horario = turno_str.rsplit(" ", 1)
                 turno_obj = Turno.objects.get(dia=dia, horario=horario)
-                if turno_obj not in turnos_asignados:
-                    disponibles = buscar_turnos_disponibles(dia, operador_hora="exact", hora_referencia=horario)
-                    if any(t["id_turno"] == turno_obj.id_turno for t in disponibles):
+
+        # Validar disponibilidad
+                disponibles = buscar_turnos_disponibles(dia, operador_hora="exact", hora_referencia=horario)
+                if any(t["id_turno"] == turno_obj.id_turno for t in disponibles):
+                    if turno_obj not in turnos_asignados:
                         turnos_asignados.append(turno_obj)
                         turnos_obj_nuevos.append(turno_obj)
+                else:
+                    errores.append(f"No hay cupo disponible para {dia} {horario}")
+            except Turno.DoesNotExist:
+                errores.append(f"Turno {turno_str} no existe")
             except Exception as e:
-                return JsonResponse({"error": f"Turno inválido {turno_str}: {str(e)}"}, status=400)
+                errores.append(f"Error procesando {turno_str}: {str(e)}")
 
         # --- 3️⃣ Crear nuevo AlumnoPaquete ---
         alumno_paquete = AlumnoPaquete.objects.create(
