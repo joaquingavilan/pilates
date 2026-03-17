@@ -407,7 +407,6 @@ def renovar_paquete(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-
 @csrf_exempt
 @transaction.atomic
 def relacionar_alumnos(request):
