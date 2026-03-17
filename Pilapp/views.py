@@ -205,65 +205,13 @@ def reprogramar_clase(request):
         logging.error(f"[reprogramar_clase] Error: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
-###Funcion auxiliar renovar paquete
-
-def asignar_clases_automaticas(alumno_paquete):
-    """
-    Busca los turnos que tenía el alumno y crea los registros en AlumnoClase
-    para el nuevo paquete, proyectando las fechas hacia el futuro.
-    """
-    from .models import AlumnoPaqueteTurno, AlumnoClase, Clase
-    
-    # Buscamos qué días y horas tiene asignados este paquete
-    turnos = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
-    cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
-    
-    dias_map = {'Lunes': 0, 'Martes': 1, 'Miércoles': 2, 'Jueves': 3, 'Viernes': 4, 'Sábado': 5, 'Domingo': 6}
-    clases_creadas = 0
-    fecha_busqueda = alumno_paquete.fecha_inicio
-    
-    for i in range(60): 
-        if clases_creadas >= cantidad_clases:
-            break
-            
-        fecha_actual = fecha_busqueda + timedelta(days=i)
-        dia_semana_num = fecha_actual.weekday()
-        dia_nombre = [k for k, v in dias_map.items() if v == dia_semana_num][0]
-        
-        turnos_hoy = turnos.filter(id_turno__dia=dia_nombre)
-        
-        for t in turnos_hoy:
-            if clases_creadas >= cantidad_clases:
-                break
-            
-            clase_fisica = Clase.objects.filter(fecha=fecha_actual, id_turno=t.id_turno).first()
-            
-            if clase_fisica:
-                # --- MEJORA ANTI-DUPLICADOS ---
-                # Verificamos si el alumno YA tiene una clase este día a esta hora
-                # (en cualquier paquete, para evitar duplicados por re-ejecución)
-                ya_existe = AlumnoClase.objects.filter(
-                    id_alumno_paquete__id_alumno=alumno_paquete.id_alumno,
-                    id_clase=clase_fisica
-                ).exists()
-
-                if not ya_existe:
-                    AlumnoClase.objects.create(
-                        id_alumno_paquete=alumno_paquete,
-                        id_clase=clase_fisica,
-                        estado='reservado'
-                    )
-                    clases_creadas += 1
-
-
 @csrf_exempt
 @transaction.atomic
 def renovar_paquete(request):
     """
     POST /renovar_paquete/
     ---------------------
-    Registra la renovación de un paquete de clases para un alumno.
-    Si el alumno no tiene un paquete activo, este endpoint inicia uno nuevo.
+    Registra la renovación o actualización de un paquete de clases para un alumno.
 
     Entradas (JSON):
     - id_alumno (int)           [Opcional; si no se envía, busca por nombre/teléfono]
@@ -272,15 +220,18 @@ def renovar_paquete(request):
     - telefono (str)            [Opcional; para búsqueda]
     - tipo_paquete (str)        [Obligatorio; ej: "8 clases"]
     - precio (int)              [Obligatorio; monto abonado]
+    - turnos_ids (list[int])    [Opcional; turnos a agregar o cambiar]
+    - fecha_inicio (str)        [Opcional; formato YYYY-MM-DD]
 
     Respuesta 200 OK:
     {
         "status": "success",
-        "message": "Paquete renovado correctamente.",
+        "message": "Renovación completa",
         "data": { 
             "alumno": "Nombre Completo", 
             "paquete": "X clases", 
-            "id_alumno_paquete": ID 
+            "turnos_anteriores": [...],
+            "turnos_nuevos": [...]
         }
     }
     """
@@ -297,8 +248,10 @@ def renovar_paquete(request):
         nuevos_turnos_ids = data.get("turnos_ids", [])
         fecha_inicio = data.get("fecha_inicio")
 
+        # Asegurarse que turnos_ids sea lista de enteros
         if isinstance(nuevos_turnos_ids, int):
             nuevos_turnos_ids = [nuevos_turnos_ids]
+        nuevos_turnos_ids = [int(t) for t in nuevos_turnos_ids] if nuevos_turnos_ids else []
 
         # -------------------------
         # BUSCAR ALUMNO
@@ -323,110 +276,103 @@ def renovar_paquete(request):
         try:
             cantidad = int(tipo_paquete_str.split()[0])
             paquete_base = Paquete.objects.get(cantidad_clases=cantidad)
-        except:
+        except (ValueError, Paquete.DoesNotExist):
             return JsonResponse({"error": "Paquete inválido"}, status=400)
 
         # -------------------------
         # PAQUETE ANTERIOR
         # -------------------------
-        turnos_existentes = []
-
         paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, estado="activo"
         ).order_by('-id_alumno_paquete').first()
+
+        turnos_existentes = []
+        fecha_inicio_base = timezone.localdate()
+        tipo_paquete_anterior = None
+
         if paquete_anterior:
-                turnos_existentes = list(Turno.objects.filter(
-                    alumnopaqueteturno__id_alumno_paquete=paquete_anterior
-                ).values_list('id_turno', flat=True))
+            tipo_paquete_anterior = paquete_anterior.id_paquete.cantidad_clases
+            turnos_existentes = list(Turno.objects.filter(
+                alumnopaqueteturno__id_alumno_paquete=paquete_anterior
+            ).values_list('id_turno', flat=True))
+            if not fecha_inicio:
+                fecha_inicio_base = paquete_anterior.fecha_inicio
+            else:
+                fecha_inicio_base = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        else:
+            if fecha_inicio:
+                fecha_inicio_base = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
 
         # -------------------------
         # DEFINIR TURNOS FINALES
         # -------------------------
+        # Combinar turnos existentes y nuevos
         if nuevos_turnos_ids:
-            nuevos_turnos_ids = list(set(nuevos_turnos_ids))
+            turnos_finales_ids = list(set(turnos_existentes + nuevos_turnos_ids))
         else:
-            nuevos_turnos_ids = turnos_existentes
-    
-        turnos_finales = []
+            turnos_finales_ids = turnos_existentes
 
-        turnos_finales = Turno.objects.filter(id_turno__in=nuevos_turnos_ids)
-
-        if not turnos_finales:
+        if not turnos_finales_ids:
             return JsonResponse({"error": "Debe definir al menos un turno"}, status=400)
 
-        # -------------------------
-        # EXPIRAR ANTERIOR
-        # -------------------------
-        AlumnoPaquete.objects.filter(
-            id_alumno=alumno, estado="activo"
-        ).update(estado="expirado")
+        turnos_finales = Turno.objects.filter(id_turno__in=turnos_finales_ids)
+        turnos_nuevos_ids = list(set(turnos_finales_ids) - set(turnos_existentes))
+        turnos_nuevos = Turno.objects.filter(id_turno__in=turnos_nuevos_ids)
 
         # -------------------------
-        # CREAR NUEVO PAQUETE
+        # DECIDIR SI EXPIRAR O ACTUALIZAR
         # -------------------------
-        if not fecha_inicio:
-            fecha_inicio = timezone.localdate()
+        # Si cambia tipo de paquete, expira anterior y crea nuevo
+        if tipo_paquete_anterior != cantidad or not paquete_anterior:
+            if paquete_anterior:
+                paquete_anterior.estado = "expirado"
+                paquete_anterior.save()
 
-        nuevo_paquete = AlumnoPaquete.objects.create(
-            id_alumno=alumno,
-            id_paquete=paquete_base,
-            estado="activo",
-            estado_pago="pagado",
-            fecha_inicio=fecha_inicio
-        )
+            nuevo_paquete = AlumnoPaquete.objects.create(
+                id_alumno=alumno,
+                id_paquete=paquete_base,
+                estado="activo",
+                estado_pago="pagado",
+                fecha_inicio=fecha_inicio_base
+            )
+        else:
+            # actualizar paquete existente
+            nuevo_paquete = paquete_anterior
 
         # -------------------------
-        # GUARDAR TURNOS
+        # GUARDAR TURNOS NUEVOS
         # -------------------------
-        for turno in turnos_finales:
-            AlumnoPaqueteTurno.objects.create(
+        for turno in turnos_nuevos:
+            AlumnoPaqueteTurno.objects.get_or_create(
                 id_alumno_paquete=nuevo_paquete,
                 id_turno=turno
             )
 
         # -------------------------
-        # GENERAR CLASES (MISMA LÓGICA QUE REGISTRO)
+        # GENERAR CLASES PARA TURNOS NUEVOS
         # -------------------------
         cantidad_clases = paquete_base.cantidad_clases
         cantidad_turnos = len(turnos_finales)
-        clases_por_turno = cantidad_clases // cantidad_turnos
+        clases_por_turno = cantidad_clases // cantidad_turnos if cantidad_turnos else 0
 
-        for turno in turnos_finales:
-
-            fecha_base = fecha_inicio
-
-            if isinstance(fecha_base, str):
-                fecha_base = datetime.strptime(fecha_base, "%Y-%m-%d").date()
-
+        for turno in turnos_nuevos:
             fechas = obtener_fechas_turno_normal(
                 turno.id_turno,
-                str(fecha_base),
+                str(fecha_inicio_base),
                 clases_por_turno
             )["fechas"]
 
             for fecha in fechas:
                 fecha_clase = datetime.strptime(fecha, "%Y-%m-%d").date()
-
-                clase = Clase.objects.filter(
-                    id_turno=turno,
-                    fecha=fecha_clase
-                ).first()
-
+                clase = Clase.objects.filter(id_turno=turno, fecha=fecha_clase).first()
                 if not clase:
                     continue
 
-                # evitar duplicados
-                existe = AlumnoClase.objects.filter(
-                    id_alumno_paquete__id_alumno=alumno,
-                    id_clase=clase
-                ).exists()
-
-                if not existe:
-                    AlumnoClase.objects.create(
-                        id_alumno_paquete=nuevo_paquete,
-                        id_clase=clase,
-                        estado="pendiente"
-                    )
+                AlumnoClase.objects.get_or_create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_clase=clase,
+                    defaults={"estado": "pendiente"}
+                )
 
         # -------------------------
         # ESTADO ALUMNO
@@ -441,13 +387,15 @@ def renovar_paquete(request):
             "data": {
                 "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
                 "paquete": f"{paquete_base.cantidad_clases} clases",
-                "turnos": [f"{t.dia} {t.horario}" for t in turnos_finales]
+                "turnos_anteriores": [f"{t.dia} {t.horario}" for t in Turno.objects.filter(id_turno__in=turnos_existentes)],
+                "turnos_nuevos": [f"{t.dia} {t.horario}" for t in turnos_nuevos]
             }
         })
 
     except Exception as e:
         logging.error(f"[renovar_paquete] {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt
 @transaction.atomic
