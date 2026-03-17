@@ -852,7 +852,7 @@ def registrar_pago(request):
         )
 
         # 4. VINCULACIÓN
-        alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo").order_by('-id_alumno_paquete').first()
+        alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
         
         if alumno_paquete:
             PagoAlumno.objects.create(
@@ -860,6 +860,10 @@ def registrar_pago(request):
                 id_alumno_paquete=alumno_paquete,
                 observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
             )
+
+            if alumno_paquete.estado != "activo":
+                alumno_paquete.estado = "activo"
+                alumno_paquete.save()
 
         return JsonResponse({
             "status": "success",
