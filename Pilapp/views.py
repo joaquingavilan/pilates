@@ -329,24 +329,27 @@ def renovar_paquete(request):
         # -------------------------
         # PAQUETE ANTERIOR
         # -------------------------
+        turnos_existentes = []
+
         paquete_anterior = AlumnoPaquete.objects.filter(
             id_alumno=alumno, estado="activo"
         ).order_by('-id_alumno_paquete').first()
+        if paquete_anterior:
+                turnos_existentes = list(Turno.objects.filter(
+                    alumnopaqueteturno__id_alumno_paquete=paquete_anterior
+                ).values_list('id_turno', flat=True))
 
         # -------------------------
         # DEFINIR TURNOS FINALES
         # -------------------------
+        if nuevos_turnos_ids:
+            nuevos_turnos_ids = list(set(nuevos_turnos_ids))
+        else:
+            nuevos_turnos_ids = turnos_existentes
+    
         turnos_finales = []
 
-        if nuevos_turnos_ids:
-            # 👉 QUIERE CAMBIAR O AGREGAR TURNOS
-            turnos_finales = Turno.objects.filter(id_turno__in=nuevos_turnos_ids)
-
-        elif paquete_anterior:
-            # 👉 MANTENER TURNOS ANTERIORES
-            turnos_finales = Turno.objects.filter(
-                alumnopaqueteturno__id_alumno_paquete=paquete_anterior
-            )
+        turnos_finales = Turno.objects.filter(id_turno__in=nuevos_turnos_ids)
 
         if not turnos_finales:
             return JsonResponse({"error": "Debe definir al menos un turno"}, status=400)
