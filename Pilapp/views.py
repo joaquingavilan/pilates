@@ -852,6 +852,8 @@ def registrar_pago(request):
         )
 
         # 4. VINCULACIÓN
+
+        cant_clases = data.get("cant_clases")
         alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
         
         if alumno_paquete:
