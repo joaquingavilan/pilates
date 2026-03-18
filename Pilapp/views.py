@@ -206,6 +206,7 @@ def reprogramar_clase(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+
 @csrf_exempt
 @transaction.atomic
 def cambiar_turnos_paquete(request):
