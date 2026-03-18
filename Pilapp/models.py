@@ -512,20 +512,38 @@ class RenovadorPaqueteService:
 
     def ejecutar(self):
         with transaction.atomic():
-            # 1. BUSCAR Y LIMPIAR PAQUETES ANTERIORES
+            # 1. CAPTURAR TURNOS ACTUALES (Sin borrar nada todavía)
             paquetes_activos = AlumnoPaquete.objects.filter(
                 id_alumno=self.alumno, 
                 estado="activo"
             )
 
             turnos_a_mantener = []
-            
             for p_viejo in paquetes_activos:
-                # Guardamos los turnos para no perder el lugar del alumno
-                turnos_ids = p_viejo.alumnopaqueteturno_set.values_list('id_turno_id', flat=True)
-                turnos_a_mantener.extend(list(turnos_ids))
-                
-                # Borramos vinculaciones para liberar cupos (el 3/4 que vimos)
+                # Extraemos los IDs de los turnos antes de tocar la base de datos
+                ids = list(p_viejo.alumnopaqueteturno_set.values_list('id_turno_id', flat=True))
+                turnos_a_mantener.extend(ids)
+
+            # 2. CREAR EL NUEVO PAQUETE (Nace como pendiente)
+            nuevo_paquete = AlumnoPaquete.objects.create(
+                id_alumno=self.alumno,
+                id_paquete=self.paquete_base,
+                estado="activo",
+                estado_pago="pendiente",
+                fecha_inicio=timezone.now().date()
+            )
+
+            # 3. TRASPASO DE TURNOS AL NUEVO PAQUETE
+            # Si el script falla aquí, los turnos del paquete viejo siguen existiendo
+            for t_id in set(turnos_a_mantener):
+                AlumnoPaqueteTurno.objects.create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_turno_id=t_id
+                )
+
+            # 4. AHORA SÍ, LIMPIAR Y EXPIRAR LOS PAQUETES VIEJOS
+            # Hacemos esto al final para que sea lo último en confirmarse
+            for p_viejo in paquetes_activos:
                 p_viejo.alumnopaqueteturno_set.all().delete()
                 p_viejo.alumnoclase_set.filter(
                     id_clase__fecha__gte=timezone.now().date(),
@@ -535,39 +553,22 @@ class RenovadorPaqueteService:
                 p_viejo.estado = "expirado"
                 p_viejo.save()
 
-            # 2. CREAR EL NUEVO PAQUETE (Inicia como PENDIENTE)
-            nuevo_paquete = AlumnoPaquete.objects.create(
-                id_alumno=self.alumno,
-                id_paquete=self.paquete_base,
-                estado="activo",
-                estado_pago="pendiente", # <-- Cambiado a pendiente por seguridad
-                fecha_inicio=timezone.now().date()
-            )
-
-            # 3. TRASPASO DE TURNOS AL NUEVO REGISTRO
-            for t_id in set(turnos_a_mantener):
-                AlumnoPaqueteTurno.objects.create(
-                    id_alumno_paquete=nuevo_paquete,
-                    id_turno_id=t_id
-                )
-
-            # 4. REGISTRAR EL PAGO REAL
+            # 5. REGISTRAR EL PAGO Y VINCULAR
             nuevo_pago = Pago.objects.create(
                 fecha=timezone.now().date(),
                 monto=self.monto,
                 metodo_pago=self.metodo,
-                estado="pagado", # El registro del pago sí nace pagado
+                estado="pagado",
                 nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}"
             )
 
-            # 5. VINCULAR Y ACTUALIZAR ESTADO DEL PAQUETE
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
                 id_alumno_paquete=nuevo_paquete,
-                observaciones="Renovación procesada con éxito"
+                observaciones="Renovación procesada con éxito y traspaso de turnos"
             )
 
-            # Ahora que el pago existe y está vinculado, marcamos el paquete como pagado
+            # 6. FINALIZAR: Marcamos como pagado el nuevo paquete
             nuevo_paquete.estado_pago = "pagado"
             nuevo_paquete.save()
 
