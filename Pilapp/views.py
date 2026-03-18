@@ -326,7 +326,7 @@ def cambiar_turnos_paquete(request):
                     AlumnoClase.objects.create(
                         id_alumno_paquete=alumno_paquete,
                         id_clase=clase_obj,
-                        estado="pendiente"
+                        estado="reservado"
                     )
                     clases_reservadas.append(f"{fecha_obj} {t.dia} {t.horario}")
 
@@ -531,7 +531,7 @@ def renovar_paquete(request):
                 AlumnoClase.objects.create(
                     id_alumno_paquete=alumno_paquete,
                     id_clase=clase,
-                    estado="pendiente"
+                    estado="reservado"
                 )
 
                 clases_reservadas.append(
@@ -862,7 +862,7 @@ def obtener_clases_agendadas(request):
             clases_regulares = AlumnoClase.objects.filter(
                 id_alumno_paquete__id_alumno=alumno,
                 id_alumno_paquete__estado = 'activo',
-                estado = 'pendiente'
+                estado = 'reservado'
             ).select_related("id_clase", "id_clase__id_turno")
 
             for ac in clases_regulares:
