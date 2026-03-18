@@ -1693,11 +1693,12 @@ def registrar_alumno_datos(data):
         logging.debug(f"[registrar_alumno_datos] Creando AlumnoClase para clase fecha={clase.fecha}")
         AlumnoClase.objects.create(id_alumno_paquete=alumno_paquete, id_clase=clase, estado="pendiente")
 
+        clase.total_inscriptos = AlumnoClase.objects.filter(id_clase=clase).count()
+        clase.save()
+
+
     logging.info(f"[registrar_alumno_datos] Proceso completado exitosamente")
     return {"message": "Alumno registrado exitosamente"}
-
-
-
 
 
 @csrf_exempt
