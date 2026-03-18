@@ -888,7 +888,7 @@ def obtener_clases_agendadas(request):
                 clases_resultado.append({
                 "id_clase": clase.id_clase,
                 "fecha": str(clase.fecha),
-                "dia": clase.fecha.strftime("%A").capitalize(),  # o un mapa ES consistente
+                "dia": clase.fecha.strftime("%A").capitalize(),
                 "hora": clase.id_turno.horario.strftime("%H:%M"),
                 "tipo": "ocasional",
                 "estado": ao.estado
@@ -1004,7 +1004,7 @@ def registrar_pago(request):
 
         if alumno_paquete:
             alumno_paquete.estado = "activo"
-            alumno_paquete.estado_pago = "Pagado"
+            alumno_paquete.estado_pago = "pagado"
             alumno_paquete.save()
         else:
             if not cant_clases:
