@@ -85,94 +85,127 @@ def reprogramar_clase(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    errores = []
-
     try:
         data = json.loads(request.body)
         
-        
+        # --- 1. EXTRACCIÓN Y DEFINICIÓN INICIAL ---
+        # Definimos las variables al principio para que siempre existan en el scope
         id_alumno = data.get("id_alumno")
-        print(f"DEBUG: Intentando buscar Alumno con id_alumno={id_alumno} (Tipo: {type(id_alumno)})")
-        if not id_alumno:
-            nombre = data.get("nombre")
-            telefono = data.get("telefono") or data.get("numero")
-            if not nombre or not telefono:
-                return JsonResponse({"errores": ["Debes enviar 'id_alumno' o ('nombre' y 'telefono')"]}, status=400)
-            
-            try:
-                alumno_obj = Alumno.objects.get(id_persona__nombre=nombre, id_persona__telefono=telefono)
-                id_alumno = alumno_obj.id_alumno
-            except Alumno.DoesNotExist:
-                return JsonResponse({"errores": ["Alumno no encontrado con esos datos."]}, status=404)
-
-        
         id_clase_origen = data.get("id_clase_origen")
         dia_destino = data.get("dia_destino")
         hora_destino = data.get("hora_destino")
         fecha_destino_str = data.get("fecha_destino")
+        nombre = data.get("nombre")
+        telefono = data.get("telefono") or data.get("numero") # Unificamos origen de teléfono
 
+        # --- 2. VALIDACIÓN DE ALUMNO ---
+        if not id_alumno:
+            if not nombre or not telefono:
+                return JsonResponse({"errores": ["Falta id_alumno o datos de contacto (nombre/telefono)."]}, status=400)
+            
+            try:
+                # Buscamos por nombre y teléfono si no hay ID directo
+                alumno_obj = Alumno.objects.get(id_persona__nombre__icontains=nombre, id_persona__telefono=telefono)
+                id_alumno = alumno_obj.id_alumno
+            except Alumno.DoesNotExist:
+                return JsonResponse({"errores": ["Alumno no encontrado con esos datos."]}, status=404)
+            except Alumno.MultipleObjectsReturned:
+                return JsonResponse({"errores": ["Múltiples alumnos encontrados. Usa ID específico."]}, status=400)
+
+        # Obtenemos el objeto Alumno principal
+        try:
+            alumno = Alumno.objects.get(id_alumno=id_alumno)
+        except Alumno.DoesNotExist:
+            return JsonResponse({"errores": ["ID de alumno no existe."]}, status=404)
+
+        # --- 3. VALIDACIÓN DE CLASE ORIGEN ---
         if not id_clase_origen:
             return JsonResponse({"errores": ["Falta 'id_clase_origen'."]}, status=400)
 
-        alumno = Alumno.objects.get(id_alumno=id_alumno)
-        clase_origen = Clase.objects.get(id_clase=id_clase_origen)
+        try:
+            clase_origen = Clase.objects.get(id_clase=id_clase_origen)
+        except Clase.DoesNotExist:
+            return JsonResponse({"errores": ["Clase de origen no encontrada."]}, status=404)
 
-        # Determinar si es regular u ocasional
-        paquetes = AlumnoPaquete.objects.filter(id_alumno=alumno)
-        alumno_clase = AlumnoClase.objects.filter(id_alumno_paquete__in=paquetes, id_clase=clase_origen).first()
+        # --- 4. DETERMINAR TIPO DE ALUMNO Y REGISTRO ---
+        # Buscamos si es regular
+        alumno_clase = AlumnoClase.objects.filter(
+            id_alumno_paquete__id_alumno=alumno, 
+            id_clase=clase_origen
+        ).first()
+        
         tipo_alumno = "regular" if alumno_clase else None
+        alumno_clase_ocasional = None
 
         if not alumno_clase:
-            alumno_clase_ocasional = AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_origen).first()
+            # Si no es regular, buscamos si es ocasional
+            alumno_clase_ocasional = AlumnoClaseOcasional.objects.filter(
+                id_alumno=alumno, 
+                id_clase=clase_origen
+            ).first()
             if alumno_clase_ocasional:
                 tipo_alumno = "ocasional"
 
         if not tipo_alumno:
-            return JsonResponse({"errores": ["El alumno no está registrado en la clase de origen."]}, status=404)
+            return JsonResponse({"errores": ["El alumno no está registrado en la clase de origen especificada."]}, status=404)
 
-        
+        # --- 5. LÓGICA DE REPROGRAMACIÓN O CANCELACIÓN ---
         es_reprogramacion = all([dia_destino, hora_destino, fecha_destino_str])
         clase_destino = None 
         msg = "Clase cancelada y cupo liberado correctamente."
 
         if es_reprogramacion:
-            # Validar fecha destino
+            # Validar y buscar clase destino
             try:
-                fecha_destino = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
+                fecha_dt = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
                 turno_destino = Turno.objects.get(dia=dia_destino, horario=hora_destino)
-                clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_destino)
+                clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_dt)
             except (ValueError, TypeError):
                 return JsonResponse({"errores": ["Formato de fecha inválido (YYYY-MM-DD)."]}, status=400)
-            except (Turno.DoesNotExist, Clase.DoesNotExist):
-                return JsonResponse({"errores": ["Clase destino no encontrada."]}, status=404)
+            except Turno.DoesNotExist:
+                return JsonResponse({"errores": [f"No existe el turno {dia_destino} {hora_destino}."]}, status=404)
+            except Clase.DoesNotExist:
+                return JsonResponse({"errores": ["No existe una clase abierta para el destino solicitado."]}, status=404)
 
-            # Verificar cupos
+            # Verificar cupos en destino (Max 4)
             if clase_destino.total_inscriptos >= 4:
                 return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
 
-            # Verificar duplicados en destino
-            ya_en_clase = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists() if tipo_alumno == "regular" else \
-                          AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
-            
-            if ya_en_clase:
-                return JsonResponse({"errores": ["El alumno ya está registrado en la clase destino."]}, status=400)
-
-            # Ejecutar Reprogramación
+            # Verificar si ya está en la clase destino para evitar duplicados
             if tipo_alumno == "regular":
+                ya_esta = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists()
+            else:
+                ya_esta = AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
+            
+            if ya_esta:
+                return JsonResponse({"errores": ["El alumno ya está inscrito en la clase destino."]}, status=400)
+
+            # --- EJECUTAR CAMBIOS EN DB ---
+            if tipo_alumno == "regular":
+                # Regular: Cambiamos estado de la vieja y creamos la nueva vinculada al mismo paquete
                 alumno_clase.estado = "reprogramó"
                 alumno_clase.save()
-                AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperó")
+                AlumnoClase.objects.create(
+                    id_alumno_paquete=alumno_clase.id_alumno_paquete, 
+                    id_clase=clase_destino, 
+                    estado="recuperó"
+                )
             else:
+                # Ocasional: Cambiamos estado y creamos nueva reserva ocasional
                 alumno_clase_ocasional.estado = "canceló"
                 alumno_clase_ocasional.save()
-                AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
+                AlumnoClaseOcasional.objects.create(
+                    id_alumno=alumno, 
+                    id_clase=clase_destino, 
+                    estado="reservado"
+                )
             
-            # Incrementar cupo destino
+            # Actualizar cupo destino
             Clase.objects.filter(pk=clase_destino.pk).update(total_inscriptos=F('total_inscriptos') + 1)
             msg = "Clase reprogramada correctamente."
 
         else:
-            # Ejecutar solo Cancelación
+            # Solo cancelación
             if tipo_alumno == "regular":
                 alumno_clase.estado = "canceló"
                 alumno_clase.save()
@@ -180,32 +213,29 @@ def reprogramar_clase(request):
                 alumno_clase_ocasional.estado = "canceló"
                 alumno_clase_ocasional.save()
 
-        # LIBERAR SIEMPRE EL CUPO ORIGEN
+        # LIBERAR SIEMPRE EL CUPO EN LA CLASE DE ORIGEN
         Clase.objects.filter(pk=clase_origen.pk, total_inscriptos__gt=0).update(total_inscriptos=F('total_inscriptos') - 1)
 
-        # --- 4. RESPUESTA (Manteniendo tu estructura original) ---
+        # --- 6. RESPUESTA FINAL ---
         return JsonResponse({
+            "status": "success",
             "message": msg,
-            "tipo_alumno": tipo_alumno,
-            "clase_origen": {
-                "fecha": str(clase_origen.fecha),
-                "hora": clase_origen.id_turno.horario.strftime("%H:%M")
-            },
-            "clase_destino": {
-                "fecha": str(clase_destino.fecha),
-                "hora": clase_destino.id_turno.horario.strftime("%H:%M")
-            } if clase_destino else None
+            "data": {
+                "tipo_alumno": tipo_alumno,
+                "clase_origen": {
+                    "fecha": str(clase_origen.fecha),
+                    "hora": clase_origen.id_turno.horario.strftime("%H:%M")
+                },
+                "clase_destino": {
+                    "fecha": str(clase_destino.fecha),
+                    "hora": clase_destino.id_turno.horario.strftime("%H:%M")
+                } if clase_destino else None
+            }
         })
 
-    except Alumno.DoesNotExist:
-        return JsonResponse({"errores": ["Alumno no encontrado."]}, status=404)
-    except Clase.DoesNotExist:
-        return JsonResponse({"errores": ["Clase de origen no encontrada."]}, status=404)
     except Exception as e:
-        logging.error(f"[reprogramar_clase] Error: {str(e)}")
-        return JsonResponse({"error": str(e)}, status=500)
-
-
+        logging.error(f"[reprogramar_clase] ERROR CRÍTICO: {str(e)}")
+        return JsonResponse({"error": "Error interno del servidor", "detalle": str(e)}, status=500)
 
 @csrf_exempt
 @transaction.atomic
