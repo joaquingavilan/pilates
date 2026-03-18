@@ -28,4 +28,5 @@ urlpatterns = [
     path('renovar_paquete/', renovar_paquete, name='renovar_paquete'),
     path("relacionar_alumnos/", relacionar_alumnos, name="relacionar_alumnos"),    
     path("obtener_relacionados/", obtener_relacionados, name="obtener_relacionados"),
+    path('cambiar_turnos_paquete/', cambiar_turnos_paquete, name='cambiar_turnos_paquete')
 ]
