@@ -501,7 +501,7 @@ class ClienteProspecto(models.Model):
 
 from django.db import transaction
 from django.utils import timezone
-from .models import AlumnoPaquete, Pago, PagoAlumno
+from .models import AlumnoPaquete, Pago, PagoAlumno, AlumnoPaqueteTurno
 
 class RenovadorPaqueteService:
     def __init__(self, alumno_obj, paquete_base_obj, monto_pago, metodo_pago):
@@ -512,36 +512,63 @@ class RenovadorPaqueteService:
 
     def ejecutar(self):
         with transaction.atomic():
-            # 1. DAR DE BAJA EL ANTERIOR (Esto limpia tu tabla de la imagen)
-            # Buscamos todos los paquetes activos de este alumno y los pasamos a expirado
-            AlumnoPaquete.objects.filter(
+            # 1. BUSCAR Y LIMPIAR PAQUETES ANTERIORES
+            paquetes_activos = AlumnoPaquete.objects.filter(
                 id_alumno=self.alumno, 
                 estado="activo"
-            ).update(estado="expirado")
+            )
 
-            # 2. CREAR EL NUEVO PAQUETE
+            turnos_a_mantener = []
+            
+            for p_viejo in paquetes_activos:
+                # Guardamos los turnos para no perder el lugar del alumno
+                turnos_ids = p_viejo.alumnopaqueteturno_set.values_list('id_turno_id', flat=True)
+                turnos_a_mantener.extend(list(turnos_ids))
+                
+                # Borramos vinculaciones para liberar cupos (el 3/4 que vimos)
+                p_viejo.alumnopaqueteturno_set.all().delete()
+                p_viejo.alumnoclase_set.filter(
+                    id_clase__fecha__gte=timezone.now().date(),
+                    estado='pendiente'
+                ).delete()
+                
+                p_viejo.estado = "expirado"
+                p_viejo.save()
+
+            # 2. CREAR EL NUEVO PAQUETE (Inicia como PENDIENTE)
             nuevo_paquete = AlumnoPaquete.objects.create(
                 id_alumno=self.alumno,
                 id_paquete=self.paquete_base,
                 estado="activo",
-                estado_pago="pagado",
+                estado_pago="pendiente", # <-- Cambiado a pendiente por seguridad
                 fecha_inicio=timezone.now().date()
             )
 
-            # 3. REGISTRAR EL PAGO (Usando tu modelo Pago)
+            # 3. TRASPASO DE TURNOS AL NUEVO REGISTRO
+            for t_id in set(turnos_a_mantener):
+                AlumnoPaqueteTurno.objects.create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_turno_id=t_id
+                )
+
+            # 4. REGISTRAR EL PAGO REAL
             nuevo_pago = Pago.objects.create(
                 fecha=timezone.now().date(),
                 monto=self.monto,
                 metodo_pago=self.metodo,
-                estado="pagado",
-                nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}" # Un nro de referencia
+                estado="pagado", # El registro del pago sí nace pagado
+                nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}"
             )
 
-            # 4. VINCULAR PAGO CON PAQUETE (Usando tu modelo PagoAlumno)
+            # 5. VINCULAR Y ACTUALIZAR ESTADO DEL PAQUETE
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
                 id_alumno_paquete=nuevo_paquete,
-                observaciones="Renovación automática vía sistema"
+                observaciones="Renovación procesada con éxito"
             )
+
+            # Ahora que el pago existe y está vinculado, marcamos el paquete como pagado
+            nuevo_paquete.estado_pago = "pagado"
+            nuevo_paquete.save()
 
             return nuevo_paquete
