@@ -408,23 +408,25 @@ def renovar_paquete(request):
         # --- 1️⃣ MANEJO DE PAQUETE ANTERIOR Y LIMPIEZA DE CUPOS ---
         paquete_anterior = AlumnoPaquete.objects.filter(id_alumno=alumno, estado='activo').first()
         
-        turnos_anteriores = []
-        if paquete_anterior:
-            # ❗ AQUÍ EL FIX: Borramos clases futuras para que dejen de ocupar lugar en la DB
-            AlumnoClase.objects.filter(
-                id_alumno_paquete=paquete_anterior,
-                id_clase__fecha__gte=timezone.localdate()
-            ).delete()
+        turnos_anteriores_objs = [] # Guardaremos los objetos de relación aquí
 
-            turnos_anteriores = list(
-                AlumnoPaqueteTurno.objects.filter(
-                    id_alumno_paquete=paquete_anterior
-                ).select_related('id_turno')
-            )
-            
-            # Marcamos como expirado para que no haya dos 'activos'
-            paquete_anterior.estado = 'expirado'
-            paquete_anterior.save()
+        if paquete_anterior:
+            turnos_anteriores_objs = list(
+            AlumnoPaqueteTurno.objects.filter(
+            id_alumno_paquete=paquete_anterior
+            ).select_related('id_turno')
+     )
+
+        AlumnoClase.objects.filter(
+        id_alumno_paquete=paquete_anterior,
+        id_clase__fecha__gte=timezone.localdate()
+    ).delete()
+
+        AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_anterior).delete()
+
+    # 3. Marcamos como expirado
+        paquete_anterior.estado = 'expirado'
+        paquete_anterior.save()
 
         # --- 2️⃣ PROCESAR TURNOS NUEVOS ---
         for turno_str in turnos_nuevos:
