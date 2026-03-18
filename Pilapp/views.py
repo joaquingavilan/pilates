@@ -1003,7 +1003,7 @@ def registrar_pago(request):
         alumno_paquete  = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
 
         if alumno_paquete:
-            alumno_paquete.estado != "activo"
+            alumno_paquete.estado = "activo"
             alumno_paquete.estado_pago = "Pagado"
             alumno_paquete.save()
         else:
@@ -1023,10 +1023,10 @@ def registrar_pago(request):
             )
 
         
-            PagoAlumno.objects.create(
-                id_pago=nuevo_pago,
-                id_alumno_paquete=alumno_paquete,
-                observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
+        PagoAlumno.objects.create(
+            id_pago=nuevo_pago,
+            id_alumno_paquete=alumno_paquete,
+            observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
             )
 
         return JsonResponse({
