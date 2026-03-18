@@ -813,6 +813,7 @@ def registrar_pago(request):
         id_alumno = data.get("id_alumno")
         nombre = data.get("nombre")
         apellido = data.get("apellido")
+        cant_clases = data.get("cant_clases")
 
         if not monto or not metodo:
             return JsonResponse({"errores": ["Falta monto o metodo_pago"]}, status=400)
@@ -851,21 +852,35 @@ def registrar_pago(request):
             comprobante=comprobante
         )
 
-        # 4. VINCULACIÓN
+        # 4. VINCULACIÓn
+        alumno_paquete  = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
 
-        cant_clases = data.get("cant_clases")
-        alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
-        
         if alumno_paquete:
+            alumno_paquete.estado != "activo"
+            alumno_paquete.estado_pago = "Pagado"
+            alumno_paquete.save()
+        else:
+            if not cant_clases:
+                return JsonResponse({
+                    "error": "Debes indicar 'cant_clases' si no existe paquete"
+                }, status=400)
+            
+            paquete = Paquete.objects.get(cantidad_clases=int(cant_clases))
+
+            alumno_paquete = AlumnoPaquete.objects.create(
+                id_alumno=alumno,
+                id_paquete=paquete,
+                estado='activo',
+                estado_pago='pagado',
+                fecha_inicio=timezone.localdate()
+            )
+
+        
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
                 id_alumno_paquete=alumno_paquete,
                 observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
             )
-
-            if alumno_paquete.estado != "activo":
-                alumno_paquete.estado = "activo"
-                alumno_paquete.save()
 
         return JsonResponse({
             "status": "success",
