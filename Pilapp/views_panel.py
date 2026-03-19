@@ -418,15 +418,35 @@ def panel_clases(request):
 
 
 def panel_clase_detalle(request, id_clase):
-    """Detalle de una clase específica."""
-    clase = get_object_or_404(Clase.objects.select_related('id_turno', 'id_instructor__id_persona'), id_clase=id_clase)
+    """Detalle de una clase específica con conteo forzado de inscriptos."""
+    from django.db.models import Q, Count
+
+    # 1. Obtenemos la clase pero anotamos los totales filtrando por los estados que "suman"
+    clase = get_object_or_404(
+        Clase.objects.filter(id_clase=id_clase).select_related(
+            'id_turno', 
+            'id_instructor__id_persona'
+        ).annotate(
+            total_reg = Count(
+                'alumnoclase', 
+                filter=Q(alumnoclase__estado__in=['Reservado', 'confirmado', 'asistió'])
+            ),
+            total_ocas = Count(
+                'alumnoclaseocasional', 
+                filter=Q(alumnoclaseocasional__estado__in=['Reservado', 'confirmado', 'asistió'])
+            )
+        )
+    )
     
-    # Alumnos regulares
+    # 2. Creamos la variable 'total' que el HTML necesita para mostrar "X/4"
+    clase.total = clase.total_reg + clase.total_ocas
+
+    # Alumnos regulares (para la lista de abajo)
     alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase).select_related(
         'id_alumno_paquete__id_alumno__id_persona'
     )
     
-    # Alumnos ocasionales
+    # Alumnos ocasionales (para la lista de abajo)
     alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related(
         'id_alumno__id_persona'
     )
