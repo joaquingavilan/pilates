@@ -389,11 +389,11 @@ def renovar_paquete(request):
     try:
         data = json.loads(request.body)
         id_alumno = data.get("id_alumno")
-        tipo_paquete_str = data.get("tipo_paquete") # Ej: "8 clases"
+        tipo_paquete_str = data.get("tipo_paquete") 
         monto = data.get("precio", 0)
         metodo = data.get("metodo_pago", "transferencia")
 
-        # 1. VALIDACIONES Y OBJETOS
+        # 1. VALIDACIONES
         if not id_alumno or not tipo_paquete_str:
             return JsonResponse({"error": "Faltan datos"}, status=400)
 
@@ -401,20 +401,18 @@ def renovar_paquete(request):
         cant_clases = int(tipo_paquete_str.split()[0])
         paquete_base = Paquete.objects.get(cantidad_clases=cant_clases)
 
-        # 2. CAPTURAR TURNOS ACTUALES ANTES DE BORRAR
+        # 2. CAPTURAR TURNOS Y LIMPIAR ANTERIORES
         paquetes_activos = AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo")
-        
         ids_a_mantener = []
+        
         for p_viejo in paquetes_activos:
-            # Sacamos los IDs de los turnos que ya tiene el alumno
             ids = list(p_viejo.alumnopaqueteturno_set.values_list('id_turno_id', flat=True))
             ids_a_mantener.extend(ids)
             
-            # Limpiamos el paquete viejo
-            p_viejo.alumnopaqueteturno_set.all().delete()
+            # Borramos clases futuras pendientes (para no dejar basura)
             p_viejo.alumnoclase_set.filter(
                 id_clase__fecha__gte=timezone.now().date(),
-                estado='reservado'
+                estado__in=['reservado', 'pendiente']
             ).delete()
             
             p_viejo.estado = "expirado"
@@ -429,14 +427,43 @@ def renovar_paquete(request):
             fecha_inicio=timezone.now().date()
         )
 
-        # 4. REASIGNAR TURNOS AL NUEVO (Evita el error de variable no definida)
+        # 4. ASIGNAR TURNOS
+        turnos_objetos = []
         for t_id in set(ids_a_mantener):
-            AlumnoPaqueteTurno.objects.create(
-                id_alumno_paquete=nuevo_paquete,
-                id_turno_id=t_id
-            )
+            rel = AlumnoPaqueteTurno.objects.create(id_alumno_paquete=nuevo_paquete, id_turno_id=t_id)
+            turnos_objetos.append(rel.id_turno)
 
-        # 5. REGISTRAR EL PAGO
+        # --- 8. GENERACIÓN DE CLASES CON VALIDACIÓN DE CUPO ---
+        if turnos_objetos:
+            num_turnos = len(turnos_objetos)
+            clases_por_turno = cant_clases // num_turnos
+            residuo = cant_clases % num_turnos
+
+            for i, turno in enumerate(turnos_objetos):
+                cuota = clases_por_turno + (1 if i < residuo else 0)
+                
+                # Buscamos clases futuras para este turno
+                clases_posibles = Clase.objects.filter(
+                    id_turno=turno, 
+                    fecha__gte=timezone.now().date()
+                ).order_by('fecha')
+                
+                asignadas = 0
+                for c in clases_posibles:
+                    if asignadas >= cuota:
+                        break
+                    
+                    # VALIDACIÓN DE CUPO (Máximo 4)
+                    cupos_ocupados = AlumnoClase.objects.filter(id_clase=c).count()
+                    if cupos_ocupados < 4:
+                        AlumnoClase.objects.create(
+                            id_alumno_paquete=nuevo_paquete,
+                            id_clase=c,
+                            estado="reservado"
+                        )
+                        asignadas += 1
+
+        # 5. PAGO
         nuevo_pago = Pago.objects.create(
             fecha=timezone.now().date(),
             monto=monto,
@@ -445,25 +472,20 @@ def renovar_paquete(request):
             nro_pago=f"REN-{nuevo_paquete.id_alumno_paquete}"
         )
 
-        # 6. VINCULAR PAGO Y PAQUETE
         PagoAlumno.objects.create(
             id_pago=nuevo_pago,
             id_alumno_paquete=nuevo_paquete,
-            observaciones="Renovación procesada"
+            observaciones="Renovación completa con validación de cupos"
         )
 
-        # 7. FINALIZAR
         nuevo_paquete.estado_pago = "pagado"
         nuevo_paquete.save()
 
-        return JsonResponse({
-            "status": "success",
-            "message": "Renovación exitosa",
-            "id_nuevo": nuevo_paquete.id_alumno_paquete
-        })
+        return JsonResponse({"status": "success", "id_nuevo": nuevo_paquete.id_alumno_paquete})
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt
 @transaction.atomic
