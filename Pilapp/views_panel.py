@@ -683,14 +683,45 @@ def _total_pagado_paquete(alumno_paquete: AlumnoPaquete) -> Decimal:
 @require_POST
 @transaction.atomic
 def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
-    # Obtenemos al alumno y los datos del POST
+    # 1. Importamos el servicio y el paquete base
+    from .models import Alumno, Paquete, RenovadorPaqueteService
+    
     alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
     id_paquete_nuevo = request.POST.get("id_paquete_nuevo")
+    paquete_base = get_object_or_404(Paquete, id_paquete=id_paquete_nuevo)
 
     try:
-        # Llamamos al método que creamos en el modelo
-        AlumnoPaquete.renovar(alumno, id_paquete_nuevo)
-        messages.success(request, "Paquete renovado con éxito.")
+        # 2. Usamos el Service que ya tienes definido en models.py
+        # Le pasamos monto 0 y efectivo por defecto para la renovación rápida
+        service = RenovadorPaqueteService(
+            alumno_obj=alumno,
+            paquete_base_obj=paquete_base,
+            monto_pago=Decimal("0"), 
+            metodo_pago="efectivo"
+        )
+        
+        # 3. Ejecutamos la lógica (esto creará el paquete, los turnos y el pago)
+        nuevo_paquete = service.ejecutar()
+        
+        # 4. REFUERZO: Creamos las inscripciones a clases para que aparezca el 4/4
+        # Buscamos los turnos que el Service acaba de asignar
+        turnos_ids = nuevo_paquete.alumnopaqueteturno_set.values_list('id_turno_id', flat=True)
+        
+        clases_futuras = Clase.objects.filter(
+            id_turno_id__in=turnos_ids,
+            fecha__gte=timezone.now().date()
+        ).order_by('fecha')[:paquete_base.cantidad_clases]
+
+        for clase in clases_futuras:
+            AlumnoClase.objects.get_or_create(
+                id_alumno_paquete=nuevo_paquete,
+                id_clase=clase,
+                defaults={'estado': 'pendiente'}
+            )
+            # Forzamos refresco del contador en la clase
+            clase.save()
+
+        messages.success(request, f"Paquete de {paquete_base.cantidad_clases} clases renovado y cupos reservados.")
         
     except Exception as e:
         messages.error(request, f"Error al renovar: {str(e)}")

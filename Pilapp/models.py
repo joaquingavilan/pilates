@@ -572,4 +572,24 @@ class RenovadorPaqueteService:
             nuevo_paquete.estado_pago = "pagado"
             nuevo_paquete.save()
 
+            # --- NUEVO PASO 7: GENERAR INSCRIPCIONES A CLASES ---
+            # Esto es lo que activa el contador 4/4 en la web
+            from .models import Clase, AlumnoClase
+            
+            # Buscamos clases desde hoy en adelante que coincidan con los turnos del paquete
+            clases_futuras = Clase.objects.filter(
+                id_turno_id__in=turnos_a_mantener,
+                fecha__gte=timezone.now().date()
+            ).order_by('fecha')[:self.paquete_base.cantidad_clases]
+
+            for clase in clases_futuras:
+                AlumnoClase.objects.get_or_create(
+                    id_alumno_paquete=nuevo_paquete,
+                    id_clase=clase,
+                    defaults={'estado': 'pendiente'} # O 'confirmado' según prefieras
+                )
+                
+                # Opcional: Forzar el refresco del contador denso de la clase
+                clase.save() 
+
             return nuevo_paquete
