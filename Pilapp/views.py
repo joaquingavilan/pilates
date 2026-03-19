@@ -251,8 +251,7 @@ def cambiar_turnos_paquete(request):
 
         # Obtener alumno
         alumno = Alumno.objects.get(id_alumno=id_alumno)
-
-        # 1️⃣ Obtener paquete activo
+        
         if id_paquete:
             alumno_paquete = AlumnoPaquete.objects.filter(
                 id_alumno=alumno,
@@ -268,11 +267,9 @@ def cambiar_turnos_paquete(request):
         if not alumno_paquete:
             return JsonResponse({"errores": ["No se encontró un paquete activo para el alumno"]}, status=404)
 
-        # 2️⃣ Guardar turnos actuales
         turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
         turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
 
-        # 3️⃣ Convertir turnos_nuevos_str a objetos Turno y validar disponibilidad
         turnos_nuevos_objs = []
         errores = []
         for turno_str in turnos_nuevos_str:
@@ -291,18 +288,15 @@ def cambiar_turnos_paquete(request):
         if errores:
             return JsonResponse({"errores": errores}, status=400)
 
-        # 4️⃣ Reasignar clases futuras
         fecha_actual = timezone.localdate()
         clases_futuras = AlumnoClase.objects.filter(
             id_alumno_paquete=alumno_paquete,
             id_clase__fecha__gte=fecha_actual
         )
 
-        # Eliminar clases futuras y turnos antiguos
         clases_futuras.delete()
         AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).delete()
 
-        # 5️⃣ Crear nuevas clases y turnos sin duplicados
         clases_reservadas = []
         cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
         cantidad_turnos = len(turnos_nuevos_objs)
@@ -321,7 +315,7 @@ def cambiar_turnos_paquete(request):
                     fecha=fecha_obj,
                     defaults={"id_instructor": Instructor.objects.get(id_instructor=1)}
                 )
-                # ✅ Evitar duplicados de AlumnoClase
+
                 if not AlumnoClase.objects.filter(id_alumno_paquete=alumno_paquete, id_clase=clase_obj).exists():
                     AlumnoClase.objects.create(
                         id_alumno_paquete=alumno_paquete,
@@ -330,10 +324,8 @@ def cambiar_turnos_paquete(request):
                     )
                     clases_reservadas.append(f"{fecha_obj} {t.dia} {t.horario}")
 
-            # ✅ Evitar duplicados de AlumnoPaqueteTurno
             AlumnoPaqueteTurno.objects.get_or_create(id_alumno_paquete=alumno_paquete, id_turno=t)
 
-        # 6️⃣ Respuesta
         return JsonResponse({
             "status": "success",
             "message": "Turnos actualizados correctamente.",
@@ -388,62 +380,204 @@ def renovar_paquete(request):
 
     try:
         data = json.loads(request.body)
-        id_alumno = data.get("id_alumno")
-        tipo_paquete_str = data.get("tipo_paquete") 
-        # Ya no necesitamos monto ni metodo aquí, porque el pago ya se registró antes
 
-        if not id_alumno or not tipo_paquete_str:
-            return JsonResponse({"error": "Faltan datos"}, status=400)
+        id_alumno = data.get("id_alumno")
+        tipo_paquete = data.get("tipo_paquete")
+        turnos_nuevos_str = data.get("turnos_nuevos", [])
+        fecha_inicio_str = data.get("fecha_inicio")
+
+        if not id_alumno or not tipo_paquete:
+            return JsonResponse({"error": "Debes enviar 'id_alumno' y 'tipo_paquete'."}, status=400)
+
+        # Normalizar paquete
+        if isinstance(tipo_paquete, str):
+            tipo_paquete = int(tipo_paquete.split()[0])
 
         alumno = Alumno.objects.get(id_alumno=id_alumno)
-        cant_clases = int(tipo_paquete_str.split()[0])
-        paquete_base = Paquete.objects.get(cantidad_clases=cant_clases)
+        paquete = Paquete.objects.get(cantidad_clases=tipo_paquete)
 
-        # 1. CAPTURAR Y LIMPIAR (Igual que antes)
-        paquetes_activos = AlumnoPaquete.objects.filter(id_alumno=alumno, estado="activo")
-        ids_a_mantener = []
-        for p_viejo in paquetes_activos:
-            ids = list(p_viejo.alumnopaqueteturno_set.values_list('id_turno_id', flat=True))
-            ids_a_mantener.extend(ids)
-            p_viejo.alumnoclase_set.filter(id_clase__fecha__gte=timezone.now().date(), estado='reservado').delete()
-            p_viejo.estado = "expirado"
-            p_viejo.save()
+        errores = []
+        clases_a_reservar = []
+        turnos_obj_nuevos = []
 
-        # 2. CREAR EL NUEVO PAQUETE
-        # Lo creamos como 'pagado' porque asumimos que registrar_pago se llamó antes con éxito
+        # -------------------------------
+        # 1️⃣ Obtener turnos actuales
+        # -------------------------------
+        paquete_actual = AlumnoPaquete.objects.filter(
+            id_alumno=alumno,
+            estado='activo'
+        ).first()
+
+        turnos_actuales = []
+        if paquete_actual:
+            turnos_actuales = [
+                t.id_turno for t in
+                AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=paquete_actual)
+            ]
+
+        # -------------------------------
+        # 2️⃣ Procesar nuevos turnos
+        # -------------------------------
+        for turno_str in turnos_nuevos_str:
+            try:
+                dia, hora = turno_str.rsplit(" ", 1)
+                turno_obj = Turno.objects.get(dia=dia, horario=hora)
+
+                disponibles = buscar_turnos_disponibles(
+                    dia,
+                    operador_hora="exact",
+                    hora_referencia=hora
+                )
+
+                if any(t["id_turno"] == turno_obj.id_turno for t in disponibles):
+                    turnos_obj_nuevos.append(turno_obj)
+                else:
+                    errores.append(f"No hay cupo para {turno_str}")
+
+            except Turno.DoesNotExist:
+                errores.append(f"Turno {turno_str} no existe")
+
+        # -------------------------------
+        # 3️⃣ Combinar turnos sin duplicar
+        # -------------------------------
+        turnos_finales = {t.id_turno: t for t in turnos_actuales}
+
+        for t in turnos_obj_nuevos:
+            turnos_finales[t.id_turno] = t
+
+        turnos_finales = list(turnos_finales.values())
+
+        if not turnos_finales:
+            return JsonResponse({"error": "No hay turnos válidos"}, status=400)
+
+        # -------------------------------
+        # 4️⃣ Calcular distribución
+        # -------------------------------
+        cantidad_clases = paquete.cantidad_clases
+        cantidad_turnos = len(turnos_finales)
+
+        base = cantidad_clases // cantidad_turnos
+        extra = cantidad_clases % cantidad_turnos
+
+        # -------------------------------
+        # 5️⃣ Validar cupos y preparar clases
+        # -------------------------------
+        for idx, turno in enumerate(turnos_finales):
+
+            clases_para_turno = base + (1 if idx < extra else 0)
+
+            fecha_inicio = (
+                datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
+                if fecha_inicio_str
+                else obtener_fecha_proximo_dia(turno.dia)
+            )
+
+            fechas = obtener_fechas_turno_normal(
+                turno.id_turno,
+                str(fecha_inicio),
+                clases_para_turno
+            )["fechas"]
+
+            for fecha_str in fechas:
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+
+                clase, _ = Clase.objects.get_or_create(
+                    id_turno=turno,
+                    fecha=fecha_obj,
+                    defaults={
+                        "id_instructor": Instructor.objects.get(id_instructor=1)
+                    }
+                )
+
+                # Validar duplicados
+                existe = AlumnoClase.objects.filter(
+                    id_clase=clase,
+                    id_alumno_paquete__id_alumno=alumno
+                ).exists()
+
+                if existe:
+                    continue
+
+                # Validar cupo
+                total = (
+                    AlumnoClase.objects.filter(id_clase=clase).count() +
+                    AlumnoClaseOcasional.objects.filter(id_clase=clase).count()
+                )
+
+                if total >= 4:
+                    errores.append(f"Clase llena {fecha_obj} {turno.horario}")
+                    continue
+
+                clases_a_reservar.append((clase, turno))
+
+        if errores:
+            return JsonResponse({"errores": errores}, status=400)
+
+        # -------------------------------
+        # 6️⃣ Expirar paquete anterior
+        # -------------------------------
+        AlumnoPaquete.objects.filter(
+            id_alumno=alumno,
+            estado='activo'
+        ).update(estado='expirado')
+
+        # -------------------------------
+        # 7️⃣ Crear nuevo paquete
+        # -------------------------------
         nuevo_paquete = AlumnoPaquete.objects.create(
             id_alumno=alumno,
-            id_paquete=paquete_base,
-            estado="activo",
-            estado_pago="pagado", 
-            fecha_inicio=timezone.now().date()
+            id_paquete=paquete,
+            estado='activo',
+            fecha_inicio=fecha_inicio_str or timezone.localdate()
         )
 
-        # 3. ASIGNAR TURNOS Y GENERAR CLASES
-        turnos_objetos = []
-        for t_id in set(ids_a_mantener):
-            rel = AlumnoPaqueteTurno.objects.create(id_alumno_paquete=nuevo_paquete, id_turno_id=t_id)
-            turnos_objetos.append(rel.id_turno)
+        # -------------------------------
+        # 8️⃣ Guardar turnos
+        # -------------------------------
+        for turno in turnos_finales:
+            AlumnoPaqueteTurno.objects.get_or_create(
+                id_alumno_paquete=nuevo_paquete,
+                id_turno=turno
+            )
 
-        if turnos_objetos:
-            num_turnos = len(turnos_objetos)
-            cuota_base = cant_clases // num_turnos
-            residuo = cant_clases % num_turnos
+        # -------------------------------
+        # 9️⃣ Crear clases
+        # -------------------------------
+        clases_reservadas = []
 
-            for i, turno in enumerate(turnos_objetos):
-                limite = cuota_base + (1 if i < residuo else 0)
-                clases_posibles = Clase.objects.filter(id_turno=turno, fecha__gte=timezone.now().date()).order_by('fecha')
-                
-                asignadas = 0
-                for c in clases_posibles:
-                    if asignadas >= limite: break
-                    if AlumnoClase.objects.filter(id_clase=c).count() < 4:
-                        AlumnoClase.objects.create(id_alumno_paquete=nuevo_paquete, id_clase=c, estado="reservado")
-                        asignadas += 1
+        for clase, turno in clases_a_reservar:
+            AlumnoClase.objects.create(
+                id_alumno_paquete=nuevo_paquete,
+                id_clase=clase,
+                estado="reservado"
+            )
 
-        return JsonResponse({"status": "success", "message": "Paquete y calendario actualizados", "id_nuevo": nuevo_paquete.id_alumno_paquete})
+            # Actualizar contador correctamente
+            total = (
+                AlumnoClase.objects.filter(id_clase=clase).count() +
+                AlumnoClaseOcasional.objects.filter(id_clase=clase).count()
+            )
+
+            clase.total_inscriptos = total
+            clase.save()
+
+            clases_reservadas.append(
+                f"{clase.fecha} {turno.dia} {turno.horario}"
+            )
+
+        return JsonResponse({
+            "status": "success",
+            "message": "Renovación completa",
+            "data": {
+                "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
+                "paquete": f"{tipo_paquete} clases",
+                "turnos_finales": [f"{t.dia} {t.horario}" for t in turnos_finales],
+                "clases_reservadas": clases_reservadas
+            }
+        })
 
     except Exception as e:
+        logging.error(f"[renovar_paquete] Error: {str(e)}")
         return JsonResponse({"error": str(e)}, status=500)
 
 
@@ -823,11 +957,9 @@ def resolver_nombre(nombre_dict, alumnos_dict):
 
     posibles = []
 
-    # 1. Coincidencia exacta nombre completo
     if nombre_completo_input in alumnos_dict:
         return nombre_completo_input
 
-    # 2. Substring parcial (nombre dentro de nombre completo anotado)
     for nombre_guardado in alumnos_dict:
         if nombre_input and nombre_input in nombre_guardado:
             if apellido_input and apellido_input in nombre_guardado:
@@ -838,7 +970,6 @@ def resolver_nombre(nombre_dict, alumnos_dict):
     if len(posibles) == 1:
         return posibles[0]
 
-    # 3. Fuzzy
     difusos = get_close_matches(nombre_completo_input, alumnos_dict.keys(), n=1, cutoff=0.85)
     if len(difusos) == 1:
         return difusos[0]
