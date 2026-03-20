@@ -606,7 +606,8 @@ def api_turno_alumnos(request, id_turno):
     from .models import AlumnoPaqueteTurno
     
     asignaciones = AlumnoPaqueteTurno.objects.filter(
-        id_turno=turno
+        id_turno=turno,
+        id_alumno_paquete__estado='activo'
     ).select_related(
         'id_alumno_paquete__id_alumno__id_persona',
         'id_alumno_paquete'

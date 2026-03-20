@@ -204,6 +204,17 @@ class Turno(models.Model):
         id_alumno_paquete__estado='activo'
     ).count()
 
+    # En models.py -> class Turno
+
+    def obtener_inscripciones_activas(self):
+        """
+        Retorna solo los objetos AlumnoPaqueteTurno cuyos paquetes 
+        están activos, evitando duplicados de alumnos que renovaron.
+        """
+        return self.alumnopaqueteturno_set.filter(
+            id_alumno_paquete__estado='activo'
+        ).select_related('id_alumno_paquete__id_alumno__id_persona')
+
     @property
     def estado(self):
         return 'Ocupado' if self.lugares_ocupados >= 4 else 'Libre'
