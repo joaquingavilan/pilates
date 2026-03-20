@@ -199,8 +199,10 @@ class Turno(models.Model):
 
     @property
     def lugares_ocupados(self):
-        from .models import AlumnoPaqueteTurno
-        return AlumnoPaqueteTurno.objects.filter(id_turno_id=self.id_turno).count()
+        return AlumnoPaqueteTurno.objects.filter(
+        id_turno_id=self.id_turno,
+        id_alumno_paquete__estado='activo'
+    ).count()
 
     @property
     def estado(self):
@@ -289,6 +291,24 @@ class AlumnoPaquete(models.Model):
     ], default="pendiente")
     clases_usadas = models.IntegerField(default=0)
     fecha_inicio = models.DateField(null=True)
+
+    # Dentro de class AlumnoPaquete(models.Model):
+
+    def expirar_y_liberar(self):
+        """
+        Cambia el estado a expirado y elimina los turnos asociados 
+        para liberar cupos en el gimnasio inmediatamente.
+        """
+        with transaction.atomic():
+            self.alumnopaqueteturno_set.all().delete()
+            
+            self.alumnoclase_set.filter(
+                id_clase__fecha__gte=timezone.now().date(),
+                estado='pendiente'
+            ).delete()
+            
+            self.estado = "expirado"
+            self.save()
     def __str__(self):
         return f"AlumnoPaquete {self.id_alumno_paquete}"
 
@@ -327,6 +347,12 @@ class AlumnoClase(models.Model):
     id_clase = models.ForeignKey(Clase, on_delete=models.CASCADE)
     estado = models.CharField(max_length=50, choices=[("asistió", "Asistió"), ("faltó", "Faltó"), ("canceló", "Canceló"), ("recuperó", "Recuperó"), ("reprogramó","Reprogramó"), ("pendiente", "Pendiente")])
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        clase = self.id_clase
+        clase.total_inscriptos = clase.obtener_total_inscriptos
+        clase.save()
+    
     def __str__(self):
         return f"AlumnoClase {self.id_alumno_clase}"
 
@@ -544,14 +570,7 @@ class RenovadorPaqueteService:
             # 4. AHORA SÍ, LIMPIAR Y EXPIRAR LOS PAQUETES VIEJOS
             # Hacemos esto al final para que sea lo último en confirmarse
             for p_viejo in paquetes_activos:
-                p_viejo.alumnopaqueteturno_set.all().delete()
-                p_viejo.alumnoclase_set.filter(
-                    id_clase__fecha__gte=timezone.now().date(),
-                    estado='pendiente'
-                ).delete()
-                
-                p_viejo.estado = "expirado"
-                p_viejo.save()
+                p_viejo.expirar_y_liberar()
 
             # 5. REGISTRAR EL PAGO Y VINCULAR
             nuevo_pago = Pago.objects.create(

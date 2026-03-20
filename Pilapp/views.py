@@ -382,16 +382,35 @@ def renovar_paquete(request):
         data = json.loads(request.body)
 
         id_alumno = data.get("id_alumno")
+        nombre_in = data.get("nombre")
+        apellido_in = data.get("apellido")
+        telefono_in = data.get("telefono") or data.get("numero")
         tipo_paquete = data.get("tipo_paquete")
         turnos_nuevos_str = data.get("turnos_nuevos", [])
         fecha_inicio_str = data.get("fecha_inicio")
 
-        if not id_alumno or not tipo_paquete:
-            return JsonResponse({"error": "Debes enviar 'id_alumno' y 'tipo_paquete'."}, status=400)
+        if not id_alumno:
+            if not (nombre_in and telefono_in):
+                #return JsonResponse({"error": "Debes enviar 'id_alumno' o ('nombre' y 'telefono')."}, status=400)
+                return JsonResponse({"error": "Debes enviar 'id_alumno' y 'tipo_paquete'."}, status=400)
+        
+            personas = Persona.objects.filter(telefono = telefono)
+            alumnos_dict = {
+                normalizar(f"{p.nombre} {p.apellido}"): Alumno.objects.get(id_persona=p).id_alumno
+                for p in personas if Alumno.objects.filter(id_persona=p).exists()
+            }
 
-        # Normalizar paquete
+            match = resolver_nombre({"nombre":nombre_in, "apellido":apellido_in}, alumnos_dict)
+            if not match:
+                return JsonResponse({"error":"No se pudo identificar al alumno con exactitud"}, status = 404)
+            id_alumno = alumnos_dict[match]
+
+        if not tipo_paquete:
+            return JsonResponse({"error": "Falta 'tipo_paquete'."}, status=400)
+        
         if isinstance(tipo_paquete, str):
-            tipo_paquete = int(tipo_paquete.split()[0])
+            tipo_paquete = int(tipo_paquete.split()[0])  # Extraer número de clases
+
 
         alumno = Alumno.objects.get(id_alumno=id_alumno)
         paquete = Paquete.objects.get(cantidad_clases=tipo_paquete)
@@ -1034,13 +1053,21 @@ def registrar_pago(request):
         
         if not alumno and telefono:
             persona = Persona.objects.filter(telefono=telefono).first()
-            if persona:
-                alumno = Alumno.objects.filter(id_persona=persona).first()
+            if persona.count() == 1:
+                alumno = Alumno.objects.filter(id_persona=persona.first()).first()
+            elif persona.count() > 1:
+                candidatos =  {
+                    normalizar(f"{nombre} {apellido}"): Alumno.objects.filter(id_persona=persona)
+                    for p in persona if Alumno.objects.filter(id_persona=p).exists()
+                }
+            match = resolver_nombre({"nombre":nombre_in, "apellido":apellido_in}, candidatos)
+            if match:
+                alumno = candidatos[match]
 
-        if not alumno and nombre and apellido:
-            persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
-            if persona:
-                alumno = Alumno.objects.filter(id_persona=persona).first()
+ #       if not alumno and nombre and apellido:
+  #          persona = Persona.objects.filter(nombre__icontains=nombre, apellido__icontains=apellido).first()
+  #          if persona:
+  #              alumno = Alumno.objects.filter(id_persona=persona).first()
 
         if not alumno:
             return JsonResponse({"errores": ["Alumno no encontrado."]}, status=404)
