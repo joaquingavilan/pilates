@@ -1052,15 +1052,15 @@ def registrar_pago(request):
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
         
         if not alumno and telefono:
-            persona = Persona.objects.filter(telefono=telefono).first()
-            if persona.count() == 1:
-                alumno = Alumno.objects.filter(id_persona=persona.first()).first()
-            elif persona.count() > 1:
+            personas = Persona.objects.filter(telefono=telefono)
+            if personas.count() == 1:
+                alumno = Alumno.objects.filter(id_persona=personas.first()).first()
+            elif personas.count() > 1:
                 candidatos =  {
-                    normalizar(f"{nombre} {apellido}"): Alumno.objects.filter(id_persona=persona)
-                    for p in persona if Alumno.objects.filter(id_persona=p).exists()
+                    normalizar(f"{nombre} {apellido}"): Alumno.objects.filter(id_persona=personas)
+                    for p in personas if Alumno.objects.filter(id_persona=p).exists()
                 }
-            match = resolver_nombre({"nombre":nombre_in, "apellido":apellido_in}, candidatos)
+            match = resolver_nombre({"nombre":nombre, "apellido":apellido}, candidatos)
             if match:
                 alumno = candidatos[match]
 
