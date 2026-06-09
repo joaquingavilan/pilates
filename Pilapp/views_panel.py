@@ -434,6 +434,34 @@ def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
         
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
+def panel_alumno_paquete_renovar(request, id_alumno):
+    """Vista para renovar el paquete (expirar el actual y crear uno nuevo con los mismos turnos)."""
+    from .views import renovar_paquete_datos
+    if request.method == "POST":
+        tipo_paquete = request.POST.get("tipo_paquete")
+        fecha_inicio_str = request.POST.get("fecha_inicio")
+        
+        if not tipo_paquete:
+            messages.error(request, "Debes seleccionar un tipo de paquete.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        data = {
+            "id_alumno": id_alumno,
+            "tipo_paquete": tipo_paquete,
+            "fecha_inicio": fecha_inicio_str,
+            "turnos_nuevos": [] # No se agregan turnos nuevos desde acá, solo se mantienen los que tiene
+        }
+        
+        resultado = renovar_paquete_datos(data)
+        
+        if "errores" in resultado:
+            for error in resultado["errores"]:
+                messages.error(request, error)
+        else:
+            messages.success(request, resultado.get("message", "Paquete renovado exitosamente."))
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
     """Vista para editar el estado de asistencia de una clase."""
     from .models import AlumnoClase, AlumnoClaseOcasional
