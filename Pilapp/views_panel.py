@@ -401,6 +401,53 @@ def panel_alumno_editar(request, id_alumno):
     }
     return render(request, "admin_panel/alumnos/editar.html", context)
 
+def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
+    """Vista para editar el estado y pago de un paquete."""
+    from .models import AlumnoPaquete
+    if request.method == "POST":
+        paquete = get_object_or_404(AlumnoPaquete, id_alumno_paquete=id_alumno_paquete, id_alumno_id=id_alumno)
+        nuevo_estado = request.POST.get("estado")
+        nuevo_estado_pago = request.POST.get("estado_pago")
+        
+        # Validar
+        if nuevo_estado in ["activo", "expirado"]:
+            # Si se marca como expirado y antes era activo
+            if nuevo_estado == "expirado" and paquete.estado == "activo":
+                paquete.expirar_y_liberar()
+            else:
+                paquete.estado = nuevo_estado
+                
+        if nuevo_estado_pago in ["pendiente", "pagado", "parcial"]:
+            paquete.estado_pago = nuevo_estado_pago
+            
+        paquete.save()
+        messages.success(request, "Paquete actualizado correctamente.")
+        
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
+    """Vista para editar el estado de asistencia de una clase."""
+    from .models import AlumnoClase, AlumnoClaseOcasional
+    if request.method == "POST":
+        nuevo_estado = request.POST.get("estado")
+        estados_permitidos = ["asistió", "faltó", "canceló", "recuperó", "reprogramó", "pendiente", "reservado"]
+        
+        if nuevo_estado in estados_permitidos:
+            if tipo == "regular":
+                clase_rel = get_object_or_404(AlumnoClase, id_alumno_clase=id_relacion)
+                clase_rel.estado = nuevo_estado
+                clase_rel.save()
+            elif tipo == "ocasional":
+                clase_rel = get_object_or_404(AlumnoClaseOcasional, id_alumno_clase_ocasional=id_relacion, id_alumno_id=id_alumno)
+                clase_rel.estado = nuevo_estado
+                clase_rel.save()
+                
+            messages.success(request, "Estado de la clase actualizado.")
+        else:
+            messages.error(request, "Estado no válido.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_editar_turnos(request, id_alumno):
     """Vista para editar los turnos de un paquete activo."""
     from .models import Alumno, AlumnoPaquete, Turno, AlumnoPaqueteTurno
@@ -509,6 +556,7 @@ def panel_alumno_detalle(request, id_alumno):
 
     for ac in clases_regulares:
         historial_clases.append({
+            'id_relacion': ac.id_alumno_clase,
             'fecha': ac.id_clase.fecha,
             'horario': ac.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'regular',
@@ -521,6 +569,7 @@ def panel_alumno_detalle(request, id_alumno):
 
     for ao in clases_ocasionales:
         historial_clases.append({
+            'id_relacion': ao.id_alumno_clase_ocasional,
             'fecha': ao.id_clase.fecha,
             'horario': ao.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'ocasional',

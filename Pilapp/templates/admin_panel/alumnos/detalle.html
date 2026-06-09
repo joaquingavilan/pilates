@@ -158,15 +158,19 @@
                                     {% if paquete.id_alumno_paquete == ultimo_paquete_id and paquete.estado_pago != 'pagado' %}
                                         <button
                                         type="button"
-                                        class="btn btn-sm btn-primary"
+                                        class="btn btn-sm btn-primary mb-1"
                                         data-bs-toggle="modal"
                                         data-bs-target="#modalRegistrarPago"
                                         >
-                                        <i class="bi bi-cash-coin me-1"></i> Registrar pago
+                                        <i class="bi bi-cash-coin"></i> Pago
                                         </button>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
                                     {% endif %}
+                                    <button class="btn btn-sm btn-outline-secondary mb-1" data-bs-toggle="modal" data-bs-target="#modalEditarPaquete" 
+                                            data-id="{{ paquete.id_alumno_paquete }}" 
+                                            data-estado="{{ paquete.estado }}" 
+                                            data-pago="{{ paquete.estado_pago }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -195,6 +199,7 @@
                                 <th>Horario</th>
                                 <th>Tipo</th>
                                 <th>Estado</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -223,6 +228,14 @@
                                     {% else %}
                                     <span class="text-muted">{{ clase.estado|title }}</span>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="modal" data-bs-target="#modalEditarClase"
+                                            data-tipo="{{ clase.tipo }}"
+                                            data-idrelacion="{{ clase.id_relacion }}"
+                                            data-estado="{{ clase.estado }}">
+                                        <i class="bi bi-pencil" style="font-size: 0.8rem;"></i>
+                                    </button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -393,14 +406,81 @@
 {% endif %}
 
 
-{% endblock %}
-{% block extra_js %}
-<script>
+<!-- Modal Editar Paquete -->
+<div class="modal fade" id="modalEditarPaquete" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Paquete</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Estado del Paquete</label>
+            <select name="estado" class="form-select" required>
+              <option value="activo">Activo</option>
+              <option value="expirado">Expirado</option>
+            </select>
+            <div class="form-text text-danger">Si cambias a "Expirado", se liberarán sus turnos futuros automáticamente.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Estado de Pago</label>
+            <select name="estado_pago" class="form-select" required>
+              <option value="pendiente">Pendiente</option>
+              <option value="parcial">Parcial</option>
+              <option value="pagado">Pagado</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Clase -->
+<div class="modal fade" id="modalEditarClase" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Estado de Asistencia</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Estado</label>
+            <select name="estado" class="form-select" required>
+              <option value="asistió">Asistió</option>
+              <option value="faltó">Faltó</option>
+              <option value="canceló">Canceló</option>
+              <option value="recuperó">Recuperó</option>
+              <option value="reprogramó">Reprogramó</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="reservado">Reservado</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% <script>
 (function () {
   const nf = new Intl.NumberFormat('es-PY');
 
   function toInt(value) {
-    // Convertir directamente a número entero
     const num = parseInt(value, 10);
     return isNaN(num) ? null : num;
   }
@@ -413,64 +493,103 @@
     el.textContent = nf.format(n);
   }
 
-  // Modal: restante/pagado
   formatSpanByDataValue('restante_ultimo_fmt');
   formatSpanByDataValue('pagado_ultimo_fmt');
 
-  // Historial pagos - ahora recibe el valor sin formatear
   document.querySelectorAll('[data-money]').forEach(el => {
     const n = toInt(el.dataset.money);
     if (n !== null) el.textContent = nf.format(n);
   });
 
   const modal = document.getElementById('modalRegistrarPago');
-  if (!modal) return;
+  if (modal) {
+      const display = document.getElementById('monto_display');
+      const hidden = document.getElementById('monto_hidden');
+      const form = modal.querySelector('form');
 
-  const display = document.getElementById('monto_display');
-  const hidden = document.getElementById('monto_hidden');
-  const form = modal.querySelector('form');
+      modal.addEventListener('shown.bs.modal', function () {
+        const n = toInt(hidden.value);
+        if (n !== null) {
+          display.value = nf.format(n);
+          hidden.value = String(n);
+        } else {
+          display.value = '';
+          hidden.value = '';
+        }
+        display.focus();
+      });
 
-  modal.addEventListener('shown.bs.modal', function () {
-    const n = toInt(hidden.value);
-    if (n !== null) {
-      display.value = nf.format(n);
-      hidden.value = String(n);
-    } else {
-      display.value = '';
-      hidden.value = '';
-    }
-    display.focus();
-  });
+      display.addEventListener('input', function () {
+        const digits = display.value.replace(/[^\d]/g, '');
+        const n = digits ? parseInt(digits, 10) : null;
+        hidden.value = (n === null) ? '' : String(n);
+      });
 
-  // Extraer solo dígitos mientras se escribe
-  display.addEventListener('input', function () {
-    const digits = display.value.replace(/[^\d]/g, '');
-    const n = digits ? parseInt(digits, 10) : null;
-    hidden.value = (n === null) ? '' : String(n);
-  });
+      display.addEventListener('blur', function () {
+        const digits = display.value.replace(/[^\d]/g, '');
+        const n = digits ? parseInt(digits, 10) : null;
+        if (n === null) {
+          display.value = '';
+          hidden.value = '';
+          return;
+        }
+        display.value = nf.format(n);
+        hidden.value = String(n);
+      });
 
-  display.addEventListener('blur', function () {
-    const digits = display.value.replace(/[^\d]/g, '');
-    const n = digits ? parseInt(digits, 10) : null;
-    if (n === null) {
-      display.value = '';
-      hidden.value = '';
-      return;
-    }
-    display.value = nf.format(n);
-    hidden.value = String(n);
-  });
+      form.addEventListener('submit', function (e) {
+        const digits = display.value.replace(/[^\d]/g, '');
+        const n = digits ? parseInt(digits, 10) : null;
+        if (n === null || n <= 0) {
+          e.preventDefault();
+          display.focus();
+          return;
+        }
+        hidden.value = String(n);
+      });
+  }
 
-  form.addEventListener('submit', function (e) {
-    const digits = display.value.replace(/[^\d]/g, '');
-    const n = digits ? parseInt(digits, 10) : null;
-    if (n === null || n <= 0) {
-      e.preventDefault();
-      display.focus();
-      return;
-    }
-    hidden.value = String(n);
-  });
+  const modalEditarPaquete = document.getElementById('modalEditarPaquete');
+  if (modalEditarPaquete) {
+    modalEditarPaquete.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const id = button.getAttribute('data-id');
+      const estado = button.getAttribute('data-estado');
+      const pago = button.getAttribute('data-pago');
+      
+      const form = modalEditarPaquete.querySelector('form');
+      let actionUrl = "{% url 'panel_alumno_paquete_editar' alumno.id_alumno 999999 %}".replace('999999', id);
+      form.action = actionUrl;
+      
+      form.querySelector('[name="estado"]').value = estado;
+      form.querySelector('[name="estado_pago"]').value = pago;
+    });
+  }
+
+  const modalEditarClase = document.getElementById('modalEditarClase');
+  if (modalEditarClase) {
+    modalEditarClase.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const idrelacion = button.getAttribute('data-idrelacion');
+      const tipo = button.getAttribute('data-tipo');
+      const estado = button.getAttribute('data-estado');
+      
+      const form = modalEditarClase.querySelector('form');
+      let actionUrl = "{% url 'panel_alumno_clase_editar' alumno.id_alumno 'TIPO' 999999 %}".replace('TIPO', tipo).replace('999999', idrelacion);
+      form.action = actionUrl;
+      
+      const select = form.querySelector('[name="estado"]');
+      let found = false;
+      for (let i=0; i<select.options.length; i++) {
+         if (select.options[i].value === estado) {
+             select.selectedIndex = i;
+             found = true;
+             break;
+         }
+      }
+      if(!found) select.value = estado;
+    });
+  }
 })();
 </script>
 {% endblock %}

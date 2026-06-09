@@ -14,6 +14,8 @@ urlpatterns = [
     path('alumnos/<int:id_alumno>/', views_panel.panel_alumno_detalle, name='panel_alumno_detalle'),
     path('alumnos/<int:id_alumno>/editar/', views_panel.panel_alumno_editar, name='panel_alumno_editar'),
     path('alumnos/<int:id_alumno>/turnos/editar/', views_panel.panel_alumno_editar_turnos, name='panel_alumno_editar_turnos'),
+    path('alumnos/<int:id_alumno>/paquete/<int:id_alumno_paquete>/editar/', views_panel.panel_alumno_paquete_editar, name='panel_alumno_paquete_editar'),
+    path('alumnos/<int:id_alumno>/clase/<str:tipo>/<int:id_relacion>/editar/', views_panel.panel_alumno_clase_editar, name='panel_alumno_clase_editar'),
     
     # Clases
     path('clases/', views_panel.panel_clases, name='panel_clases'),
