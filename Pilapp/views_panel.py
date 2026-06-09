@@ -287,38 +287,119 @@ def panel_alumnos(request):
 
 def panel_alumno_crear(request):
     """Vista para crear manualmente un alumno nuevo (y su persona asociada)."""
+    from .models import Paquete, Turno, Persona, Alumno
+    from .views import registrar_alumno_datos
+    from django.db import transaction
+    
+    paquetes = Paquete.objects.all().order_by('cantidad_clases')
+    turnos = Turno.objects.filter(estado="Disponible").order_by('dia', 'horario')
+    
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    turnos_por_dia = {dia: [] for dia in dias_orden}
+    for t in turnos:
+        if t.dia in turnos_por_dia:
+            turnos_por_dia[t.dia].append(t)
+    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+
     if request.method == "POST":
         nombre = request.POST.get("nombre", "").strip()
         apellido = request.POST.get("apellido", "").strip()
         telefono = request.POST.get("telefono", "").strip()
-        estado = request.POST.get("estado", "ocasional")
         canal = request.POST.get("canal_captacion", "").strip()
+        
+        paquete_val = request.POST.get("paquete")
+        turnos_seleccionados = request.POST.getlist("turnos")
+        fecha_inicio = request.POST.get("fecha_inicio", "").strip()
         
         if not nombre or not apellido:
             messages.error(request, "Nombre y apellido son obligatorios.")
-            return render(request, "admin_panel/alumnos/crear.html")
+            return render(request, "admin_panel/alumnos/crear.html", {"paquetes": paquetes, "turnos_por_dia": turnos_por_dia})
             
         try:
-            with transaction.atomic():
-                persona = Persona.objects.create(
-                    nombre=nombre,
-                    apellido=apellido,
-                    telefono=telefono
-                )
+            if paquete_val == "ocasional" or not paquete_val:
+                with transaction.atomic():
+                    persona = Persona.objects.create(
+                        nombre=nombre,
+                        apellido=apellido,
+                        telefono=telefono
+                    )
+                    alumno = Alumno.objects.create(
+                        id_persona=persona,
+                        estado="ocasional",
+                        canal_captacion=canal
+                    )
+                messages.success(request, f"Alumna {nombre} {apellido} registrada como ocasional (sin paquete asignado).")
+                return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+            else:
+                data = {
+                    "nombre": nombre,
+                    "apellido": apellido,
+                    "telefono": telefono,
+                    "canal_captacion": canal,
+                    "paquete": int(paquete_val),
+                    "turnos": turnos_seleccionados,
+                    "fecha_inicio": fecha_inicio
+                }
                 
-                alumno = Alumno.objects.create(
-                    id_persona=persona,
-                    estado=estado,
-                    canal_captacion=canal
-                )
+                registrar_alumno_datos(data)
                 
-            messages.success(request, f"Alumna {nombre} {apellido} registrada exitosamente. Puedes agregarle su paquete de clases aquí.")
-            return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
-            
+                persona_creada = Persona.objects.filter(nombre=nombre, apellido=apellido, telefono=telefono).order_by('-id_persona').first()
+                if not persona_creada:
+                    persona_creada = Persona.objects.filter(nombre=nombre, apellido=apellido).order_by('-id_persona').first()
+                
+                alumno_creado = Alumno.objects.filter(id_persona=persona_creada).first()
+                
+                messages.success(request, f"Alumna {nombre} {apellido} registrada exitosamente con paquete de {paquete_val} clases.")
+                return redirect("panel_alumno_detalle", id_alumno=alumno_creado.id_alumno)
+                
         except Exception as e:
             messages.error(request, f"Ocurrió un error al crear la alumna: {str(e)}")
             
-    return render(request, "admin_panel/alumnos/crear.html")
+    return render(request, "admin_panel/alumnos/crear.html", {
+        "paquetes": paquetes,
+        "turnos_por_dia": turnos_por_dia
+    })
+
+def panel_alumno_editar(request, id_alumno):
+    """Vista para editar los datos personales de un alumno."""
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    persona = alumno.id_persona
+    
+    if request.method == "POST":
+        nombre = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        telefono = request.POST.get("telefono", "").strip()
+        ruc = request.POST.get("ruc", "").strip()
+        estado = request.POST.get("estado", "ocasional")
+        canal = request.POST.get("canal_captacion", "").strip()
+        observaciones = request.POST.get("observaciones", "").strip()
+        
+        if not nombre or not apellido:
+            messages.error(request, "Nombre y apellido son obligatorios.")
+        else:
+            try:
+                with transaction.atomic():
+                    persona.nombre = nombre
+                    persona.apellido = apellido
+                    persona.telefono = telefono
+                    persona.ruc = ruc
+                    persona.observaciones = observaciones
+                    persona.save()
+                    
+                    alumno.estado = estado
+                    alumno.canal_captacion = canal
+                    alumno.save()
+                    
+                messages.success(request, f"Datos de {nombre} {apellido} actualizados correctamente.")
+                return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+            except Exception as e:
+                messages.error(request, f"Ocurrió un error al actualizar: {str(e)}")
+                
+    context = {
+        'alumno': alumno,
+        'persona': persona
+    }
+    return render(request, "admin_panel/alumnos/editar.html", context)
 
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""

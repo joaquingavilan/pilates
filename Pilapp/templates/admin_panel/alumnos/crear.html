@@ -10,47 +10,116 @@
     </a>
 </div>
 
-<div class="card shadow-sm max-w-md mx-auto" style="max-width: 600px;">
-    <div class="card-body">
-        <form method="post" action="{% url 'panel_alumno_crear' %}">
-            {% csrf_token %}
-            
-            <div class="mb-3">
-                <label for="nombre" class="form-label">Nombre *</label>
-                <input type="text" class="form-control" id="nombre" name="nombre" required>
-            </div>
-            
-            <div class="mb-3">
-                <label for="apellido" class="form-label">Apellido *</label>
-                <input type="text" class="form-control" id="apellido" name="apellido" required>
-            </div>
-            
-            <div class="mb-3">
-                <label for="telefono" class="form-label">Teléfono (ej: +5959...)</label>
-                <input type="text" class="form-control" id="telefono" name="telefono">
-                <div class="form-text">Usado por el bot de WhatsApp para reconocer a la alumna.</div>
-            </div>
+<form method="post" action="{% url 'panel_alumno_crear' %}">
+    {% csrf_token %}
+    <div class="row g-4">
+        <!-- Columna de Datos Personales -->
+        <div class="col-md-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <i class="bi bi-person me-2"></i>Datos Personales
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="apellido" class="form-label">Apellido *</label>
+                        <input type="text" class="form-control" id="apellido" name="apellido" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="telefono" class="form-label">Teléfono (ej: +5959...)</label>
+                        <input type="text" class="form-control" id="telefono" name="telefono">
+                        <div class="form-text">Usado por el bot para reconocer a la alumna.</div>
+                    </div>
 
-            <div class="mb-3">
-                <label for="estado" class="form-label">Estado Inicial</label>
-                <select class="form-select" id="estado" name="estado">
-                    <option value="ocasional">Ocasional (Sin paquete activo aún)</option>
-                    <option value="inactivo">Inactivo</option>
-                </select>
-                <div class="form-text">Si deseas agregar un paquete regular, podrás hacerlo desde su perfil luego de crearla.</div>
+                    <div class="mb-3">
+                        <label for="canal_captacion" class="form-label">Canal de Captación</label>
+                        <input type="text" class="form-control" id="canal_captacion" name="canal_captacion" placeholder="Ej: Instagram, Referido, etc.">
+                    </div>
+                </div>
             </div>
-            
-            <div class="mb-4">
-                <label for="canal_captacion" class="form-label">Canal de Captación</label>
-                <input type="text" class="form-control" id="canal_captacion" name="canal_captacion" placeholder="Ej: Instagram, Referido, etc.">
-            </div>
+        </div>
 
-            <div class="d-grid">
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-check-circle me-1"></i> Guardar Alumna
-                </button>
+        <!-- Columna de Paquete y Turnos -->
+        <div class="col-md-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <i class="bi bi-calendar-check me-2"></i>Paquete y Turnos
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="paquete" class="form-label">Tipo de Paquete</label>
+                            <select class="form-select border-primary" id="paquete" name="paquete">
+                                <option value="ocasional">Ocasional (Paga por clase)</option>
+                                {% for paquete in paquetes %}
+                                <option value="{{ paquete.cantidad_clases }}">{{ paquete.cantidad_clases }} clases</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fecha_inicio" class="form-label">Fecha de Inicio (Opcional)</label>
+                            <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio">
+                            <div class="form-text">Si está vacío, asume el próximo turno.</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="seccion_turnos" style="display: none;">
+                        <label class="form-label fw-bold d-block border-bottom pb-2 mb-3">Selecciona los Turnos</label>
+                        <div class="row g-3">
+                            {% for dia, turnos_dia in turnos_por_dia.items %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-2 text-primary">{{ dia }}</h6>
+                                        {% for t in turnos_dia %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="turnos" value="{{ t.dia }} {{ t.horario|time:'H:i' }}" id="turno_{{ t.id_turno }}">
+                                            <label class="form-check-label" style="font-size: 0.9rem;" for="turno_{{ t.id_turno }}">
+                                                {{ t.horario|time:"H:i" }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
-</div>
+    
+    <div class="d-flex justify-content-end mt-4">
+        <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle me-1"></i> Guardar Alumna
+        </button>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const paqueteSelect = document.getElementById("paquete");
+        const seccionTurnos = document.getElementById("seccion_turnos");
+
+        function toggleTurnos() {
+            if (paqueteSelect.value === "ocasional") {
+                seccionTurnos.style.display = "none";
+            } else {
+                seccionTurnos.style.display = "block";
+            }
+        }
+
+        paqueteSelect.addEventListener("change", toggleTurnos);
+        toggleTurnos(); // Run on load
+    });
+</script>
 {% endblock %}

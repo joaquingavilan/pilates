@@ -1,0 +1,67 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Editar {{ persona.nombre }} {{ persona.apellido }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Editar Alumna</h2>
+    <a href="{% url 'panel_alumno_detalle' alumno.id_alumno %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Volver al Perfil
+    </a>
+</div>
+
+<div class="card shadow-sm mx-auto" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="post" action="{% url 'panel_alumno_editar' alumno.id_alumno %}">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre *</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" value="{{ persona.nombre }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="apellido" class="form-label">Apellido *</label>
+                <input type="text" class="form-control" id="apellido" name="apellido" value="{{ persona.apellido }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="telefono" class="form-label">Teléfono (ej: +5959...)</label>
+                <input type="text" class="form-control" id="telefono" name="telefono" value="{{ persona.telefono|default:'' }}">
+                <div class="form-text">Usado por el bot de WhatsApp para reconocer a la alumna.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="ruc" class="form-label">RUC</label>
+                <input type="text" class="form-control" id="ruc" name="ruc" value="{{ persona.ruc|default:'' }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="estado" class="form-label">Estado</label>
+                <select class="form-select" id="estado" name="estado">
+                    <option value="regular" {% if alumno.estado == 'regular' %}selected{% endif %}>Regular (Con paquete activo)</option>
+                    <option value="ocasional" {% if alumno.estado == 'ocasional' %}selected{% endif %}>Ocasional (Paga por clase)</option>
+                    <option value="inactivo" {% if alumno.estado == 'inactivo' %}selected{% endif %}>Inactivo</option>
+                </select>
+                <div class="form-text">El estado "Regular" se asume si tiene un paquete.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="canal_captacion" class="form-label">Canal de Captación</label>
+                <input type="text" class="form-control" id="canal_captacion" name="canal_captacion" value="{{ alumno.canal_captacion|default:'' }}">
+            </div>
+            
+            <div class="mb-4">
+                <label for="observaciones" class="form-label">Observaciones</label>
+                <textarea class="form-control" id="observaciones" name="observaciones" rows="3">{{ persona.observaciones|default:'' }}</textarea>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle me-1"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

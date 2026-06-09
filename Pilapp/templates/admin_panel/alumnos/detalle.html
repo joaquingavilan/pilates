@@ -10,14 +10,19 @@
     <li class="breadcrumb-item active">{{ alumno.id_persona.nombre }} {{ alumno.id_persona.apellido }}</li>
   </ol>
 
-  <button
-    type="button"
-    class="btn btn-danger"
-    data-bs-toggle="modal"
-    data-bs-target="#modalEliminarAlumno"
-  >
-    <i class="bi bi-trash me-1"></i> Eliminar alumno
-  </button>
+  <div>
+      <a href="{% url 'panel_alumno_editar' alumno.id_alumno %}" class="btn btn-warning me-2">
+        <i class="bi bi-pencil me-1"></i> Editar
+      </a>
+      <button
+        type="button"
+        class="btn btn-danger"
+        data-bs-toggle="modal"
+        data-bs-target="#modalEliminarAlumno"
+      >
+        <i class="bi bi-trash me-1"></i> Eliminar
+      </button>
+  </div>
 </nav>
 
 
