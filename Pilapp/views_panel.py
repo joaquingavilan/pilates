@@ -292,7 +292,7 @@ def panel_alumno_crear(request):
     from django.db import transaction
     
     paquetes = Paquete.objects.all().order_by('cantidad_clases')
-    turnos = Turno.objects.filter(estado="Disponible").order_by('dia', 'horario')
+    turnos = Turno.objects.all().order_by('dia', 'horario')
     
     dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     turnos_por_dia = {dia: [] for dia in dias_orden}
