@@ -236,9 +236,14 @@
                                             data-estado="{{ clase.estado }}">
                                         <i class="bi bi-pencil" style="font-size: 0.8rem;"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-primary py-0 px-1" title="Reprogramar" data-bs-toggle="modal" data-bs-target="#modalReprogramarClase"
+                                    <button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Reprogramar" data-bs-toggle="modal" data-bs-target="#modalReprogramarClase"
                                             data-idclase="{{ clase.id_clase }}">
                                         <i class="bi bi-calendar-event" style="font-size: 0.8rem;"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Eliminar Clase" data-bs-toggle="modal" data-bs-target="#modalEliminarClase"
+                                            data-tipo="{{ clase.tipo }}"
+                                            data-idrelacion="{{ clase.id_relacion }}">
+                                        <i class="bi bi-trash" style="font-size: 0.8rem;"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -517,6 +522,31 @@
   </div>
 </div>
 
+<!-- Modal Eliminar Clase -->
+<div class="modal fade" id="modalEliminarClase" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirmar Eliminación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0 text-danger">
+          ¿Seguro que deseas eliminar esta reserva? <br><br>
+          Esta acción removerá a la alumna de la clase permanentemente y liberará el cupo.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -647,6 +677,19 @@
       // Limpiar inputs al abrir
       form.querySelector('[name="fecha_destino"]').value = '';
       form.querySelector('[name="hora_destino"]').value = '';
+    });
+  }
+
+  const modalEliminarClase = document.getElementById('modalEliminarClase');
+  if (modalEliminarClase) {
+    modalEliminarClase.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const idrelacion = button.getAttribute('data-idrelacion');
+      const tipo = button.getAttribute('data-tipo');
+      
+      const form = modalEliminarClase.querySelector('form');
+      let actionUrl = "{% url 'panel_alumno_clase_eliminar' alumno.id_alumno 'TIPO' 999999 %}".replace('TIPO', tipo).replace('999999', idrelacion);
+      form.action = actionUrl;
     });
   }
 })();

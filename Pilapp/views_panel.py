@@ -489,6 +489,35 @@ def panel_alumno_clase_reprogramar(request, id_alumno, id_clase_origen):
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
+def panel_alumno_clase_eliminar(request, id_alumno, tipo, id_relacion):
+    """Vista para eliminar permanentemente una clase de una alumna."""
+    from .models import AlumnoClase, AlumnoClaseOcasional, Clase
+    from django.db.models import F
+    
+    if request.method == "POST":
+        try:
+            with transaction.atomic():
+                if tipo == "regular":
+                    clase_rel = get_object_or_404(AlumnoClase, id_alumno_clase=id_relacion)
+                    id_clase = clase_rel.id_clase_id
+                    clase_rel.delete()
+                elif tipo == "ocasional":
+                    clase_rel = get_object_or_404(AlumnoClaseOcasional, id_alumno_clase_ocasional=id_relacion, id_alumno_id=id_alumno)
+                    id_clase = clase_rel.id_clase_id
+                    clase_rel.delete()
+                else:
+                    messages.error(request, "Tipo de clase no válido.")
+                    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+                # Descontar el cupo si corresponde
+                Clase.objects.filter(pk=id_clase, total_inscriptos__gt=0).update(total_inscriptos=F('total_inscriptos') - 1)
+                messages.success(request, "Clase eliminada correctamente.")
+                
+        except Exception as e:
+            messages.error(request, f"Error al eliminar clase: {str(e)}")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_editar_turnos(request, id_alumno):
     """Vista para editar los turnos de un paquete activo."""
     from .models import Alumno, AlumnoPaquete, Turno, AlumnoPaqueteTurno
