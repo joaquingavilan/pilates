@@ -448,6 +448,47 @@ def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
+def panel_alumno_clase_reprogramar(request, id_alumno, id_clase_origen):
+    """Vista para reprogramar una clase hacia una nueva fecha y horario."""
+    from .views import reprogramar_clase_datos
+    if request.method == "POST":
+        fecha_destino_str = request.POST.get("fecha_destino")
+        hora_destino = request.POST.get("hora_destino")
+        
+        if not fecha_destino_str or not hora_destino:
+            messages.error(request, "Debes seleccionar fecha y hora de destino.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        try:
+            fecha_dt = datetime.strptime(fecha_destino_str, "%Y-%m-%d")
+            # Determinar el día de la semana (0=Lunes, ..., 6=Domingo)
+            dias_map = {
+                0: "Lunes", 1: "Martes", 2: "Miércoles",
+                3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"
+            }
+            dia_destino = dias_map[fecha_dt.weekday()]
+            
+            data = {
+                "id_alumno": id_alumno,
+                "id_clase_origen": id_clase_origen,
+                "dia_destino": dia_destino,
+                "hora_destino": hora_destino,
+                "fecha_destino": fecha_destino_str
+            }
+            
+            resultado = reprogramar_clase_datos(data)
+            
+            if "errores" in resultado:
+                for error in resultado["errores"]:
+                    messages.error(request, error)
+            else:
+                messages.success(request, resultado.get("message", "Clase reprogramada."))
+                
+        except ValueError:
+            messages.error(request, "Formato de fecha inválido.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_editar_turnos(request, id_alumno):
     """Vista para editar los turnos de un paquete activo."""
     from .models import Alumno, AlumnoPaquete, Turno, AlumnoPaqueteTurno
@@ -557,6 +598,7 @@ def panel_alumno_detalle(request, id_alumno):
     for ac in clases_regulares:
         historial_clases.append({
             'id_relacion': ac.id_alumno_clase,
+            'id_clase': ac.id_clase.id_clase,
             'fecha': ac.id_clase.fecha,
             'horario': ac.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'regular',
@@ -570,6 +612,7 @@ def panel_alumno_detalle(request, id_alumno):
     for ao in clases_ocasionales:
         historial_clases.append({
             'id_relacion': ao.id_alumno_clase_ocasional,
+            'id_clase': ao.id_clase.id_clase,
             'fecha': ao.id_clase.fecha,
             'horario': ao.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'ocasional',
@@ -583,12 +626,17 @@ def panel_alumno_detalle(request, id_alumno):
         id_alumno_paquete__id_alumno=alumno
     ).select_related('id_pago', 'id_alumno_paquete__id_paquete').order_by('-id_pago__fecha')
 
+    # Horarios únicos disponibles para el dropdown de reprogramar
+    from .models import Turno
+    horarios_disponibles = sorted(list(set(t.horario.strftime('%H:%M') for t in Turno.objects.all())))
+
     return render(request, 'admin_panel/alumnos/detalle.html', {
         'alumno': alumno,
         'paquetes': paquetes,
         'turnos': turnos,
         'historial_clases': historial_clases,
         'pagos': pagos,
+        'horarios_disponibles': horarios_disponibles,
 
         # NUEVO
         'ultimo_paquete_id': ultimo_paquete_id,

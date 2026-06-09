@@ -230,11 +230,15 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="modal" data-bs-target="#modalEditarClase"
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1 me-1" title="Editar Estado" data-bs-toggle="modal" data-bs-target="#modalEditarClase"
                                             data-tipo="{{ clase.tipo }}"
                                             data-idrelacion="{{ clase.id_relacion }}"
                                             data-estado="{{ clase.estado }}">
                                         <i class="bi bi-pencil" style="font-size: 0.8rem;"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary py-0 px-1" title="Reprogramar" data-bs-toggle="modal" data-bs-target="#modalReprogramarClase"
+                                            data-idclase="{{ clase.id_clase }}">
+                                        <i class="bi bi-calendar-event" style="font-size: 0.8rem;"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -476,7 +480,46 @@
   </div>
 </div>
 
-{% <script>
+<!-- Modal Reprogramar Clase -->
+<div class="modal fade" id="modalReprogramarClase" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Reprogramar Clase</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nueva Fecha</label>
+            <input type="date" name="fecha_destino" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nueva Hora</label>
+            <select name="hora_destino" class="form-select" required>
+              <option value="">Seleccionar horario...</option>
+              {% for h in horarios_disponibles %}
+              <option value="{{ h }}">{{ h }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="alert alert-info py-2 mb-0" style="font-size: 0.9rem;">
+            Se liberará el cupo en el horario original y se moverá a la nueva fecha y hora.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Reprogramación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
 (function () {
   const nf = new Intl.NumberFormat('es-PY');
 
@@ -588,6 +631,22 @@
          }
       }
       if(!found) select.value = estado;
+    });
+  }
+
+  const modalReprogramarClase = document.getElementById('modalReprogramarClase');
+  if (modalReprogramarClase) {
+    modalReprogramarClase.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const idclase = button.getAttribute('data-idclase');
+      
+      const form = modalReprogramarClase.querySelector('form');
+      let actionUrl = "{% url 'panel_alumno_clase_reprogramar' alumno.id_alumno 999999 %}".replace('999999', idclase);
+      form.action = actionUrl;
+      
+      // Limpiar inputs al abrir
+      form.querySelector('[name="fecha_destino"]').value = '';
+      form.querySelector('[name="hora_destino"]').value = '';
     });
   }
 })();
