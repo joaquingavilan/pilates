@@ -402,13 +402,22 @@ def panel_alumno_editar(request, id_alumno):
     return render(request, "admin_panel/alumnos/editar.html", context)
 
 def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
-    """Vista para editar el estado y pago de un paquete."""
-    from .models import AlumnoPaquete
+    """Vista para editar el paquete, estado y pago."""
+    from .models import AlumnoPaquete, Paquete
     if request.method == "POST":
         paquete = get_object_or_404(AlumnoPaquete, id_alumno_paquete=id_alumno_paquete, id_alumno_id=id_alumno)
         nuevo_estado = request.POST.get("estado")
         nuevo_estado_pago = request.POST.get("estado_pago")
+        nuevo_id_paquete = request.POST.get("id_paquete")
         
+        # Actualizar tipo de paquete si se envió
+        if nuevo_id_paquete and str(nuevo_id_paquete).isdigit():
+            try:
+                paquete_obj = Paquete.objects.get(id_paquete=nuevo_id_paquete)
+                paquete.id_paquete = paquete_obj
+            except Paquete.DoesNotExist:
+                pass
+
         # Validar
         if nuevo_estado in ["activo", "expirado"]:
             # Si se marca como expirado y antes era activo
@@ -656,8 +665,11 @@ def panel_alumno_detalle(request, id_alumno):
     ).select_related('id_pago', 'id_alumno_paquete__id_paquete').order_by('-id_pago__fecha')
 
     # Horarios únicos disponibles para el dropdown de reprogramar
-    from .models import Turno
+    from .models import Turno, Paquete
     horarios_disponibles = sorted(list(set(t.horario.strftime('%H:%M') for t in Turno.objects.all())))
+    
+    # Todos los paquetes disponibles para actualizar
+    lista_paquetes = Paquete.objects.all().order_by('cantidad_clases')
 
     return render(request, 'admin_panel/alumnos/detalle.html', {
         'alumno': alumno,
@@ -666,6 +678,7 @@ def panel_alumno_detalle(request, id_alumno):
         'historial_clases': historial_clases,
         'pagos': pagos,
         'horarios_disponibles': horarios_disponibles,
+        'lista_paquetes': lista_paquetes,
 
         # NUEVO
         'ultimo_paquete_id': ultimo_paquete_id,

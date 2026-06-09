@@ -167,6 +167,7 @@
                                     {% endif %}
                                     <button class="btn btn-sm btn-outline-secondary mb-1" data-bs-toggle="modal" data-bs-target="#modalEditarPaquete" 
                                             data-id="{{ paquete.id_alumno_paquete }}" 
+                                            data-paquete="{{ paquete.id_paquete.id_paquete }}"
                                             data-estado="{{ paquete.estado }}" 
                                             data-pago="{{ paquete.estado_pago }}">
                                         <i class="bi bi-pencil"></i>
@@ -427,6 +428,14 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
+            <label class="form-label">Tipo de Paquete</label>
+            <select name="id_paquete" class="form-select" required>
+              {% for p in lista_paquetes %}
+              <option value="{{ p.id_paquete }}">{{ p.cantidad_clases }} clases - {{ p.frecuencia }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Estado del Paquete</label>
             <select name="estado" class="form-select" required>
               <option value="activo">Activo</option>
@@ -627,6 +636,7 @@
     modalEditarPaquete.addEventListener('show.bs.modal', event => {
       const button = event.relatedTarget;
       const id = button.getAttribute('data-id');
+      const id_paquete = button.getAttribute('data-paquete');
       const estado = button.getAttribute('data-estado');
       const pago = button.getAttribute('data-pago');
       
@@ -634,6 +644,7 @@
       let actionUrl = "{% url 'panel_alumno_paquete_editar' alumno.id_alumno 999999 %}".replace('999999', id);
       form.action = actionUrl;
       
+      form.querySelector('[name="id_paquete"]').value = id_paquete;
       form.querySelector('[name="estado"]').value = estado;
       form.querySelector('[name="estado_pago"]').value = pago;
     });
