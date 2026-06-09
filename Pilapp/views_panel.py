@@ -285,6 +285,41 @@ def panel_alumnos(request):
         'filtros': filtros,
     })
 
+def panel_alumno_crear(request):
+    """Vista para crear manualmente un alumno nuevo (y su persona asociada)."""
+    if request.method == "POST":
+        nombre = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        telefono = request.POST.get("telefono", "").strip()
+        estado = request.POST.get("estado", "ocasional")
+        canal = request.POST.get("canal_captacion", "").strip()
+        
+        if not nombre or not apellido:
+            messages.error(request, "Nombre y apellido son obligatorios.")
+            return render(request, "admin_panel/alumnos/crear.html")
+            
+        try:
+            with transaction.atomic():
+                persona = Persona.objects.create(
+                    nombre=nombre,
+                    apellido=apellido,
+                    telefono=telefono
+                )
+                
+                alumno = Alumno.objects.create(
+                    id_persona=persona,
+                    estado=estado,
+                    canal_captacion=canal
+                )
+                
+            messages.success(request, f"Alumna {nombre} {apellido} registrada exitosamente. Puedes agregarle su paquete de clases aquí.")
+            return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+            
+        except Exception as e:
+            messages.error(request, f"Ocurrió un error al crear la alumna: {str(e)}")
+            
+    return render(request, "admin_panel/alumnos/crear.html")
+
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""
     from .models import AlumnoPaqueteTurno

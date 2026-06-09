@@ -1,0 +1,56 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Crear Alumna{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-person-plus me-2"></i>Añadir Alumna Manual</h2>
+    <a href="{% url 'panel_alumnos' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Volver a la lista
+    </a>
+</div>
+
+<div class="card shadow-sm max-w-md mx-auto" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="post" action="{% url 'panel_alumno_crear' %}">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre *</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="apellido" class="form-label">Apellido *</label>
+                <input type="text" class="form-control" id="apellido" name="apellido" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="telefono" class="form-label">Teléfono (ej: +5959...)</label>
+                <input type="text" class="form-control" id="telefono" name="telefono">
+                <div class="form-text">Usado por el bot de WhatsApp para reconocer a la alumna.</div>
+            </div>
+
+            <div class="mb-3">
+                <label for="estado" class="form-label">Estado Inicial</label>
+                <select class="form-select" id="estado" name="estado">
+                    <option value="ocasional">Ocasional (Sin paquete activo aún)</option>
+                    <option value="inactivo">Inactivo</option>
+                </select>
+                <div class="form-text">Si deseas agregar un paquete regular, podrás hacerlo desde su perfil luego de crearla.</div>
+            </div>
+            
+            <div class="mb-4">
+                <label for="canal_captacion" class="form-label">Canal de Captación</label>
+                <input type="text" class="form-control" id="canal_captacion" name="canal_captacion" placeholder="Ej: Instagram, Referido, etc.">
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle me-1"></i> Guardar Alumna
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
