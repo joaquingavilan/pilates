@@ -208,6 +208,111 @@ def reprogramar_clase(request):
 
 @csrf_exempt
 @transaction.atomic
+def cambiar_turnos_paquete_datos(data):
+    """
+    Procesa la solicitud de cambio de turnos y devuelve un diccionario con el resultado.
+    data debe contener:
+    - id_alumno
+    - id_paquete (opcional)
+    - turnos_nuevos (lista de strings 'Dia HH:MM')
+    """
+    id_alumno = data.get("id_alumno")
+    id_paquete = data.get("id_paquete")
+    turnos_nuevos_str = data.get("turnos_nuevos", [])
+
+    if not id_alumno or not turnos_nuevos_str:
+        return {"errores": ["Falta 'id_alumno' o 'turnos_nuevos'"]}
+
+    # Obtener alumno
+    alumno = Alumno.objects.get(id_alumno=id_alumno)
+    
+    if id_paquete:
+        alumno_paquete = AlumnoPaquete.objects.filter(
+            id_alumno=alumno,
+            id_paquete=id_paquete,
+            estado='activo'
+        ).first()
+    else:
+        alumno_paquete = AlumnoPaquete.objects.filter(
+            id_alumno=alumno,
+            estado='activo'
+        ).order_by('-id_alumno_paquete').first()
+
+    if not alumno_paquete:
+        return {"errores": ["No se encontró un paquete activo para el alumno"]}
+
+    turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
+    turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
+
+    turnos_nuevos_objs = []
+    errores = []
+    for turno_str in turnos_nuevos_str:
+        try:
+            dia, hora = turno_str.rsplit(" ", 1)
+            turno_obj = Turno.objects.get(dia=dia, horario=hora)
+            # Validar cupo: clase futura < 4
+            clase = Clase.objects.filter(id_turno=turno_obj, fecha__gte=timezone.localdate()).first()
+            if clase and clase.total_inscriptos >= 4:
+                errores.append(f"No hay cupo disponible para {turno_str}")
+                continue
+            turnos_nuevos_objs.append(turno_obj)
+        except Turno.DoesNotExist:
+            errores.append(f"Turno {turno_str} no existe")
+
+    if errores:
+        return {"errores": errores}
+
+    fecha_actual = timezone.localdate()
+    clases_futuras = AlumnoClase.objects.filter(
+        id_alumno_paquete=alumno_paquete,
+        id_clase__fecha__gte=fecha_actual
+    )
+
+    clases_futuras.delete()
+    AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).delete()
+
+    clases_reservadas = []
+    cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
+    cantidad_turnos = len(turnos_nuevos_objs)
+    base_clases = cantidad_clases // cantidad_turnos
+    extra = cantidad_clases % cantidad_turnos
+
+    for idx, t in enumerate(turnos_nuevos_objs):
+        clases_por_turno = base_clases + (1 if idx < extra else 0)
+        fecha_inicio = obtener_fecha_proximo_dia(t.dia)
+        fechas = obtener_fechas_turno_normal(t.id_turno, str(fecha_inicio), clases_por_turno)["fechas"]
+
+        for fecha_str in fechas:
+            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            clase_obj, _ = Clase.objects.get_or_create(
+                id_turno=t,
+                fecha=fecha_obj,
+                defaults={"id_instructor": Instructor.objects.get(id_instructor=1)}
+            )
+
+            if not AlumnoClase.objects.filter(id_alumno_paquete=alumno_paquete, id_clase=clase_obj).exists():
+                AlumnoClase.objects.create(
+                    id_alumno_paquete=alumno_paquete,
+                    id_clase=clase_obj,
+                    estado="reservado"
+                )
+                clases_reservadas.append(f"{fecha_obj} {t.dia} {t.horario}")
+
+        AlumnoPaqueteTurno.objects.get_or_create(id_alumno_paquete=alumno_paquete, id_turno=t)
+
+    return {
+        "status": "success",
+        "message": "Turnos actualizados correctamente.",
+        "data": {
+            "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
+            "paquete": f"{alumno_paquete.id_paquete.cantidad_clases} clases",
+            "turnos_anteriores": turnos_anteriores,
+            "turnos_nuevos": [f"{t.dia} {t.horario}" for t in turnos_nuevos_objs],
+            "clases_reservadas": clases_reservadas
+        }
+    }
+
+
 def cambiar_turnos_paquete(request):
     """
     POST /cambiar_turnos_paquete/
@@ -216,127 +321,26 @@ def cambiar_turnos_paquete(request):
 
     Entradas (JSON):
     - id_alumno (int)                 [obligatorio]
-    - id_paquete (int)                [opcional; si no se envía, toma el paquete activo más reciente]
-    - turnos_nuevos (list[str])      [obligatorio; formato: "Día HH:MM"]
+    - id_paquete (int)                [opcional; si no se envia, toma el paquete activo más reciente]
+    - turnos_nuevos (list[str])      [obligatorio; formato: "Dia HH:MM"]
 
     Lógica:
     1. Verifica que el alumno y paquete existan.
     2. Valida disponibilidad de los nuevos turnos.
     3. Reasigna clases futuras del paquete a los nuevos turnos.
     4. Mantiene clases pasadas intactas.
-
-    Respuesta 200 OK:
-    {
-        "status": "success",
-        "message": "Turnos actualizados correctamente",
-        "data": {
-            "alumno": "Nombre Completo",
-            "paquete": "12 clases",
-            "turnos_anteriores": ["Lunes 07:00", "Viernes 07:00"],
-            "turnos_nuevos": ["Lunes 07:00", "Martes 07:00", "Viernes 07:00"]
-        }
-    }
     """
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
-        id_alumno = data.get("id_alumno")
-        id_paquete = data.get("id_paquete")
-        turnos_nuevos_str = data.get("turnos_nuevos", [])
-
-        if not id_alumno or not turnos_nuevos_str:
-            return JsonResponse({"errores": ["Falta 'id_alumno' o 'turnos_nuevos'"]}, status=400)
-
-        # Obtener alumno
-        alumno = Alumno.objects.get(id_alumno=id_alumno)
+        resultado = cambiar_turnos_paquete_datos(data)
         
-        if id_paquete:
-            alumno_paquete = AlumnoPaquete.objects.filter(
-                id_alumno=alumno,
-                id_paquete=id_paquete,
-                estado='activo'
-            ).first()
-        else:
-            alumno_paquete = AlumnoPaquete.objects.filter(
-                id_alumno=alumno,
-                estado='activo'
-            ).order_by('-id_alumno_paquete').first()
-
-        if not alumno_paquete:
-            return JsonResponse({"errores": ["No se encontró un paquete activo para el alumno"]}, status=404)
-
-        turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
-        turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
-
-        turnos_nuevos_objs = []
-        errores = []
-        for turno_str in turnos_nuevos_str:
-            try:
-                dia, hora = turno_str.rsplit(" ", 1)
-                turno_obj = Turno.objects.get(dia=dia, horario=hora)
-                # Validar cupo: clase futura < 4
-                clase = Clase.objects.filter(id_turno=turno_obj, fecha__gte=timezone.localdate()).first()
-                if clase and clase.total_inscriptos >= 4:
-                    errores.append(f"No hay cupo disponible para {turno_str}")
-                    continue
-                turnos_nuevos_objs.append(turno_obj)
-            except Turno.DoesNotExist:
-                errores.append(f"Turno {turno_str} no existe")
-
-        if errores:
-            return JsonResponse({"errores": errores}, status=400)
-
-        fecha_actual = timezone.localdate()
-        clases_futuras = AlumnoClase.objects.filter(
-            id_alumno_paquete=alumno_paquete,
-            id_clase__fecha__gte=fecha_actual
-        )
-
-        clases_futuras.delete()
-        AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).delete()
-
-        clases_reservadas = []
-        cantidad_clases = alumno_paquete.id_paquete.cantidad_clases
-        cantidad_turnos = len(turnos_nuevos_objs)
-        base_clases = cantidad_clases // cantidad_turnos
-        extra = cantidad_clases % cantidad_turnos
-
-        for idx, t in enumerate(turnos_nuevos_objs):
-            clases_por_turno = base_clases + (1 if idx < extra else 0)
-            fecha_inicio = obtener_fecha_proximo_dia(t.dia)
-            fechas = obtener_fechas_turno_normal(t.id_turno, str(fecha_inicio), clases_por_turno)["fechas"]
-
-            for fecha_str in fechas:
-                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                clase_obj, _ = Clase.objects.get_or_create(
-                    id_turno=t,
-                    fecha=fecha_obj,
-                    defaults={"id_instructor": Instructor.objects.get(id_instructor=1)}
-                )
-
-                if not AlumnoClase.objects.filter(id_alumno_paquete=alumno_paquete, id_clase=clase_obj).exists():
-                    AlumnoClase.objects.create(
-                        id_alumno_paquete=alumno_paquete,
-                        id_clase=clase_obj,
-                        estado="reservado"
-                    )
-                    clases_reservadas.append(f"{fecha_obj} {t.dia} {t.horario}")
-
-            AlumnoPaqueteTurno.objects.get_or_create(id_alumno_paquete=alumno_paquete, id_turno=t)
-
-        return JsonResponse({
-            "status": "success",
-            "message": "Turnos actualizados correctamente.",
-            "data": {
-                "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
-                "paquete": f"{alumno_paquete.id_paquete.cantidad_clases} clases",
-                "turnos_anteriores": turnos_anteriores,
-                "turnos_nuevos": [f"{t.dia} {t.horario}" for t in turnos_nuevos_objs],
-                "clases_reservadas": clases_reservadas
-            }
-        })
+        if "errores" in resultado:
+            return JsonResponse({"errores": resultado["errores"]}, status=400)
+            
+        return JsonResponse(resultado)
 
     except Alumno.DoesNotExist:
         return JsonResponse({"errores": ["Alumno no encontrado"]}, status=404)

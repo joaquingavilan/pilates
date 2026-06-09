@@ -401,6 +401,56 @@ def panel_alumno_editar(request, id_alumno):
     }
     return render(request, "admin_panel/alumnos/editar.html", context)
 
+def panel_alumno_editar_turnos(request, id_alumno):
+    """Vista para editar los turnos de un paquete activo."""
+    from .models import Alumno, AlumnoPaquete, Turno, AlumnoPaqueteTurno
+    from .views import cambiar_turnos_paquete_datos
+    
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado='activo').order_by('-id_alumno_paquete').first()
+    
+    if not alumno_paquete:
+        messages.error(request, "La alumna no tiene un paquete activo al cual editarle los turnos.")
+        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+        
+    turnos = Turno.objects.all().order_by('dia', 'horario')
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    turnos_por_dia = {dia: [] for dia in dias_orden}
+    for t in turnos:
+        if t.dia in turnos_por_dia:
+            turnos_por_dia[t.dia].append(t)
+    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+    
+    turnos_asignados_ids = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).values_list('id_turno_id', flat=True)
+    
+    if request.method == "POST":
+        turnos_seleccionados = request.POST.getlist("turnos")
+        if not turnos_seleccionados:
+            messages.error(request, "Debes seleccionar al menos un turno.")
+        else:
+            data = {
+                "id_alumno": id_alumno,
+                "id_paquete": alumno_paquete.id_paquete_id,
+                "turnos_nuevos": turnos_seleccionados
+            }
+            
+            resultado = cambiar_turnos_paquete_datos(data)
+            
+            if "errores" in resultado:
+                for error in resultado["errores"]:
+                    messages.error(request, error)
+            else:
+                messages.success(request, "Turnos actualizados correctamente.")
+                return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+    context = {
+        'alumno': alumno,
+        'alumno_paquete': alumno_paquete,
+        'turnos_por_dia': turnos_por_dia,
+        'turnos_asignados_ids': list(turnos_asignados_ids)
+    }
+    return render(request, "admin_panel/alumnos/editar_turnos.html", context)
+
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""
     from .models import AlumnoPaqueteTurno
