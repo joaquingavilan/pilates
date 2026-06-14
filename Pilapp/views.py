@@ -1645,6 +1645,9 @@ def registrar_alumno_datos(data):
         logging.error(f"[registrar_alumno_datos] Paquete con {data['paquete']} clases no existe")
         errores.append(f"Paquete con {data['paquete']} clases no existe.")
 
+    if not turnos_asignados:
+        errores.append("Debes seleccionar al menos un turno para registrar el paquete.")
+
     # 📌 Validar clases específicas
     if not errores:
         cantidad_clases = paquete.cantidad_clases
