@@ -18,19 +18,24 @@ class Migration(migrations.Migration):
                 ('descripcion', models.CharField(blank=True, max_length=200, null=True)),
             ],
         ),
-        migrations.CreateModel(
-            name='RelacionAlumno',
-            fields=[
-                ('id_relacion_alumno', models.AutoField(primary_key=True, serialize=False)),
-                ('tipo_relacion', models.CharField(choices=[('familiares', 'Familiares'), ('amigos', 'Amigos'), ('pareja', 'Pareja'), ('otro', 'Otro')], max_length=20)),
-                ('observaciones', models.TextField(blank=True, null=True)),
-                ('activa', models.BooleanField(default=True)),
-                ('fecha_alta', models.DateTimeField(auto_now_add=True)),
-                ('id_alumno_1', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='relaciones_como_alumno_1', to='Pilapp.alumno')),
-                ('id_alumno_2', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='relaciones_como_alumno_2', to='Pilapp.alumno')),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.CreateModel(
+                    name='RelacionAlumno',
+                    fields=[
+                        ('id_relacion_alumno', models.AutoField(primary_key=True, serialize=False)),
+                        ('tipo_relacion', models.CharField(choices=[('familiares', 'Familiares'), ('amigos', 'Amigos'), ('pareja', 'Pareja'), ('otro', 'Otro')], max_length=20)),
+                        ('observaciones', models.TextField(blank=True, null=True)),
+                        ('activa', models.BooleanField(default=True)),
+                        ('fecha_alta', models.DateTimeField(auto_now_add=True)),
+                        ('id_alumno_1', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='relaciones_como_alumno_1', to='Pilapp.alumno')),
+                        ('id_alumno_2', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='relaciones_como_alumno_2', to='Pilapp.alumno')),
+                    ],
+                    options={
+                        'constraints': [models.CheckConstraint(check=models.Q(('id_alumno_1', models.F('id_alumno_2')), _negated=True), name='evitar_autorelacion_alumno'), models.UniqueConstraint(fields=('id_alumno_1', 'id_alumno_2'), name='unique_par_alumnos')],
+                    },
+                ),
             ],
-            options={
-                'constraints': [models.CheckConstraint(check=models.Q(('id_alumno_1', models.F('id_alumno_2')), _negated=True), name='evitar_autorelacion_alumno'), models.UniqueConstraint(fields=('id_alumno_1', 'id_alumno_2'), name='unique_par_alumnos')],
-            },
+            database_operations=[],
         ),
     ]
