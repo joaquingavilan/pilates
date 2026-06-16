@@ -2730,8 +2730,16 @@ def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
         fecha_actual += timedelta(days=1)
 
     fechas = []
-    for _ in range(n):
-        fechas.append(fecha_actual.strftime("%Y-%m-%d"))
+    
+    # Obtener lista de fechas de feriados
+    from .models import Feriado
+    feriados = set(Feriado.objects.values_list('fecha', flat=True))
+    
+    fechas_agregadas = 0
+    while fechas_agregadas < n:
+        if fecha_actual not in feriados:
+            fechas.append(fecha_actual.strftime("%Y-%m-%d"))
+            fechas_agregadas += 1
         fecha_actual += timedelta(days=7)
 
     return {"fechas": fechas}

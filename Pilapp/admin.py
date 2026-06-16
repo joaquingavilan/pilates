@@ -16,3 +16,9 @@ admin.site.register(FacturaPago)
 admin.site.register(AlumnoPaqueteTurno)
 admin.site.register(Conversacion)
 admin.site.register(HorarioDisponible)
+from .models import Feriado
+
+@admin.register(Feriado)
+class FeriadoAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'descripcion')
+    search_fields = ('fecha', 'descripcion')

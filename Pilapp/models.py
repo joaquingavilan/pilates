@@ -131,7 +131,7 @@ class RelacionAlumno(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=~models.Q(id_alumno_1=models.F('id_alumno_2')),
+                condition=~models.Q(id_alumno_1=models.F('id_alumno_2')),
                 name='evitar_autorelacion_alumno'
             ),
             models.UniqueConstraint(
@@ -623,3 +623,10 @@ class RenovadorPaqueteService:
                 clase.save() 
 
             return nuevo_paquete
+
+class Feriado(models.Model):
+    fecha = models.DateField(primary_key=True)
+    descripcion = models.CharField(max_length=200, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.fecha} - {self.descripcion}"
