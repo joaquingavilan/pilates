@@ -356,7 +356,7 @@ class AlumnoClase(models.Model):
     id_alumno_clase = models.AutoField(primary_key=True)
     id_alumno_paquete = models.ForeignKey(AlumnoPaquete, on_delete=models.CASCADE)
     id_clase = models.ForeignKey(Clase, on_delete=models.CASCADE)
-    estado = models.CharField(max_length=50, choices=[("asistió", "Asistió"), ("faltó", "Faltó"), ("canceló", "Canceló"), ("recuperó", "Recuperó"), ("reprogramó","Reprogramó"), ("pendiente", "Pendiente")])
+    estado = models.CharField(max_length=50, choices=[("asistió", "Asistió"), ("faltó", "Faltó"), ("canceló", "Canceló"), ("recuperó", "Recuperó"), ("reprogramó","Reprogramó"), ("pendiente", "Pendiente"), ("feriado", "Feriado")])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

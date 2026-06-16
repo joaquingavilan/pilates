@@ -488,7 +488,7 @@ def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
     from .models import AlumnoClase, AlumnoClaseOcasional
     if request.method == "POST":
         nuevo_estado = request.POST.get("estado")
-        estados_permitidos = ["asistió", "faltó", "canceló", "recuperó", "reprogramó", "pendiente", "reservado"]
+        estados_permitidos = ["asistió", "faltó", "canceló", "recuperó", "reprogramó", "pendiente", "reservado", "feriado"]
         
         if nuevo_estado in estados_permitidos:
             if tipo == "regular":
