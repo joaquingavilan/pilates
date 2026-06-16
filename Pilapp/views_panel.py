@@ -1,4 +1,4 @@
-﻿#imports de python
+#imports de python
 import time 
 from decimal import Decimal, InvalidOperation
 from collections import defaultdict
@@ -1306,12 +1306,21 @@ def panel_feriados_eliminar(request, fecha_str):
 
 def profes_clases_hoy(request, token):
     # Hardcoded token de seguridad simple
-    if token != "acceso-profes-secreto":
+    if token != "acceso-profes":
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
         
-    # Obtener fecha de hoy
+    # Obtener fecha
     from django.utils import timezone
-    hoy = timezone.now().date()
+    from datetime import datetime
+    
+    fecha_str = request.GET.get("fecha")
+    if fecha_str:
+        try:
+            hoy = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            hoy = timezone.now().date()
+    else:
+        hoy = timezone.now().date()
     
     # Buscar todas las clases de hoy ordenadas por horario del turno
     clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
@@ -1362,10 +1371,11 @@ def profes_clases_hoy(request, token):
     return render(request, "admin_panel/profes/clases_hoy.html", context)
 
 def profes_marcar_asistencia(request, token):
-    if token != "acceso-profes-secreto":
+    if token != "acceso-profes":
         return HttpResponse("Acceso denegado.", status=403)
         
     if request.method == "POST":
+        fecha_str = request.POST.get("fecha", "")
         tipo = request.POST.get("tipo")
         id_relacion = request.POST.get("id_relacion")
         nuevo_estado = request.POST.get("estado")
@@ -1384,4 +1394,7 @@ def profes_marcar_asistencia(request, token):
         except Exception as e:
             messages.error(request, f"Error al actualizar: {e}")
             
-    return redirect("profes_clases_hoy", token=token)
+    url = redirect("profes_clases_hoy", token=token)
+    if fecha_str:
+        url['Location'] += f"?fecha={fecha_str}"
+    return url

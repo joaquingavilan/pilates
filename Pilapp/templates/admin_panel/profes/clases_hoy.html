@@ -97,10 +97,15 @@
 
     <div class="header d-flex justify-content-between align-items-center">
         <div>
-            <h5 class="mb-0 fw-bold">Clases de Hoy</h5>
+            <h5 class="mb-0 fw-bold">Clases del Día</h5>
             <small class="text-white-50">{{ fecha_hoy|date:"l d \d\e F" }}</small>
         </div>
-        <i class="bi bi-calendar2-check text-primary fs-3" style="color: var(--primary-color) !important;"></i>
+        <form method="get" action="{% url 'profes_clases_hoy' token %}" class="m-0 position-relative">
+            <input type="date" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}" 
+                   class="form-control form-control-sm bg-dark text-white border-secondary" 
+                   onchange="this.form.submit()"
+                   style="width: 140px; color-scheme: dark;">
+        </form>
     </div>
 
     <div class="container mt-4">
@@ -138,6 +143,7 @@
                             <div class="d-flex gap-2">
                                 <form method="post" action="{% url 'profes_marcar_asistencia' token %}" class="m-0">
                                     {% csrf_token %}
+                                    <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
                                     <input type="hidden" name="tipo" value="{{ alumno.tipo }}">
                                     <input type="hidden" name="id_relacion" value="{{ alumno.id_relacion }}">
                                     <input type="hidden" name="estado" value="asistió">
@@ -147,6 +153,7 @@
                                 </form>
                                 <form method="post" action="{% url 'profes_marcar_asistencia' token %}" class="m-0">
                                     {% csrf_token %}
+                                    <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
                                     <input type="hidden" name="tipo" value="{{ alumno.tipo }}">
                                     <input type="hidden" name="id_relacion" value="{{ alumno.id_relacion }}">
                                     <input type="hidden" name="estado" value="faltó">
