@@ -742,7 +742,7 @@ def panel_alumno_detalle(request, id_alumno):
     for paquete in paquetes:
         paquete.clases_usadas = AlumnoClase.objects.filter(
             id_alumno_paquete=paquete,
-            estado__in=['asistió', 'faltó']
+            estado__in=['asistió', 'faltó', 'recuperó']
         ).count()
         total = paquete.id_paquete.cantidad_clases
         paquete.porcentaje_uso = (paquete.clases_usadas / total * 100) if total > 0 else 0
