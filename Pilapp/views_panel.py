@@ -29,9 +29,9 @@ from .models import (
 
 with connection.cursor() as cursor:
     try:
-        # Intentamos agregar la columna. Si ya existe, el 'try' fallarÃ¡ y pasarÃ¡ al 'except'.
+        # Intentamos agregar la columna. Si ya existe, el 'try' fallará y pasará al 'except'.
         cursor.execute('ALTER TABLE "Pilapp_alumnopaquete" ADD COLUMN "clases_usadas" INTEGER DEFAULT 0;')
-        print("Â¡Columna 'clases_usadas' creada con Ã©xito!")
+        print("¡Columna 'clases_usadas' creada con éxito!")
     except Exception as e:
         # Si la columna ya existe, simplemente no hace nada
         print(f"Aviso de DB: {e}")
@@ -40,9 +40,9 @@ with connection.cursor() as cursor:
 from django.db import connection
 with connection.cursor() as cursor:
     try:
-        # Intentamos agregar la columna. Si ya existe, el 'try' fallarÃ¡ y pasarÃ¡ al 'except'.
+        # Intentamos agregar la columna. Si ya existe, el 'try' fallará y pasará al 'except'.
         cursor.execute('ALTER TABLE "Pilapp_alumnopaquete" ADD COLUMN "clases_usadas" INTEGER DEFAULT 0;')
-        print("Â¡Columna 'clases_usadas' creada con Ã©xito!")
+        print("¡Columna 'clases_usadas' creada con éxito!")
     except Exception as e:
         # Si la columna ya existe, simplemente no hace nada
         print(f"Aviso de DB: {e}")
@@ -50,13 +50,13 @@ with connection.cursor() as cursor:
 
 
 def panel_dashboard(request):
-    """Vista principal del dashboard con estadÃ­sticas."""
+    """Vista principal del dashboard con estadísticas."""
     hoy = timezone.localdate()
     ahora = timezone.localtime()
     inicio_semana = hoy - timedelta(days=hoy.weekday())
     fin_semana = inicio_semana + timedelta(days=6)
     
-    # EstadÃ­sticas bÃ¡sicas
+    # Estadísticas básicas
     stats = {
         'alumnos_regulares': Alumno.objects.filter(estado='regular').count(),
         'alumnos_ocasionales': Alumno.objects.filter(estado='ocasional').count(),
@@ -66,12 +66,12 @@ def panel_dashboard(request):
         'asistencias_semana': AlumnoClase.objects.filter(
             id_clase__fecha__gte=inicio_semana,
             id_clase__fecha__lte=fin_semana,
-            estado='asistiÃ³'
+            estado='asistió'
         ).count(),
         'inasistencias_semana': AlumnoClase.objects.filter(
             id_clase__fecha__gte=inicio_semana,
             id_clase__fecha__lte=fin_semana,
-            estado='faltÃ³'
+            estado='faltó'
         ).count(),
         'prospectos_nuevos': ClienteProspecto.objects.filter(
             fecha_contacto__gte=inicio_semana
@@ -81,7 +81,7 @@ def panel_dashboard(request):
     # Clases de hoy
     clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
     
-    # Ãšltimos alumnos registrados
+    # Últimos alumnos registrados
     ultimos_alumnos = Alumno.objects.select_related('id_persona').order_by('-id_alumno')[:5]
     
     return render(request, 'admin_panel/dashboard.html', {
@@ -104,14 +104,14 @@ def panel_calendario(request):
     else:
         fecha_ref = timezone.localdate()
 
-    # Si es domingo, usar el lunes de la PRÃ“XIMA semana
+    # Si es domingo, usar el lunes de la PRÓXIMA semana
     dia_semana = fecha_ref.weekday()
     if dia_semana == 6:  # Domingo
-        inicio_semana = fecha_ref + timedelta(days=1)  # PrÃ³ximo lunes
+        inicio_semana = fecha_ref + timedelta(days=1)  # Próximo lunes
     else:
         inicio_semana = fecha_ref - timedelta(days=dia_semana)
     
-    fin_semana = inicio_semana + timedelta(days=5)  # SÃ¡bado
+    fin_semana = inicio_semana + timedelta(days=5)  # Sábado
 
     semana_anterior = (inicio_semana - timedelta(days=7)).strftime("%Y-%m-%d")
     semana_siguiente = (inicio_semana + timedelta(days=7)).strftime("%Y-%m-%d")
@@ -143,16 +143,16 @@ def api_calendario(request):
     else:
         fecha_ref = timezone.localdate()
 
-    # Si es domingo, usar el lunes de la PRÃ“XIMA semana
+    # Si es domingo, usar el lunes de la PRÓXIMA semana
     dia_semana = fecha_ref.weekday()
     if dia_semana == 6:  # Domingo
         inicio_semana = fecha_ref + timedelta(days=1)
     else:
         inicio_semana = fecha_ref - timedelta(days=dia_semana)
     
-    fin_semana = inicio_semana + timedelta(days=5)  # SÃ¡bado
+    fin_semana = inicio_semana + timedelta(days=5)  # Sábado
 
-    # DÃ­as (lunes a sÃ¡bado = 6 dÃ­as)
+    # Días (lunes a sábado = 6 días)
     dias = [
         (inicio_semana + timedelta(days=i)).isoformat()
         for i in range(6)
@@ -237,7 +237,7 @@ def panel_alumnos(request):
         'orden': request.GET.get('orden', 'nombre'),
     }
     
-    # Filtro de bÃºsqueda
+    # Filtro de búsqueda
     if filtros['q']:
         alumnos = alumnos.filter(
             Q(id_persona__nombre__icontains=filtros['q']) |
@@ -294,7 +294,7 @@ def panel_alumno_crear(request):
     paquetes = Paquete.objects.all().order_by('cantidad_clases')
     turnos = Turno.objects.all().order_by('dia', 'horario')
     
-    dias_orden = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes", "SÃ¡bado", "Domingo"]
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     turnos_por_dia = {dia: [] for dia in dias_orden}
     for t in turnos:
         if t.dia in turnos_por_dia:
@@ -353,7 +353,7 @@ def panel_alumno_crear(request):
                 return redirect("panel_alumno_detalle", id_alumno=alumno_creado.id_alumno)
                 
         except Exception as e:
-            messages.error(request, f"OcurriÃ³ un error al crear la alumna: {str(e)}")
+            messages.error(request, f"Ocurrió un error al crear la alumna: {str(e)}")
             
     return render(request, "admin_panel/alumnos/crear.html", {
         "paquetes": paquetes,
@@ -393,7 +393,7 @@ def panel_alumno_editar(request, id_alumno):
                 messages.success(request, f"Datos de {nombre} {apellido} actualizados correctamente.")
                 return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
             except Exception as e:
-                messages.error(request, f"OcurriÃ³ un error al actualizar: {str(e)}")
+                messages.error(request, f"Ocurrió un error al actualizar: {str(e)}")
                 
     context = {
         'alumno': alumno,
@@ -410,7 +410,7 @@ def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
         nuevo_estado_pago = request.POST.get("estado_pago")
         nuevo_id_paquete = request.POST.get("id_paquete")
         
-        # Actualizar tipo de paquete si se enviÃ³
+        # Actualizar tipo de paquete si se envió
         if nuevo_id_paquete and str(nuevo_id_paquete).isdigit():
             try:
                 paquete_obj = Paquete.objects.get(id_paquete=nuevo_id_paquete)
@@ -449,7 +449,7 @@ def panel_alumno_paquete_renovar(request, id_alumno):
             "id_alumno": id_alumno,
             "tipo_paquete": tipo_paquete,
             "fecha_inicio": fecha_inicio_str,
-            "turnos_nuevos": [] # No se agregan turnos nuevos desde acÃ¡, solo se mantienen los que tiene
+            "turnos_nuevos": [] # No se agregan turnos nuevos desde acá, solo se mantienen los que tiene
         }
         
         resultado = renovar_paquete_datos(data)
@@ -479,7 +479,7 @@ def panel_alumno_pago_editar(request, id_alumno, id_pago):
             except Exception as e:
                 messages.error(request, f"Error al actualizar la fecha del pago: {str(e)}")
         else:
-            messages.error(request, "La fecha no puede estar vacÃ­a.")
+            messages.error(request, "La fecha no puede estar vacía.")
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
@@ -488,7 +488,7 @@ def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
     from .models import AlumnoClase, AlumnoClaseOcasional
     if request.method == "POST":
         nuevo_estado = request.POST.get("estado")
-        estados_permitidos = ["asistiÃ³", "faltÃ³", "cancelÃ³", "recuperÃ³", "reprogramÃ³", "pendiente", "reservado"]
+        estados_permitidos = ["asistió", "faltó", "canceló", "recuperó", "reprogramó", "pendiente", "reservado"]
         
         if nuevo_estado in estados_permitidos:
             if tipo == "regular":
@@ -502,7 +502,7 @@ def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
                 
             messages.success(request, "Estado de la clase actualizado.")
         else:
-            messages.error(request, "Estado no vÃ¡lido.")
+            messages.error(request, "Estado no válido.")
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
@@ -523,8 +523,8 @@ def panel_alumno_clase_crear(request, id_alumno):
             
         try:
             fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-            # Mapear dÃ­a de la semana (0=Lunes, 6=Domingo)
-            dias = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes", "SÃ¡bado", "Domingo"]
+            # Mapear día de la semana (0=Lunes, 6=Domingo)
+            dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
             nombre_dia = dias[fecha_obj.weekday()]
             
             # Buscar el turno correspondiente
@@ -549,13 +549,13 @@ def panel_alumno_clase_crear(request, id_alumno):
                     messages.error(request, f"No hay cupo disponible para el {fecha_str} a las {horario}.")
                     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
                     
-                # Buscar el paquete activo mÃ¡s reciente para asociarlo (o crearlo como ocasional si no hay)
+                # Buscar el paquete activo más reciente para asociarlo (o crearlo como ocasional si no hay)
                 paquete_activo = AlumnoPaquete.objects.filter(id_alumno_id=id_alumno, estado='activo').order_by('-id_alumno_paquete').first()
                 
                 if paquete_activo:
                     # Verificar duplicado
                     if AlumnoClase.objects.filter(id_alumno_paquete=paquete_activo, id_clase=clase_destino).exists():
-                        messages.error(request, "El alumno ya estÃ¡ inscripto en esta clase.")
+                        messages.error(request, "El alumno ya está inscripto en esta clase.")
                         return redirect("panel_alumno_detalle", id_alumno=id_alumno)
                         
                     AlumnoClase.objects.create(
@@ -565,7 +565,7 @@ def panel_alumno_clase_crear(request, id_alumno):
                     )
                 else:
                     if AlumnoClaseOcasional.objects.filter(id_alumno_id=id_alumno, id_clase=clase_destino).exists():
-                        messages.error(request, "El alumno ya estÃ¡ inscripto ocasionalmente en esta clase.")
+                        messages.error(request, "El alumno ya está inscripto ocasionalmente en esta clase.")
                         return redirect("panel_alumno_detalle", id_alumno=id_alumno)
                         
                     AlumnoClaseOcasional.objects.create(
@@ -597,10 +597,10 @@ def panel_alumno_clase_reprogramar(request, id_alumno, id_clase_origen):
             
         try:
             fecha_dt = datetime.strptime(fecha_destino_str, "%Y-%m-%d")
-            # Determinar el dÃ­a de la semana (0=Lunes, ..., 6=Domingo)
+            # Determinar el día de la semana (0=Lunes, ..., 6=Domingo)
             dias_map = {
-                0: "Lunes", 1: "Martes", 2: "MiÃ©rcoles",
-                3: "Jueves", 4: "Viernes", 5: "SÃ¡bado", 6: "Domingo"
+                0: "Lunes", 1: "Martes", 2: "Miércoles",
+                3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"
             }
             dia_destino = dias_map[fecha_dt.weekday()]
             
@@ -621,7 +621,7 @@ def panel_alumno_clase_reprogramar(request, id_alumno, id_clase_origen):
                 messages.success(request, resultado.get("message", "Clase reprogramada."))
                 
         except ValueError:
-            messages.error(request, "Formato de fecha invÃ¡lido.")
+            messages.error(request, "Formato de fecha inválido.")
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
@@ -642,7 +642,7 @@ def panel_alumno_clase_eliminar(request, id_alumno, tipo, id_relacion):
                     id_clase = clase_rel.id_clase_id
                     clase_rel.delete()
                 else:
-                    messages.error(request, "Tipo de clase no vÃ¡lido.")
+                    messages.error(request, "Tipo de clase no válido.")
                     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
                 # Descontar el cupo si corresponde
@@ -667,7 +667,7 @@ def panel_alumno_editar_turnos(request, id_alumno):
         return redirect("panel_alumno_detalle", id_alumno=id_alumno)
         
     turnos = Turno.objects.all().order_by('dia', 'horario')
-    dias_orden = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes", "SÃ¡bado", "Domingo"]
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     turnos_por_dia = {dia: [] for dia in dias_orden}
     for t in turnos:
         if t.dia in turnos_por_dia:
@@ -705,7 +705,7 @@ def panel_alumno_editar_turnos(request, id_alumno):
     return render(request, "admin_panel/alumnos/editar_turnos.html", context)
 
 def panel_alumno_detalle(request, id_alumno):
-    """Detalle de un alumno especÃ­fico."""
+    """Detalle de un alumno específico."""
     from .models import AlumnoPaqueteTurno
 
     alumno = get_object_or_404(
@@ -713,7 +713,7 @@ def panel_alumno_detalle(request, id_alumno):
         id_alumno=id_alumno
     )
 
-    # Paquetes del alumno (ordenados por "mÃ¡s reciente" usando el PK)
+    # Paquetes del alumno (ordenados por "más reciente" usando el PK)
     paquetes = (
         AlumnoPaquete.objects
         .filter(id_alumno=alumno)
@@ -721,11 +721,11 @@ def panel_alumno_detalle(request, id_alumno):
         .order_by('-id_alumno_paquete')
     )
 
-    # Definir Ãºltimo paquete (si existe)
+    # Definir último paquete (si existe)
     ultimo_paquete = paquetes.first()
     ultimo_paquete_id = ultimo_paquete.id_alumno_paquete if ultimo_paquete else None
 
-    # Calcular pagado/restante solo para el Ãºltimo paquete
+    # Calcular pagado/restante solo para el último paquete
     total_pagado_ultimo = None
     restante_ultimo = None
     if ultimo_paquete:
@@ -742,7 +742,7 @@ def panel_alumno_detalle(request, id_alumno):
     for paquete in paquetes:
         paquete.clases_usadas = AlumnoClase.objects.filter(
             id_alumno_paquete=paquete,
-            estado__in=['asistiÃ³', 'faltÃ³', 'recuperÃ³']
+            estado__in=['asistió', 'faltó', 'recuperó']
         ).count()
         total = paquete.id_paquete.cantidad_clases
         paquete.porcentaje_uso = (paquete.clases_usadas / total * 100) if total > 0 else 0
@@ -786,12 +786,12 @@ def panel_alumno_detalle(request, id_alumno):
 
     historial_clases.sort(key=lambda x: x['fecha'], reverse=True)
 
-    # Pagos (ya lo tenÃ­as bien)
+    # Pagos (ya lo tenías bien)
     pagos = PagoAlumno.objects.filter(
         id_alumno_paquete__id_alumno=alumno
     ).select_related('id_pago', 'id_alumno_paquete__id_paquete').order_by('-id_pago__fecha')
 
-    # Horarios Ãºnicos disponibles para el dropdown de reprogramar
+    # Horarios únicos disponibles para el dropdown de reprogramar
     from .models import Turno, Paquete
     horarios_disponibles = sorted(list(set(t.horario.strftime('%H:%M') for t in Turno.objects.all())))
     
@@ -821,12 +821,12 @@ def panel_clases(request):
     hoy = timezone.localdate()
     
     if not fecha_desde:
-        fecha_desde = hoy  # â† Cambiar a HOY
+        fecha_desde = hoy  # ← Cambiar a HOY
     else:
         fecha_desde = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
     
     if not fecha_hasta:
-        fecha_hasta = hoy + timedelta(days=14)  # â† Mostrar 2 semanas futuras
+        fecha_hasta = hoy + timedelta(days=14)  # ← Mostrar 2 semanas futuras
     else:
         fecha_hasta = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
 
@@ -850,7 +850,7 @@ def panel_clases(request):
 
 
 def panel_clase_detalle(request, id_clase):
-    """Detalle de una clase especÃ­fica con conteo forzado de inscriptos."""
+    """Detalle de una clase específica con conteo forzado de inscriptos."""
     from django.db.models import Q, Count
 
     # 1. Obtenemos la clase pero anotamos los totales filtrando por los estados que "suman"
@@ -861,11 +861,11 @@ def panel_clase_detalle(request, id_clase):
         ).annotate(
             total_reg = Count(
                 'alumnoclase', 
-                filter=Q(alumnoclase__estado__in=['Reservado', 'confirmado', 'asistiÃ³'])
+                filter=Q(alumnoclase__estado__in=['Reservado', 'confirmado', 'asistió'])
             ),
             total_ocas = Count(
                 'alumnoclaseocasional', 
-                filter=Q(alumnoclaseocasional__estado__in=['Reservado', 'confirmado', 'asistiÃ³'])
+                filter=Q(alumnoclaseocasional__estado__in=['Reservado', 'confirmado', 'asistió'])
             )
         )
     )
@@ -917,9 +917,9 @@ def panel_turnos(request):
         else:
             turno.estado_color = 'warning'  # amarillo
     
-    # Agrupar por dÃ­a
+    # Agrupar por día
     turnos_por_dia = {}
-    orden_dias = ['Lunes', 'Martes', 'MiÃ©rcoles', 'Jueves', 'Viernes', 'SÃ¡bado']
+    orden_dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
     
     for turno in turnos:
         turnos_por_dia.setdefault(turno.dia, []).append(turno)
@@ -1000,7 +1000,7 @@ def api_clase_alumnos(request, id_clase):
         persona = alumno.id_persona
 
         alumnos.append({
-            'id_alumno': alumno.id_alumno,   # ðŸ‘ˆ CLAVE
+            'id_alumno': alumno.id_alumno,   # 👈 CLAVE
             'nombre': persona.nombre,
             'apellido': persona.apellido,
             'tipo': 'regular',
@@ -1017,7 +1017,7 @@ def api_clase_alumnos(request, id_clase):
         persona = alumno.id_persona
 
         alumnos.append({
-            'id_alumno': alumno.id_alumno,   # ðŸ‘ˆ CLAVE
+            'id_alumno': alumno.id_alumno,   # 👈 CLAVE
             'nombre': persona.nombre,
             'apellido': persona.apellido,
             'tipo': 'ocasional',
@@ -1063,11 +1063,11 @@ def api_turno_alumnos(request, id_turno):
 @require_POST
 def panel_alumno_eliminar(request, id_alumno):
     """
-    Elimina un alumno y todos sus vÃ­nculos operativos:
+    Elimina un alumno y todos sus vínculos operativos:
     - AlumnoPaquete, AlumnoPaqueteTurno, AlumnoClase, AlumnoClaseOcasional, PagoAlumno.
-    AdemÃ¡s, elimina los Pagos (Pago) asociados si no estÃ¡n vinculados a otros objetos.
-    TambiÃ©n elimina Persona si ya no estÃ¡ usada por Alumno/Instructor.
-    Opcional: elimina ClienteProspecto por telÃ©fono (aquÃ­ lo hago).
+    Además, elimina los Pagos (Pago) asociados si no están vinculados a otros objetos.
+    También elimina Persona si ya no está usada por Alumno/Instructor.
+    Opcional: elimina ClienteProspecto por teléfono (aquí lo hago).
     """
     alumno = get_object_or_404(Alumno.objects.select_related("id_persona"), id_alumno=id_alumno)
     persona = alumno.id_persona
@@ -1088,8 +1088,8 @@ def panel_alumno_eliminar(request, id_alumno):
         # 1) Borrado principal (cascade elimina: AlumnoPaquete*, AlumnoClase*, AlumnoClaseOcasional, PagoAlumno, etc.)
         alumno.delete()
 
-        # 2) Borrar pagos (Pago) si ya no estÃ¡n usados por otros vÃ­nculos
-        #    (Evita borrar pagos que por algÃºn motivo estÃ©n compartidos con otra entidad)
+        # 2) Borrar pagos (Pago) si ya no están usados por otros vínculos
+        #    (Evita borrar pagos que por algún motivo estén compartidos con otra entidad)
         for pid in pago_ids:
             existe_otro_pago_alumno = PagoAlumno.objects.filter(id_pago_id=pid).exists()
             existe_pago_instructor = PagoInstructor.objects.filter(id_pago_id=pid).exists()
@@ -1097,27 +1097,27 @@ def panel_alumno_eliminar(request, id_alumno):
             if (not existe_otro_pago_alumno) and (not existe_pago_instructor):
                 Pago.objects.filter(id_pago=pid).delete()
 
-        # 3) Borrar persona si no quedÃ³ referenciada por nadie
-        #    (Protege el caso raro de que Persona sea tambiÃ©n Instructor)
+        # 3) Borrar persona si no quedó referenciada por nadie
+        #    (Protege el caso raro de que Persona sea también Instructor)
         if persona:
             persona_sigue_en_alumno = Alumno.objects.filter(id_persona=persona).exists()
             persona_sigue_en_instructor = Instructor.objects.filter(id_persona=persona).exists()
             if (not persona_sigue_en_alumno) and (not persona_sigue_en_instructor):
                 persona.delete()
 
-        # 4) (Opcional) Borrar prospecto por telÃ©fono para evitar residuos de registros errÃ³neos
-        #    Si preferÃ­s conservar prospectos histÃ³ricos, se puede quitar esto.
+        # 4) (Opcional) Borrar prospecto por teléfono para evitar residuos de registros erróneos
+        #    Si preferís conservar prospectos históricos, se puede quitar esto.
         if telefono:
             ClienteProspecto.objects.filter(telefono=telefono).delete()
 
-    # Volver a la lista (si querÃ©s volver al referer, tambiÃ©n se puede)
+    # Volver a la lista (si querés volver al referer, también se puede)
     return redirect("panel_alumnos")
 
 ##registrar pago de paquete para alumno desde su detalle
 
 
 def _generar_nro_pago(alumno_paquete: AlumnoPaquete) -> str:
-    # Obligatorio en tu modelo. Lo hacemos Ãºnico y trazable.
+    # Obligatorio en tu modelo. Lo hacemos único y trazable.
     ts = timezone.now().strftime("%Y%m%d-%H%M%S")
   # ej: APQ-123-20260111-193010
     return f"APQ-{alumno_paquete.id_alumno_paquete}-{ts}"
@@ -1125,7 +1125,7 @@ def _generar_nro_pago(alumno_paquete: AlumnoPaquete) -> str:
 
 def _total_pagado_paquete(alumno_paquete: AlumnoPaquete) -> Decimal:
     # Suma de pagos asociados al paquete.
-    # Tomamos pagos 'pagado' y 'parcial'. Si tuvieras 'pendiente' en pagos reales, podrÃ­as excluirlo.
+    # Tomamos pagos 'pagado' y 'parcial'. Si tuvieras 'pendiente' en pagos reales, podrías excluirlo.
     qs = PagoAlumno.objects.filter(id_alumno_paquete=alumno_paquete).select_related("id_pago")
     total = Decimal("0")
     for pa in qs:
@@ -1145,7 +1145,7 @@ def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
 
     try:
         # 2. Usamos el Service que ya tienes definido en models.py
-        # Le pasamos monto 0 y efectivo por defecto para la renovaciÃ³n rÃ¡pida
+        # Le pasamos monto 0 y efectivo por defecto para la renovación rápida
         service = RenovadorPaqueteService(
             alumno_obj=alumno,
             paquete_base_obj=paquete_base,
@@ -1153,7 +1153,7 @@ def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
             metodo_pago="efectivo"
         )
         
-        # 3. Ejecutamos la lÃ³gica (esto crearÃ¡ el paquete, los turnos y el pago)
+        # 3. Ejecutamos la lógica (esto creará el paquete, los turnos y el pago)
         nuevo_paquete = service.ejecutar()
         
         # 4. REFUERZO: Creamos las inscripciones a clases para que aparezca el 4/4
@@ -1202,14 +1202,14 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
     if not monto_raw:
         errores.append("Debes ingresar un monto.")
     if metodo_pago not in ("efectivo", "tarjeta", "transferencia"):
-        errores.append("Debes seleccionar un mÃ©todo de pago vÃ¡lido.")
+        errores.append("Debes seleccionar un método de pago válido.")
 
     try:
         monto = Decimal(monto_raw)
         if monto <= 0:
             errores.append("El monto debe ser mayor que 0.")
     except (InvalidOperation, ValueError):
-        errores.append("El monto no tiene un formato vÃ¡lido.")
+        errores.append("El monto no tiene un formato válido.")
 
     if errores:
         # Si no usas messages, puedes devolver un HttpResponse o guardar en session.
@@ -1228,7 +1228,7 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
 
     restante_antes = max(Decimal("0"), costo - total_pagado_antes)
 
-    # Estado del pago creado (segÃºn lo que faltaba en ese momento)
+    # Estado del pago creado (según lo que faltaba en ese momento)
     estado_pago_creado = "pagado" if monto >= restante_antes else "parcial"
 
     nro_pago = f"APQ-{alumno_paquete.id_alumno_paquete}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
@@ -1249,7 +1249,7 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
         observaciones=observaciones or None
     )
 
-    # Actualizar estado_pago del paquete segÃºn acumulado total
+    # Actualizar estado_pago del paquete según acumulado total
     total_pagado_despues = total_pagado_antes + monto
     if costo > 0 and total_pagado_despues >= costo:
         alumno_paquete.estado_pago = "pagado"
@@ -1259,7 +1259,7 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
         alumno_paquete.estado_pago = "pendiente"
 
     alumno_paquete.save()
-    # CAMBIO AQUÃ: Usar el parÃ¡metro next
+    # CAMBIO AQUÍ: Usar el parámetro next
     next_page = request.GET.get('next', 'detalle')
     
     if next_page == 'pagos':
