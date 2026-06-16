@@ -191,7 +191,12 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-journal-check me-2"></i>Historial de Clases</span>
-                <span class="badge bg-secondary">{{ historial_clases|length }} clases</span>
+                <div>
+                    <span class="badge bg-secondary me-2">{{ historial_clases|length }} clases</span>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearClase">
+                        <i class="bi bi-plus-lg"></i> Agregar
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 {% if historial_clases %}
@@ -281,6 +286,7 @@
                                 <th>Método</th>
                                 <th>Estado</th>
                                 <th>Paquete</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -295,6 +301,13 @@
                                     </span>
                                 </td>
                                 <td>{{ pago.id_alumno_paquete.id_paquete.cantidad_clases }} clases</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary mb-1" data-bs-toggle="modal" data-bs-target="#modalEditarPago"
+                                            data-id="{{ pago.id_pago.id_pago }}"
+                                            data-fecha="{{ pago.id_pago.fecha|date:'Y-m-d' }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -596,6 +609,67 @@
   </div>
 </div>
 
+<!-- Modal Crear Clase -->
+<div class="modal fade" id="modalCrearClase" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'panel_alumno_clase_crear' alumno.id_alumno %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Agregar Clase Manualmente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Fecha de la Clase</label>
+            <input type="date" name="fecha" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Horario</label>
+            <select name="horario" class="form-select" required>
+              {% for h in horarios_disponibles %}
+              <option value="{{ h }}">{{ h }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="alert alert-info py-2 mb-0" style="font-size: 0.9rem;">
+            La clase se asociará automáticamente al paquete activo actual, o se registrará como ocasional si no hay paquetes activos.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Agendar Clase</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Pago -->
+<div class="modal fade" id="modalEditarPago" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Fecha de Pago</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Fecha de Pago</label>
+            <input type="date" name="fecha" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -687,6 +761,21 @@
       form.querySelector('[name="id_paquete"]').value = id_paquete;
       form.querySelector('[name="estado"]').value = estado;
       form.querySelector('[name="estado_pago"]').value = pago;
+    });
+  }
+
+  const modalEditarPago = document.getElementById('modalEditarPago');
+  if (modalEditarPago) {
+    modalEditarPago.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      const idPago = button.getAttribute('data-id');
+      const fecha = button.getAttribute('data-fecha');
+      
+      const form = modalEditarPago.querySelector('form');
+      let actionUrl = "{% url 'panel_alumno_pago_editar' alumno.id_alumno 999999 %}".replace('999999', idPago);
+      form.action = actionUrl;
+      
+      form.querySelector('[name="fecha"]').value = fecha;
     });
   }
 

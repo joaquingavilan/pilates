@@ -462,6 +462,27 @@ def panel_alumno_paquete_renovar(request, id_alumno):
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
+def panel_alumno_pago_editar(request, id_alumno, id_pago):
+    """Vista para editar la fecha de un pago."""
+    from .models import Pago
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        if fecha_str:
+            try:
+                pago = get_object_or_404(Pago, id_pago=id_pago)
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                pago.fecha = fecha_obj
+                pago.save()
+                messages.success(request, "Fecha de pago actualizada correctamente.")
+            except Exception as e:
+                messages.error(request, f"Error al actualizar la fecha del pago: {str(e)}")
+        else:
+            messages.error(request, "La fecha no puede estar vacía.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
     """Vista para editar el estado de asistencia de una clase."""
     from .models import AlumnoClase, AlumnoClaseOcasional
@@ -482,6 +503,84 @@ def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
             messages.success(request, "Estado de la clase actualizado.")
         else:
             messages.error(request, "Estado no válido.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_crear(request, id_alumno):
+    """Vista para crear (agendar) manualmente una clase para un alumno."""
+    from .models import Turno, Clase, AlumnoPaquete, AlumnoClase, Instructor, AlumnoClaseOcasional
+    from django.db.models import F
+    from django.utils import timezone
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        horario = request.POST.get("horario")
+        
+        if not fecha_str or not horario:
+            messages.error(request, "Falta fecha u horario para crear la clase.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        try:
+            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            # Mapear día de la semana (0=Lunes, 6=Domingo)
+            dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+            nombre_dia = dias[fecha_obj.weekday()]
+            
+            # Buscar el turno correspondiente
+            try:
+                turno_obj = Turno.objects.get(dia=nombre_dia, horario=horario)
+            except Turno.DoesNotExist:
+                messages.error(request, f"No existe un turno habilitado los {nombre_dia} a las {horario}.")
+                return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                
+            with transaction.atomic():
+                # Obtener o crear la clase
+                clase_destino, _ = Clase.objects.get_or_create(
+                    id_turno=turno_obj,
+                    fecha=fecha_obj,
+                    defaults={
+                        "id_instructor": Instructor.objects.first()
+                    }
+                )
+                
+                # Validar cupo
+                if clase_destino.total_inscriptos >= 4:
+                    messages.error(request, f"No hay cupo disponible para el {fecha_str} a las {horario}.")
+                    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                    
+                # Buscar el paquete activo más reciente para asociarlo (o crearlo como ocasional si no hay)
+                paquete_activo = AlumnoPaquete.objects.filter(id_alumno_id=id_alumno, estado='activo').order_by('-id_alumno_paquete').first()
+                
+                if paquete_activo:
+                    # Verificar duplicado
+                    if AlumnoClase.objects.filter(id_alumno_paquete=paquete_activo, id_clase=clase_destino).exists():
+                        messages.error(request, "El alumno ya está inscripto en esta clase.")
+                        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                        
+                    AlumnoClase.objects.create(
+                        id_alumno_paquete=paquete_activo,
+                        id_clase=clase_destino,
+                        estado="reservado"
+                    )
+                else:
+                    if AlumnoClaseOcasional.objects.filter(id_alumno_id=id_alumno, id_clase=clase_destino).exists():
+                        messages.error(request, "El alumno ya está inscripto ocasionalmente en esta clase.")
+                        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                        
+                    AlumnoClaseOcasional.objects.create(
+                        id_alumno_id=id_alumno,
+                        id_clase=clase_destino,
+                        estado="reservado"
+                    )
+                
+                # Incrementar inscriptos
+                clase_destino.total_inscriptos = F('total_inscriptos') + 1
+                clase_destino.save()
+                
+                messages.success(request, f"Clase agendada exitosamente para el {fecha_str} a las {horario}.")
+        except Exception as e:
+            messages.error(request, f"Error al agendar la clase: {str(e)}")
             
     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
