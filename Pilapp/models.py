@@ -131,7 +131,7 @@ class RelacionAlumno(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=~models.Q(id_alumno_1=models.F('id_alumno_2')),
+                check=~models.Q(id_alumno_1=models.F('id_alumno_2')),
                 name='evitar_autorelacion_alumno'
             ),
             models.UniqueConstraint(

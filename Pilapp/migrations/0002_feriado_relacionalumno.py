@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ('id_alumno_2', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='relaciones_como_alumno_2', to='Pilapp.alumno')),
             ],
             options={
-                'constraints': [models.CheckConstraint(condition=models.Q(('id_alumno_1', models.F('id_alumno_2')), _negated=True), name='evitar_autorelacion_alumno'), models.UniqueConstraint(fields=('id_alumno_1', 'id_alumno_2'), name='unique_par_alumnos')],
+                'constraints': [models.CheckConstraint(check=models.Q(('id_alumno_1', models.F('id_alumno_2')), _negated=True), name='evitar_autorelacion_alumno'), models.UniqueConstraint(fields=('id_alumno_1', 'id_alumno_2'), name='unique_par_alumnos')],
             },
         ),
     ]
