@@ -1267,3 +1267,37 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
     else:
         return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
          
+
+def panel_feriados(request):
+    from .models import Feriado
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        descripcion = request.POST.get("descripcion", "")
+        if fecha_str:
+            try:
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                Feriado.objects.get_or_create(fecha=fecha_obj, defaults={"descripcion": descripcion})
+                messages.success(request, "Feriado agregado correctamente.")
+            except Exception as e:
+                messages.error(request, f"Error al agregar feriado: {e}")
+        return redirect("panel_feriados")
+        
+    feriados = Feriado.objects.all().order_by("-fecha")
+    return render(request, "admin_panel/feriados/lista.html", {"feriados": feriados})
+
+def panel_feriados_eliminar(request, fecha_str):
+    from .models import Feriado
+    from datetime import datetime
+    
+    if request.method == "POST":
+        try:
+            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            feriado = get_object_or_404(Feriado, fecha=fecha_obj)
+            feriado.delete()
+            messages.success(request, "Feriado eliminado correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al eliminar feriado: {e}")
+            
+    return redirect("panel_feriados")
