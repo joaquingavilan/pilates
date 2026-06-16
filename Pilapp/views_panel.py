@@ -1301,3 +1301,87 @@ def panel_feriados_eliminar(request, fecha_str):
             messages.error(request, f"Error al eliminar feriado: {e}")
             
     return redirect("panel_feriados")
+
+# --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
+
+def profes_clases_hoy(request, token):
+    # Hardcoded token de seguridad simple
+    if token != "acceso-profes-secreto":
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    # Obtener fecha de hoy
+    from django.utils import timezone
+    hoy = timezone.now().date()
+    
+    # Buscar todas las clases de hoy ordenadas por horario del turno
+    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
+    
+    clases_data = []
+    
+    for clase in clases_hoy:
+        alumnos_lista = []
+        
+        # Alumnos regulares
+        alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase).select_related(
+            'id_alumno_paquete__id_alumno__id_persona'
+        )
+        for ac in alumnos_regulares:
+            persona = ac.id_alumno_paquete.id_alumno.id_persona
+            alumnos_lista.append({
+                'id_relacion': ac.id_alumno_clase,
+                'nombre_completo': f"{persona.nombre} {persona.apellido}",
+                'estado': ac.estado,
+                'tipo': 'regular'
+            })
+            
+        # Alumnos ocasionales
+        alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related(
+            'id_alumno__id_persona'
+        )
+        for ao in alumnos_ocasionales:
+            persona = ao.id_alumno.id_persona
+            alumnos_lista.append({
+                'id_relacion': ao.id_alumno_clase_ocasional,
+                'nombre_completo': f"{persona.nombre} {persona.apellido} (Ocasional)",
+                'estado': ao.estado,
+                'tipo': 'ocasional'
+            })
+            
+        clases_data.append({
+            'clase': clase,
+            'horario': clase.id_turno.horario.strftime('%H:%M') if clase.id_turno else 'S/H',
+            'alumnos': alumnos_lista
+        })
+        
+    context = {
+        'fecha_hoy': hoy,
+        'clases_data': clases_data,
+        'token': token
+    }
+    
+    return render(request, "admin_panel/profes/clases_hoy.html", context)
+
+def profes_marcar_asistencia(request, token):
+    if token != "acceso-profes-secreto":
+        return HttpResponse("Acceso denegado.", status=403)
+        
+    if request.method == "POST":
+        tipo = request.POST.get("tipo")
+        id_relacion = request.POST.get("id_relacion")
+        nuevo_estado = request.POST.get("estado")
+        
+        try:
+            if tipo == 'regular':
+                rel = AlumnoClase.objects.get(pk=id_relacion)
+                rel.estado = nuevo_estado
+                rel.save()
+            elif tipo == 'ocasional':
+                rel = AlumnoClaseOcasional.objects.get(pk=id_relacion)
+                rel.estado = nuevo_estado
+                rel.save()
+                
+            messages.success(request, "Asistencia actualizada.")
+        except Exception as e:
+            messages.error(request, f"Error al actualizar: {e}")
+            
+    return redirect("profes_clases_hoy", token=token)
