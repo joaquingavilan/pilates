@@ -147,7 +147,7 @@ def reprogramar_clase(request):
                 return JsonResponse({"errores": ["Clase destino no encontrada."]}, status=404)
 
             # Verificar cupos
-            if clase_destino.total_inscriptos >= 4:
+            if clase_destino.obtener_total_inscriptos >= 4:
                 return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
 
             # Verificar duplicados en destino
@@ -1549,7 +1549,7 @@ def registrar_alumno_ocasional_datos(data):
         # 📌 Validar clase específica en esa fecha
         try:
             clase = Clase.objects.get(id_turno=turno, fecha=fecha_clase)
-            if clase.total_inscriptos >= 4:
+            if clase.obtener_total_inscriptos >= 4:
                 errores.append(f"La clase del {fecha_clase} a las {data['hora_turno']} ya está llena.")
         except Clase.DoesNotExist:
             errores.append(f"No existe clase programada para {fecha_clase} en el turno {dia_turno} {data['hora_turno']}.")
@@ -1723,7 +1723,7 @@ def registrar_alumno_datos(data):
                         fecha=fecha_clase
                     )
                     logging.debug(f"[registrar_alumno_datos] Clase encontrada: id={clase.id_clase}, inscriptos={clase.total_inscriptos}")
-                    if clase.total_inscriptos >= 4:
+                    if clase.obtener_total_inscriptos >= 4:
                         logging.warning(f"[registrar_alumno_datos] Clase llena: {fecha_clase} {turno.horario}")
                         errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya está llena.")
                     else:

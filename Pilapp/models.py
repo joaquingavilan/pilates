@@ -249,12 +249,15 @@ class Clase(models.Model):
         return f"Clase {self.id_clase} - {self.fecha}"
 
     # Renombramos la propiedad para evitar el conflicto
-
     @property
     def obtener_total_inscriptos(self):
         from .models import AlumnoClase, AlumnoClaseOcasional
-        cantidad_regulares = AlumnoClase.objects.filter(id_clase_id=self.id_clase).count()
-        cantidad_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase_id=self.id_clase).count()
+        cantidad_regulares = AlumnoClase.objects.filter(
+            id_clase_id=self.id_clase
+        ).exclude(estado__in={"canceló", "reprogramó"}).count()
+        cantidad_ocasionales = AlumnoClaseOcasional.objects.filter(
+            id_clase_id=self.id_clase
+        ).exclude(estado="canceló").count()
         return cantidad_regulares + cantidad_ocasionales
 
 
