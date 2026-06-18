@@ -1,0 +1,84 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Gestión de Feriados{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-calendar-x me-2"></i>Días Feriados</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAgregarFeriado">
+        <i class="bi bi-plus-lg me-1"></i> Agregar Feriado
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="alert alert-info py-2 mb-4" style="font-size: 0.95rem;">
+            <i class="bi bi-info-circle me-2"></i>Los días registrados aquí serán saltados automáticamente al agendar clases nuevas o renovar paquetes.
+        </div>
+        
+        {% if feriados %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in feriados %}
+                    <tr>
+                        <td><strong>{{ f.fecha|date:"d M, Y" }}</strong></td>
+                        <td>{{ f.descripcion|default:"<em class='text-muted'>Sin descripción</em>" }}</td>
+                        <td class="text-end">
+                            <form method="post" action="{% url 'panel_feriados_eliminar' f.fecha|date:'Y-m-d' %}" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este feriado?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted my-5">
+            <i class="bi bi-calendar-check fs-1"></i>
+            <p class="mt-2">No hay ningún feriado registrado.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Agregar Feriado -->
+<div class="modal fade" id="modalAgregarFeriado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'panel_feriados' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Agregar Nuevo Feriado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Fecha del Feriado</label>
+                        <input type="date" name="fecha" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción (Opcional)</label>
+                        <input type="text" name="descripcion" class="form-control" placeholder="Ej: Navidad, Año Nuevo...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -359,7 +359,7 @@ class AlumnoClase(models.Model):
     id_alumno_clase = models.AutoField(primary_key=True)
     id_alumno_paquete = models.ForeignKey(AlumnoPaquete, on_delete=models.CASCADE)
     id_clase = models.ForeignKey(Clase, on_delete=models.CASCADE)
-    estado = models.CharField(max_length=50, choices=[("asistió", "Asistió"), ("faltó", "Faltó"), ("canceló", "Canceló"), ("recuperó", "Recuperó"), ("reprogramó","Reprogramó"), ("pendiente", "Pendiente")])
+    estado = models.CharField(max_length=50, choices=[("asistió", "Asistió"), ("faltó", "Faltó"), ("canceló", "Canceló"), ("recuperó", "Recuperó"), ("reprogramó","Reprogramó"), ("pendiente", "Pendiente"), ("feriado", "Feriado")])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -626,3 +626,10 @@ class RenovadorPaqueteService:
                 clase.save() 
 
             return nuevo_paquete
+
+class Feriado(models.Model):
+    fecha = models.DateField(primary_key=True)
+    descripcion = models.CharField(max_length=200, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.fecha} - {self.descripcion}"

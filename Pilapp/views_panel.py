@@ -287,38 +287,422 @@ def panel_alumnos(request):
 
 def panel_alumno_crear(request):
     """Vista para crear manualmente un alumno nuevo (y su persona asociada)."""
+    from .models import Paquete, Turno, Persona, Alumno
+    from .views import registrar_alumno_datos
+    from django.db import transaction
+    
+    paquetes = Paquete.objects.all().order_by('cantidad_clases')
+    turnos = Turno.objects.all().order_by('dia', 'horario')
+    
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    turnos_por_dia = {dia: [] for dia in dias_orden}
+    for t in turnos:
+        if t.dia in turnos_por_dia:
+            turnos_por_dia[t.dia].append(t)
+    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+
     if request.method == "POST":
         nombre = request.POST.get("nombre", "").strip()
         apellido = request.POST.get("apellido", "").strip()
         telefono = request.POST.get("telefono", "").strip()
-        estado = request.POST.get("estado", "ocasional")
         canal = request.POST.get("canal_captacion", "").strip()
+        
+        paquete_val = request.POST.get("paquete")
+        turnos_seleccionados = request.POST.getlist("turnos")
+        fecha_inicio = request.POST.get("fecha_inicio", "").strip()
         
         if not nombre or not apellido:
             messages.error(request, "Nombre y apellido son obligatorios.")
-            return render(request, "admin_panel/alumnos/crear.html")
+            return render(request, "admin_panel/alumnos/crear.html", {"paquetes": paquetes, "turnos_por_dia": turnos_por_dia})
             
         try:
-            with transaction.atomic():
-                persona = Persona.objects.create(
-                    nombre=nombre,
-                    apellido=apellido,
-                    telefono=telefono
-                )
+            if paquete_val == "ocasional" or not paquete_val:
+                with transaction.atomic():
+                    persona = Persona.objects.create(
+                        nombre=nombre,
+                        apellido=apellido,
+                        telefono=telefono
+                    )
+                    alumno = Alumno.objects.create(
+                        id_persona=persona,
+                        estado="ocasional",
+                        canal_captacion=canal
+                    )
+                messages.success(request, f"Alumna {nombre} {apellido} registrada como ocasional (sin paquete asignado).")
+                return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+            else:
+                data = {
+                    "nombre": nombre,
+                    "apellido": apellido,
+                    "telefono": telefono,
+                    "canal_captacion": canal,
+                    "paquete": int(paquete_val),
+                    "turnos": turnos_seleccionados,
+                    "fecha_inicio": fecha_inicio
+                }
                 
-                alumno = Alumno.objects.create(
-                    id_persona=persona,
-                    estado=estado,
-                    canal_captacion=canal
-                )
+                registrar_alumno_datos(data)
                 
-            messages.success(request, f"Alumna {nombre} {apellido} registrada exitosamente. Puedes agregarle su paquete de clases aquí.")
-            return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
-            
+                persona_creada = Persona.objects.filter(nombre=nombre, apellido=apellido, telefono=telefono).order_by('-id_persona').first()
+                if not persona_creada:
+                    persona_creada = Persona.objects.filter(nombre=nombre, apellido=apellido).order_by('-id_persona').first()
+                
+                alumno_creado = Alumno.objects.filter(id_persona=persona_creada).first()
+                
+                messages.success(request, f"Alumna {nombre} {apellido} registrada exitosamente con paquete de {paquete_val} clases.")
+                return redirect("panel_alumno_detalle", id_alumno=alumno_creado.id_alumno)
+                
         except Exception as e:
             messages.error(request, f"Ocurrió un error al crear la alumna: {str(e)}")
             
-    return render(request, "admin_panel/alumnos/crear.html")
+    return render(request, "admin_panel/alumnos/crear.html", {
+        "paquetes": paquetes,
+        "turnos_por_dia": turnos_por_dia
+    })
+
+def panel_alumno_editar(request, id_alumno):
+    """Vista para editar los datos personales de un alumno."""
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    persona = alumno.id_persona
+    
+    if request.method == "POST":
+        nombre = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        telefono = request.POST.get("telefono", "").strip()
+        ruc = request.POST.get("ruc", "").strip()
+        estado = request.POST.get("estado", "ocasional")
+        canal = request.POST.get("canal_captacion", "").strip()
+        observaciones = request.POST.get("observaciones", "").strip()
+        
+        if not nombre or not apellido:
+            messages.error(request, "Nombre y apellido son obligatorios.")
+        else:
+            try:
+                with transaction.atomic():
+                    persona.nombre = nombre
+                    persona.apellido = apellido
+                    persona.telefono = telefono
+                    persona.ruc = ruc
+                    persona.observaciones = observaciones
+                    persona.save()
+                    
+                    alumno.estado = estado
+                    alumno.canal_captacion = canal
+                    alumno.save()
+                    
+                messages.success(request, f"Datos de {nombre} {apellido} actualizados correctamente.")
+                return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+            except Exception as e:
+                messages.error(request, f"Ocurrió un error al actualizar: {str(e)}")
+                
+    context = {
+        'alumno': alumno,
+        'persona': persona
+    }
+    return render(request, "admin_panel/alumnos/editar.html", context)
+
+def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
+    """Vista para editar el paquete, estado y pago."""
+    from .models import AlumnoPaquete, Paquete
+    if request.method == "POST":
+        paquete = get_object_or_404(AlumnoPaquete, id_alumno_paquete=id_alumno_paquete, id_alumno_id=id_alumno)
+        nuevo_estado = request.POST.get("estado")
+        nuevo_estado_pago = request.POST.get("estado_pago")
+        nuevo_id_paquete = request.POST.get("id_paquete")
+        
+        # Actualizar tipo de paquete si se envió
+        if nuevo_id_paquete and str(nuevo_id_paquete).isdigit():
+            try:
+                paquete_obj = Paquete.objects.get(id_paquete=nuevo_id_paquete)
+                paquete.id_paquete = paquete_obj
+            except Paquete.DoesNotExist:
+                pass
+
+        # Validar
+        if nuevo_estado in ["activo", "expirado"]:
+            # Si se marca como expirado y antes era activo
+            if nuevo_estado == "expirado" and paquete.estado == "activo":
+                paquete.expirar_y_liberar()
+            else:
+                paquete.estado = nuevo_estado
+                
+        if nuevo_estado_pago in ["pendiente", "pagado", "parcial"]:
+            paquete.estado_pago = nuevo_estado_pago
+            
+        paquete.save()
+        messages.success(request, "Paquete actualizado correctamente.")
+        
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_paquete_renovar(request, id_alumno):
+    """Vista para renovar el paquete (expirar el actual y crear uno nuevo con los mismos turnos)."""
+    from .views import renovar_paquete_datos
+    if request.method == "POST":
+        tipo_paquete = request.POST.get("tipo_paquete")
+        fecha_inicio_str = request.POST.get("fecha_inicio")
+        
+        if not tipo_paquete:
+            messages.error(request, "Debes seleccionar un tipo de paquete.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        data = {
+            "id_alumno": id_alumno,
+            "tipo_paquete": tipo_paquete,
+            "fecha_inicio": fecha_inicio_str,
+            "turnos_nuevos": [] # No se agregan turnos nuevos desde acá, solo se mantienen los que tiene
+        }
+        
+        resultado = renovar_paquete_datos(data)
+        
+        if "errores" in resultado:
+            for error in resultado["errores"]:
+                messages.error(request, error)
+        else:
+            messages.success(request, resultado.get("message", "Paquete renovado exitosamente."))
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_pago_editar(request, id_alumno, id_pago):
+    """Vista para editar la fecha de un pago."""
+    from .models import Pago
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        if fecha_str:
+            try:
+                pago = get_object_or_404(Pago, id_pago=id_pago)
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                pago.fecha = fecha_obj
+                pago.save()
+                messages.success(request, "Fecha de pago actualizada correctamente.")
+            except Exception as e:
+                messages.error(request, f"Error al actualizar la fecha del pago: {str(e)}")
+        else:
+            messages.error(request, "La fecha no puede estar vacía.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_editar(request, id_alumno, tipo, id_relacion):
+    """Vista para editar el estado de asistencia de una clase."""
+    from .models import AlumnoClase, AlumnoClaseOcasional
+    if request.method == "POST":
+        nuevo_estado = request.POST.get("estado")
+        estados_permitidos = ["asistió", "faltó", "canceló", "recuperó", "reprogramó", "pendiente", "reservado", "feriado"]
+        
+        if nuevo_estado in estados_permitidos:
+            if tipo == "regular":
+                clase_rel = get_object_or_404(AlumnoClase, id_alumno_clase=id_relacion)
+                clase_rel.estado = nuevo_estado
+                clase_rel.save()
+            elif tipo == "ocasional":
+                clase_rel = get_object_or_404(AlumnoClaseOcasional, id_alumno_clase_ocasional=id_relacion, id_alumno_id=id_alumno)
+                clase_rel.estado = nuevo_estado
+                clase_rel.save()
+                
+            messages.success(request, "Estado de la clase actualizado.")
+        else:
+            messages.error(request, "Estado no válido.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_crear(request, id_alumno):
+    """Vista para crear (agendar) manualmente una clase para un alumno."""
+    from .models import Turno, Clase, AlumnoPaquete, AlumnoClase, Instructor, AlumnoClaseOcasional
+    from django.db.models import F
+    from django.utils import timezone
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        horario = request.POST.get("horario")
+        
+        if not fecha_str or not horario:
+            messages.error(request, "Falta fecha u horario para crear la clase.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        try:
+            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            # Mapear día de la semana (0=Lunes, 6=Domingo)
+            dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+            nombre_dia = dias[fecha_obj.weekday()]
+            
+            # Buscar el turno correspondiente
+            try:
+                turno_obj = Turno.objects.get(dia=nombre_dia, horario=horario)
+            except Turno.DoesNotExist:
+                messages.error(request, f"No existe un turno habilitado los {nombre_dia} a las {horario}.")
+                return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                
+            with transaction.atomic():
+                # Obtener o crear la clase
+                clase_destino, _ = Clase.objects.get_or_create(
+                    id_turno=turno_obj,
+                    fecha=fecha_obj,
+                    defaults={
+                        "id_instructor": Instructor.objects.first()
+                    }
+                )
+                
+                # Validar cupo
+                if clase_destino.total_inscriptos >= 4:
+                    messages.error(request, f"No hay cupo disponible para el {fecha_str} a las {horario}.")
+                    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                    
+                # Buscar el paquete activo más reciente para asociarlo (o crearlo como ocasional si no hay)
+                paquete_activo = AlumnoPaquete.objects.filter(id_alumno_id=id_alumno, estado='activo').order_by('-id_alumno_paquete').first()
+                
+                if paquete_activo:
+                    # Verificar duplicado
+                    if AlumnoClase.objects.filter(id_alumno_paquete=paquete_activo, id_clase=clase_destino).exists():
+                        messages.error(request, "El alumno ya está inscripto en esta clase.")
+                        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                        
+                    AlumnoClase.objects.create(
+                        id_alumno_paquete=paquete_activo,
+                        id_clase=clase_destino,
+                        estado="reservado"
+                    )
+                else:
+                    if AlumnoClaseOcasional.objects.filter(id_alumno_id=id_alumno, id_clase=clase_destino).exists():
+                        messages.error(request, "El alumno ya está inscripto ocasionalmente en esta clase.")
+                        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+                        
+                    AlumnoClaseOcasional.objects.create(
+                        id_alumno_id=id_alumno,
+                        id_clase=clase_destino,
+                        estado="reservado"
+                    )
+                
+                # Incrementar inscriptos
+                clase_destino.total_inscriptos = F('total_inscriptos') + 1
+                clase_destino.save()
+                
+                messages.success(request, f"Clase agendada exitosamente para el {fecha_str} a las {horario}.")
+        except Exception as e:
+            messages.error(request, f"Error al agendar la clase: {str(e)}")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_reprogramar(request, id_alumno, id_clase_origen):
+    """Vista para reprogramar una clase hacia una nueva fecha y horario."""
+    from .views import reprogramar_clase_datos
+    if request.method == "POST":
+        fecha_destino_str = request.POST.get("fecha_destino")
+        hora_destino = request.POST.get("hora_destino")
+        
+        if not fecha_destino_str or not hora_destino:
+            messages.error(request, "Debes seleccionar fecha y hora de destino.")
+            return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+        try:
+            fecha_dt = datetime.strptime(fecha_destino_str, "%Y-%m-%d")
+            # Determinar el día de la semana (0=Lunes, ..., 6=Domingo)
+            dias_map = {
+                0: "Lunes", 1: "Martes", 2: "Miércoles",
+                3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"
+            }
+            dia_destino = dias_map[fecha_dt.weekday()]
+            
+            data = {
+                "id_alumno": id_alumno,
+                "id_clase_origen": id_clase_origen,
+                "dia_destino": dia_destino,
+                "hora_destino": hora_destino,
+                "fecha_destino": fecha_destino_str
+            }
+            
+            resultado = reprogramar_clase_datos(data)
+            
+            if "errores" in resultado:
+                for error in resultado["errores"]:
+                    messages.error(request, error)
+            else:
+                messages.success(request, resultado.get("message", "Clase reprogramada."))
+                
+        except ValueError:
+            messages.error(request, "Formato de fecha inválido.")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_clase_eliminar(request, id_alumno, tipo, id_relacion):
+    """Vista para eliminar permanentemente una clase de una alumna."""
+    from .models import AlumnoClase, AlumnoClaseOcasional, Clase
+    from django.db.models import F
+    
+    if request.method == "POST":
+        try:
+            with transaction.atomic():
+                if tipo == "regular":
+                    clase_rel = get_object_or_404(AlumnoClase, id_alumno_clase=id_relacion)
+                    id_clase = clase_rel.id_clase_id
+                    clase_rel.delete()
+                elif tipo == "ocasional":
+                    clase_rel = get_object_or_404(AlumnoClaseOcasional, id_alumno_clase_ocasional=id_relacion, id_alumno_id=id_alumno)
+                    id_clase = clase_rel.id_clase_id
+                    clase_rel.delete()
+                else:
+                    messages.error(request, "Tipo de clase no válido.")
+                    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+                # Descontar el cupo si corresponde
+                Clase.objects.filter(pk=id_clase, total_inscriptos__gt=0).update(total_inscriptos=F('total_inscriptos') - 1)
+                messages.success(request, "Clase eliminada correctamente.")
+                
+        except Exception as e:
+            messages.error(request, f"Error al eliminar clase: {str(e)}")
+            
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
+def panel_alumno_editar_turnos(request, id_alumno):
+    """Vista para editar los turnos de un paquete activo."""
+    from .models import Alumno, AlumnoPaquete, Turno, AlumnoPaqueteTurno
+    from .views import cambiar_turnos_paquete_datos
+    
+    alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    alumno_paquete = AlumnoPaquete.objects.filter(id_alumno=alumno, estado='activo').order_by('-id_alumno_paquete').first()
+    
+    if not alumno_paquete:
+        messages.error(request, "La alumna no tiene un paquete activo al cual editarle los turnos.")
+        return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+        
+    turnos = Turno.objects.all().order_by('dia', 'horario')
+    dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    turnos_por_dia = {dia: [] for dia in dias_orden}
+    for t in turnos:
+        if t.dia in turnos_por_dia:
+            turnos_por_dia[t.dia].append(t)
+    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+    
+    turnos_asignados_ids = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).values_list('id_turno_id', flat=True)
+    
+    if request.method == "POST":
+        turnos_seleccionados = request.POST.getlist("turnos")
+        if not turnos_seleccionados:
+            messages.error(request, "Debes seleccionar al menos un turno.")
+        else:
+            data = {
+                "id_alumno": id_alumno,
+                "id_paquete": alumno_paquete.id_paquete_id,
+                "turnos_nuevos": turnos_seleccionados
+            }
+            
+            resultado = cambiar_turnos_paquete_datos(data)
+            
+            if "errores" in resultado:
+                for error in resultado["errores"]:
+                    messages.error(request, error)
+            else:
+                messages.success(request, "Turnos actualizados correctamente.")
+                return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+            
+    context = {
+        'alumno': alumno,
+        'alumno_paquete': alumno_paquete,
+        'turnos_por_dia': turnos_por_dia,
+        'turnos_asignados_ids': list(turnos_asignados_ids)
+    }
+    return render(request, "admin_panel/alumnos/editar_turnos.html", context)
 
 def panel_alumno_detalle(request, id_alumno):
     """Detalle de un alumno específico."""
@@ -358,7 +742,7 @@ def panel_alumno_detalle(request, id_alumno):
     for paquete in paquetes:
         paquete.clases_usadas = AlumnoClase.objects.filter(
             id_alumno_paquete=paquete,
-            estado__in=['asistió', 'faltó']
+            estado__in=['asistió', 'faltó', 'recuperó']
         ).count()
         total = paquete.id_paquete.cantidad_clases
         paquete.porcentaje_uso = (paquete.clases_usadas / total * 100) if total > 0 else 0
@@ -378,6 +762,8 @@ def panel_alumno_detalle(request, id_alumno):
 
     for ac in clases_regulares:
         historial_clases.append({
+            'id_relacion': ac.id_alumno_clase,
+            'id_clase': ac.id_clase.id_clase,
             'fecha': ac.id_clase.fecha,
             'horario': ac.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'regular',
@@ -390,6 +776,8 @@ def panel_alumno_detalle(request, id_alumno):
 
     for ao in clases_ocasionales:
         historial_clases.append({
+            'id_relacion': ao.id_alumno_clase_ocasional,
+            'id_clase': ao.id_clase.id_clase,
             'fecha': ao.id_clase.fecha,
             'horario': ao.id_clase.id_turno.horario.strftime('%H:%M'),
             'tipo': 'ocasional',
@@ -403,12 +791,21 @@ def panel_alumno_detalle(request, id_alumno):
         id_alumno_paquete__id_alumno=alumno
     ).select_related('id_pago', 'id_alumno_paquete__id_paquete').order_by('-id_pago__fecha')
 
+    # Horarios únicos disponibles para el dropdown de reprogramar
+    from .models import Turno, Paquete
+    horarios_disponibles = sorted(list(set(t.horario.strftime('%H:%M') for t in Turno.objects.all())))
+    
+    # Todos los paquetes disponibles para actualizar
+    lista_paquetes = Paquete.objects.all().order_by('cantidad_clases')
+
     return render(request, 'admin_panel/alumnos/detalle.html', {
         'alumno': alumno,
         'paquetes': paquetes,
         'turnos': turnos,
         'historial_clases': historial_clases,
         'pagos': pagos,
+        'horarios_disponibles': horarios_disponibles,
+        'lista_paquetes': lista_paquetes,
 
         # NUEVO
         'ultimo_paquete_id': ultimo_paquete_id,
@@ -870,3 +1267,134 @@ def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
     else:
         return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
          
+
+def panel_feriados(request):
+    from .models import Feriado
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        descripcion = request.POST.get("descripcion", "")
+        if fecha_str:
+            try:
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                Feriado.objects.get_or_create(fecha=fecha_obj, defaults={"descripcion": descripcion})
+                messages.success(request, "Feriado agregado correctamente.")
+            except Exception as e:
+                messages.error(request, f"Error al agregar feriado: {e}")
+        return redirect("panel_feriados")
+        
+    feriados = Feriado.objects.all().order_by("-fecha")
+    return render(request, "admin_panel/feriados/lista.html", {"feriados": feriados})
+
+def panel_feriados_eliminar(request, fecha_str):
+    from .models import Feriado
+    from datetime import datetime
+    
+    if request.method == "POST":
+        try:
+            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            feriado = get_object_or_404(Feriado, fecha=fecha_obj)
+            feriado.delete()
+            messages.success(request, "Feriado eliminado correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al eliminar feriado: {e}")
+            
+    return redirect("panel_feriados")
+
+# --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
+
+def profes_clases_hoy(request, token):
+    # Hardcoded token de seguridad simple
+    if token != "acceso-profes":
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    # Obtener fecha
+    from django.utils import timezone
+    from datetime import datetime
+    
+    fecha_str = request.GET.get("fecha")
+    if fecha_str:
+        try:
+            hoy = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            hoy = timezone.now().date()
+    else:
+        hoy = timezone.now().date()
+    
+    # Buscar todas las clases de hoy ordenadas por horario del turno
+    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
+    
+    clases_data = []
+    
+    for clase in clases_hoy:
+        alumnos_lista = []
+        
+        # Alumnos regulares
+        alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase).select_related(
+            'id_alumno_paquete__id_alumno__id_persona'
+        )
+        for ac in alumnos_regulares:
+            persona = ac.id_alumno_paquete.id_alumno.id_persona
+            alumnos_lista.append({
+                'id_relacion': ac.id_alumno_clase,
+                'nombre_completo': f"{persona.nombre} {persona.apellido}",
+                'estado': ac.estado,
+                'tipo': 'regular'
+            })
+            
+        # Alumnos ocasionales
+        alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related(
+            'id_alumno__id_persona'
+        )
+        for ao in alumnos_ocasionales:
+            persona = ao.id_alumno.id_persona
+            alumnos_lista.append({
+                'id_relacion': ao.id_alumno_clase_ocasional,
+                'nombre_completo': f"{persona.nombre} {persona.apellido} (Ocasional)",
+                'estado': ao.estado,
+                'tipo': 'ocasional'
+            })
+            
+        clases_data.append({
+            'clase': clase,
+            'horario': clase.id_turno.horario.strftime('%H:%M') if clase.id_turno else 'S/H',
+            'alumnos': alumnos_lista
+        })
+        
+    context = {
+        'fecha_hoy': hoy,
+        'clases_data': clases_data,
+        'token': token
+    }
+    
+    return render(request, "admin_panel/profes/clases_hoy.html", context)
+
+def profes_marcar_asistencia(request, token):
+    if token != "acceso-profes":
+        return HttpResponse("Acceso denegado.", status=403)
+        
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha", "")
+        tipo = request.POST.get("tipo")
+        id_relacion = request.POST.get("id_relacion")
+        nuevo_estado = request.POST.get("estado")
+        
+        try:
+            if tipo == 'regular':
+                rel = AlumnoClase.objects.get(pk=id_relacion)
+                rel.estado = nuevo_estado
+                rel.save()
+            elif tipo == 'ocasional':
+                rel = AlumnoClaseOcasional.objects.get(pk=id_relacion)
+                rel.estado = nuevo_estado
+                rel.save()
+                
+            messages.success(request, "Asistencia actualizada.")
+        except Exception as e:
+            messages.error(request, f"Error al actualizar: {e}")
+            
+    url = redirect("profes_clases_hoy", token=token)
+    if fecha_str:
+        url['Location'] += f"?fecha={fecha_str}"
+    return url
