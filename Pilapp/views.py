@@ -217,41 +217,41 @@ def cambiar_turnos_paquete_datos(data):
     turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
     turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
 
-        if es_reprogramacion:
-            # Validar fecha destino
-            try:
-                fecha_destino = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
-                turno_destino = Turno.objects.get(dia=dia_destino, horario=hora_destino)
-                clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_destino)
-            except (ValueError, TypeError):
-                return JsonResponse({"errores": ["Formato de fecha inválido (YYYY-MM-DD)."]}, status=400)
-            except (Turno.DoesNotExist, Clase.DoesNotExist):
-                return JsonResponse({"errores": ["Clase destino no encontrada."]}, status=404)
+    if es_reprogramacion:
+        # Validar fecha destino
+        try:
+            fecha_destino = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
+            turno_destino = Turno.objects.get(dia=dia_destino, horario=hora_destino)
+            clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_destino)
+        except (ValueError, TypeError):
+            return JsonResponse({"errores": ["Formato de fecha inválido (YYYY-MM-DD)."]}, status=400)
+        except (Turno.DoesNotExist, Clase.DoesNotExist):
+            return JsonResponse({"errores": ["Clase destino no encontrada."]}, status=404)
 
-            # Verificar cupos
-            if clase_destino.obtener_total_inscriptos >= 4:
-                return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
+        # Verificar cupos
+        if clase_destino.obtener_total_inscriptos >= 4:
+            return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
 
-            # Verificar duplicados en destino
-            ya_en_clase = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists() if tipo_alumno == "regular" else \
-                          AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
-            
-            if ya_en_clase:
-                return JsonResponse({"errores": ["El alumno ya está registrado en la clase destino."]}, status=400)
+        # Verificar duplicados en destino
+        ya_en_clase = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists() if tipo_alumno == "regular" else \
+                      AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
+        
+        if ya_en_clase:
+            return JsonResponse({"errores": ["El alumno ya está registrado en la clase destino."]}, status=400)
 
-            # Ejecutar Reprogramación
-            if tipo_alumno == "regular":
-                alumno_clase.estado = "reprogramó"
-                alumno_clase.save()
-                AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperó")
-            else:
-                alumno_clase_ocasional.estado = "canceló"
-                alumno_clase_ocasional.save()
-                AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
-            
-            # Incrementar cupo destino
-            Clase.objects.filter(pk=clase_destino.pk).update(total_inscriptos=F('total_inscriptos') + 1)
-            msg = "Clase reprogramada correctamente."
+        # Ejecutar Reprogramación
+        if tipo_alumno == "regular":
+            alumno_clase.estado = "reprogramó"
+            alumno_clase.save()
+            AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperó")
+        else:
+            alumno_clase_ocasional.estado = "canceló"
+            alumno_clase_ocasional.save()
+            AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
+        
+        # Incrementar cupo destino
+        Clase.objects.filter(pk=clase_destino.pk).update(total_inscriptos=F('total_inscriptos') + 1)
+        msg = "Clase reprogramada correctamente."
 
     if errores:
         return {"errores": errores}
