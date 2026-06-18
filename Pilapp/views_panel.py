@@ -178,8 +178,8 @@ def api_calendario(request):
 
     reg = (
         AlumnoClase.objects
-        .filter(id_clase__fecha__gte=inicio_semana,
-                id_clase__fecha__lte=fin_semana)
+        .filter(id_clase__fecha__gte=inicio_semana, id_clase__fecha__lte=fin_semana)
+        .exclude(estado__in={"canceló", "reprogramó"})
         .values("id_clase")
         .annotate(c=Count("id_clase"))
     )
@@ -188,8 +188,8 @@ def api_calendario(request):
 
     ocas = (
         AlumnoClaseOcasional.objects
-        .filter(id_clase__fecha__gte=inicio_semana,
-                id_clase__fecha__lte=fin_semana)
+        .filter(id_clase__fecha__gte=inicio_semana, id_clase__fecha__lte=fin_semana)
+        .exclude(estado="canceló")
         .values("id_clase")
         .annotate(c=Count("id_clase"))
     )
@@ -834,8 +834,8 @@ def panel_clases(request):
         fecha__gte=fecha_desde,
         fecha__lte=fecha_hasta
     ).select_related('id_turno').annotate(
-        total_regulares=Count('alumnoclase'),
-        total_ocasionales=Count('alumnoclaseocasional')
+        total_regulares=Count('alumnoclase', filter=Q(alumnoclase__estado__in=['reservado', 'pendiente', 'recuperó', 'asistió', 'faltó'])),
+        total_ocasionales=Count('alumnoclaseocasional', filter=Q(alumnoclaseocasional__estado__in=['reservado', 'asistió', 'faltó']))
     ).order_by('fecha', 'id_turno__horario')
 
     # Agregar atributo sin pelear con Django
@@ -861,11 +861,11 @@ def panel_clase_detalle(request, id_clase):
         ).annotate(
             total_reg = Count(
                 'alumnoclase', 
-                filter=Q(alumnoclase__estado__in=['Reservado', 'confirmado', 'asistió'])
+                filter=Q(alumnoclase__estado__in=['reservado', 'pendiente', 'recuperó', 'asistió', 'faltó'])
             ),
             total_ocas = Count(
                 'alumnoclaseocasional', 
-                filter=Q(alumnoclaseocasional__estado__in=['Reservado', 'confirmado', 'asistió'])
+                filter=Q(alumnoclaseocasional__estado__in=['reservado', 'asistió', 'faltó'])
             )
         )
     )

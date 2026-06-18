@@ -217,20 +217,41 @@ def cambiar_turnos_paquete_datos(data):
     turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
     turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
 
-    turnos_nuevos_objs = []
-    errores = []
-    for turno_str in turnos_nuevos_str:
+    if es_reprogramacion:
+        # Validar fecha destino
         try:
-            dia, hora = turno_str.rsplit(" ", 1)
-            turno_obj = Turno.objects.get(dia=dia, horario=hora)
-            # Validar cupo: clase futura < 4
-            clase = Clase.objects.filter(id_turno=turno_obj, fecha__gte=timezone.localdate()).first()
-            if clase and clase.total_inscriptos >= 4:
-                errores.append(f"No hay cupo disponible para {turno_str}")
-                continue
-            turnos_nuevos_objs.append(turno_obj)
-        except Turno.DoesNotExist:
-            errores.append(f"Turno {turno_str} no existe")
+            fecha_destino = datetime.strptime(fecha_destino_str, "%Y-%m-%d").date()
+            turno_destino = Turno.objects.get(dia=dia_destino, horario=hora_destino)
+            clase_destino = Clase.objects.get(id_turno=turno_destino, fecha=fecha_destino)
+        except (ValueError, TypeError):
+            return JsonResponse({"errores": ["Formato de fecha inválido (YYYY-MM-DD)."]}, status=400)
+        except (Turno.DoesNotExist, Clase.DoesNotExist):
+            return JsonResponse({"errores": ["Clase destino no encontrada."]}, status=404)
+
+        # Verificar cupos
+        if clase_destino.obtener_total_inscriptos >= 4:
+            return JsonResponse({"errores": ["La clase destino ya está llena."]}, status=400)
+
+        # Verificar duplicados en destino
+        ya_en_clase = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists() if tipo_alumno == "regular" else \
+                      AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
+        
+        if ya_en_clase:
+            return JsonResponse({"errores": ["El alumno ya está registrado en la clase destino."]}, status=400)
+
+        # Ejecutar Reprogramación
+        if tipo_alumno == "regular":
+            alumno_clase.estado = "reprogramó"
+            alumno_clase.save()
+            AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperó")
+        else:
+            alumno_clase_ocasional.estado = "canceló"
+            alumno_clase_ocasional.save()
+            AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
+        
+        # Incrementar cupo destino
+        Clase.objects.filter(pk=clase_destino.pk).update(total_inscriptos=F('total_inscriptos') + 1)
+        msg = "Clase reprogramada correctamente."
 
     if errores:
         return {"errores": errores}
@@ -1505,7 +1526,7 @@ def registrar_alumno_ocasional_datos(data):
         # 📌 Validar clase específica en esa fecha
         try:
             clase = Clase.objects.get(id_turno=turno, fecha=fecha_clase)
-            if clase.total_inscriptos >= 4:
+            if clase.obtener_total_inscriptos >= 4:
                 errores.append(f"La clase del {fecha_clase} a las {data['hora_turno']} ya está llena.")
         except Clase.DoesNotExist:
             errores.append(f"No existe clase programada para {fecha_clase} en el turno {dia_turno} {data['hora_turno']}.")
@@ -1682,7 +1703,7 @@ def registrar_alumno_datos(data):
                         fecha=fecha_clase
                     )
                     logging.debug(f"[registrar_alumno_datos] Clase encontrada: id={clase.id_clase}, inscriptos={clase.total_inscriptos}")
-                    if clase.total_inscriptos >= 4:
+                    if clase.obtener_total_inscriptos >= 4:
                         logging.warning(f"[registrar_alumno_datos] Clase llena: {fecha_clase} {turno.horario}")
                         errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya está llena.")
                     else:
