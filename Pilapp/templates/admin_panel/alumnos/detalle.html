@@ -304,9 +304,15 @@
                                 <td>
                                     <button class="btn btn-sm btn-outline-secondary mb-1" data-bs-toggle="modal" data-bs-target="#modalEditarPago"
                                             data-id="{{ pago.id_pago.id_pago }}"
-                                            data-fecha="{{ pago.id_pago.fecha|date:'Y-m-d' }}">
+                                            data-fecha="{{ pago.id_pago.fecha|date:'Y-m-d' }}" title="Editar Fecha">
                                         <i class="bi bi-pencil"></i>
                                     </button>
+                                    <form method="post" action="{% url 'panel_pago_eliminar' pago.id_pago.id_pago %}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este pago? Esta acción volverá el paquete a estado Pendiente.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger mb-1" title="Eliminar Pago">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
