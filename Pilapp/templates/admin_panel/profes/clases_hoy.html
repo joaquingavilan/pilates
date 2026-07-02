@@ -11,49 +11,40 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #8A2BE2;
-            --primary-hover: #7B24C9;
-            --bg-dark: #121212;
-            --surface-dark: #1E1E1E;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: #fff;
-            padding-bottom: 3rem;
-        }
+</head>
+<body style="background-color: #f4f7f6; font-family: 'Inter', sans-serif; color: #333; padding-bottom: 3rem;">
+    <style>
         .header {
-            background-color: var(--surface-dark);
+            background-color: #2c3e50;
             padding: 1.5rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            color: white;
         }
         .card {
-            background-color: var(--surface-dark);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 1rem;
+            background-color: white;
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: 12px;
             overflow: hidden;
         }
         .card-header {
-            background-color: rgba(255,255,255,0.02);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
             padding: 1rem 1.25rem;
         }
         .horario-badge {
-            background-color: rgba(138, 43, 226, 0.2);
-            color: #b975ff;
-            font-weight: 600;
+            background-color: rgba(138, 43, 226, 0.1);
+            color: #8A2BE2;
+            font-weight: 700;
             padding: 0.4rem 0.8rem;
             border-radius: 2rem;
             font-size: 0.9rem;
         }
         .alumno-item {
             padding: 1rem 1.25rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -66,12 +57,12 @@
             padding: 0.2rem 0.5rem;
             border-radius: 1rem;
             text-transform: uppercase;
-            font-weight: 600;
+            font-weight: 700;
         }
-        .status-reservado { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
-        .status-asistió { background: rgba(25, 135, 84, 0.2); color: #20c997; }
-        .status-faltó { background: rgba(220, 53, 69, 0.2); color: #ff6b6b; }
-        .status-recuperó { background: rgba(13, 202, 240, 0.2); color: #0dcaf0; }
+        .status-reservado { background: rgba(255, 193, 7, 0.15); color: #d39e00; }
+        .status-asistió { background: rgba(25, 135, 84, 0.15); color: #198754; }
+        .status-faltó { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
+        .status-recuperó { background: rgba(13, 202, 240, 0.15); color: #0a58ca; }
         
         .btn-action {
             width: 40px;
@@ -86,13 +77,25 @@
         .btn-action:active {
             transform: scale(0.9);
         }
-        .btn-asistio { background-color: rgba(25, 135, 84, 0.15); color: #20c997; }
+        .btn-asistio { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
         .btn-asistio:hover, .btn-asistio:active { background-color: #198754; color: white; }
         
-        .btn-falto { background-color: rgba(220, 53, 69, 0.15); color: #ff6b6b; }
+        .btn-falto { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
         .btn-falto:hover, .btn-falto:active { background-color: #dc3545; color: white; }
+
+        /* Custom Tabs */
+        .nav-tabs .nav-link {
+            color: #6c757d;
+            border: none;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+        }
+        .nav-tabs .nav-link.active {
+            color: #2c3e50;
+            background-color: transparent;
+            border-bottom: 3px solid #8A2BE2;
+        }
     </style>
-</head>
 <body>
 
     <div class="header d-flex justify-content-between align-items-center">
@@ -102,22 +105,22 @@
         </div>
         <form method="get" action="{% url 'profes_clases_hoy' token %}" class="m-0 position-relative">
             <input type="date" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}" 
-                   class="form-control form-control-sm bg-dark text-white border-secondary" 
+                   class="form-control form-control-sm border-0 shadow-sm" 
                    onchange="this.form.submit()"
-                   style="width: 140px; color-scheme: dark;">
+                   style="width: 140px; background-color: rgba(255,255,255,0.9);">
         </form>
     </div>
 
     <!-- Navigation Tabs -->
-    <div class="bg-dark px-3 pt-3 border-bottom border-secondary mb-4 sticky-top" style="top: 76px; z-index: 90;">
+    <div class="bg-white px-3 pt-3 border-bottom shadow-sm mb-4 sticky-top" style="top: 76px; z-index: 90;">
         <ul class="nav nav-tabs border-0" style="margin-bottom: -1px;">
             <li class="nav-item">
-                <a class="nav-link active bg-dark text-white border-secondary border-bottom-0 fw-semibold" href="{% url 'profes_clases_hoy' token %}">
+                <a class="nav-link active" href="{% url 'profes_clases_hoy' token %}">
                     <i class="bi bi-calendar-check me-2"></i>Asistencias
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link text-white-50 border-0" href="{% url 'profes_pagos' token %}">
+                <a class="nav-link" href="{% url 'profes_pagos' token %}">
                     <i class="bi bi-cash-coin me-2"></i>Cobros
                 </a>
             </li>
@@ -130,7 +133,7 @@
             {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 bg-opacity-10 py-2" role="alert">
                 <small>{{ message }}</small>
-                <button type="button" class="btn-close btn-close-white" style="padding: 0.75rem 1rem;" data-bs-dismiss="alert"></button>
+                <button type="button" class="btn-close btn-close-dark" style="padding: 0.75rem 1rem;" data-bs-dismiss="alert"></button>
             </div>
             {% endfor %}
         </div>
@@ -141,7 +144,7 @@
             <div class="card mb-4 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="horario-badge"><i class="bi bi-clock me-1"></i> {{ c.horario }}</span>
-                    <small class="text-white-50">{{ c.alumnos|length }} alumna(s)</small>
+                    <small class="text-muted fw-semibold">{{ c.alumnos|length }} alumna(s)</small>
                 </div>
                 <div class="card-body p-0">
                     {% if c.alumnos %}
@@ -181,7 +184,7 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="p-4 text-center text-white-50">
+                        <div class="p-4 text-center text-muted">
                             <i class="bi bi-person-x fs-2 d-block mb-2"></i>
                             <small>No hay alumnas inscriptas</small>
                         </div>
@@ -191,7 +194,7 @@
             {% endfor %}
         {% else %}
             <div class="text-center mt-5">
-                <i class="bi bi-cup-hot text-white-50" style="font-size: 4rem;"></i>
+                <i class="bi bi-cup-hot text-muted" style="font-size: 4rem;"></i>
                 <h4 class="mt-3 fw-light">Día Libre</h4>
                 <p class="text-white-50">No hay clases registradas para el día de hoy.</p>
             </div>
