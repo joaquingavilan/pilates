@@ -3,6 +3,6 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python manage.py makemigrations && python manage.py migrate && python manage.py collectstatic --noinput && python manage.py inicializacion && gunicorn TuPilates.wsgi:application --bind 0.0.0.0:8000"
+    "startCommand": "python manage.py makemigrations && python manage.py migrate && python manage.py collectstatic --noinput && python manage.py inicializacion && gunicorn TuPilates.wsgi:application --bind 0.0.0.0:"
   }
 }
