@@ -4,93 +4,163 @@
 {% block title %}Resumen de Facturación{% endblock %}
 
 {% block content %}
+<style>
+    body { background-color: #f4f6f9; }
+    .form-card {
+        background-color: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        border: 1px solid rgba(0,0,0,0.02);
+    }
+    .summary-card {
+        background-color: white;
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,0.04);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.03);
+        padding: 1.5rem;
+    }
+    .table thead th {
+        background-color: #f8fafc;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.75rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        color: #1e293b;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .badge-pago {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    .btn-delete {
+        color: #ef4444;
+        background: #fef2f2;
+        border: none;
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+    .btn-delete:hover {
+        background: #ef4444;
+        color: white;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0">Resumen de Facturación</h4>
+    <div>
+        <h4 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">Resumen de Facturación</h4>
+        <small class="text-muted">Control de ingresos mensuales</small>
+    </div>
     
-    <form method="get" class="d-flex gap-2">
-        <input type="month" name="mes" value="{{ mes_actual|date:'Y-m' }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="color-scheme: dark;">
-        <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+    <form method="get" class="d-flex gap-2 align-items-center bg-white p-2 rounded-3 shadow-sm border border-light">
+        <input type="month" name="mes" value="{{ mes_actual|date:'Y-m' }}" class="form-control form-control-sm border-0 bg-light fw-medium">
+        <button type="submit" class="btn btn-sm btn-dark px-3 rounded-2 fw-semibold">Filtrar</button>
     </form>
 </div>
 
-<div class="row g-3 mb-4">
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} border-0 shadow-sm rounded-3" role="alert">
+        <small class="fw-semibold">{{ message }}</small>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-4 mb-5">
     <div class="col-md-3">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-body">
-                <h6 class="text-white-50 mb-2">Total General</h6>
-                <h3 class="mb-0 fw-bold text-white">Gs. {{ total_general|floatformat:"0"|intcomma }}</h3>
-            </div>
+        <div class="summary-card h-100 text-center">
+            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Total General</h6>
+            <h3 class="mb-0 fw-bold" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Gs. {{ total_general|floatformat:"0"|intcomma }}</h3>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-body">
-                <h6 class="text-white-50 mb-2">Efectivo</h6>
-                <h4 class="mb-0 text-success">Gs. {{ total_efectivo|floatformat:"0"|intcomma }}</h4>
-            </div>
+        <div class="summary-card h-100 text-center">
+            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Efectivo</h6>
+            <h4 class="mb-0 fw-bold text-success" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_efectivo|floatformat:"0"|intcomma }}</h4>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-body">
-                <h6 class="text-white-50 mb-2">Transferencia</h6>
-                <h4 class="mb-0 text-info">Gs. {{ total_transferencia|floatformat:"0"|intcomma }}</h4>
-            </div>
+        <div class="summary-card h-100 text-center">
+            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Transferencia</h6>
+            <h4 class="mb-0 fw-bold text-primary" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_transferencia|floatformat:"0"|intcomma }}</h4>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-body">
-                <h6 class="text-white-50 mb-2">Tarjeta</h6>
-                <h4 class="mb-0 text-warning">Gs. {{ total_tarjeta|floatformat:"0"|intcomma }}</h4>
-            </div>
+        <div class="summary-card h-100 text-center">
+            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Tarjeta</h6>
+            <h4 class="mb-0 fw-bold text-warning" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_tarjeta|floatformat:"0"|intcomma }}</h4>
         </div>
     </div>
 </div>
 
-<div class="card bg-dark border-secondary">
-    <div class="card-header border-secondary p-3">
-        <h6 class="mb-0">Detalle de Pagos - {{ mes_actual|date:"F Y" }}</h6>
+<div class="form-card">
+    <div class="p-4 border-bottom border-light">
+        <h5 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">Detalle de Pagos - {{ mes_actual|date:"F Y" }}</h5>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-dark table-hover mb-0">
+            <table class="table table-hover mb-0">
                 <thead>
                     <tr>
-                        <th class="text-white-50 border-secondary">Fecha</th>
-                        <th class="text-white-50 border-secondary">Monto</th>
-                        <th class="text-white-50 border-secondary">Método</th>
-                        <th class="text-white-50 border-secondary">Observaciones</th>
+                        <th class="ps-4">Fecha</th>
+                        <th>Monto</th>
+                        <th>Método</th>
+                        <th>Observaciones</th>
+                        <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for pago in pagos %}
                     <tr>
-                        <td class="border-secondary">{{ pago.fecha|date:"d/m/Y" }}</td>
-                        <td class="border-secondary fw-semibold">Gs. {{ pago.monto|floatformat:"0"|intcomma }}</td>
-                        <td class="border-secondary">
+                        <td class="ps-4 fw-medium">{{ pago.fecha|date:"d/m/Y" }}</td>
+                        <td class="fw-bold text-dark">Gs. {{ pago.monto|floatformat:"0"|intcomma }}</td>
+                        <td>
                             {% if pago.metodo_pago == 'efectivo' %}
-                                <span class="badge bg-success text-white">Efectivo</span>
+                                <span class="badge badge-pago bg-success bg-opacity-10 text-success">Efectivo</span>
                             {% elif pago.metodo_pago == 'transferencia' %}
-                                <span class="badge bg-info text-dark">Transferencia</span>
+                                <span class="badge badge-pago bg-primary bg-opacity-10 text-primary">Transferencia</span>
                             {% else %}
-                                <span class="badge bg-warning text-dark">Tarjeta</span>
+                                <span class="badge badge-pago bg-warning bg-opacity-10 text-warning">Tarjeta</span>
                             {% endif %}
                         </td>
-                        <td class="border-secondary">
-                            <small class="text-white-50">
-                                {% for pa in pago.pagoalumno_set.all %}
-                                    {{ pa.id_alumno_paquete.id_alumno.id_persona.nombre }} {{ pa.id_alumno_paquete.id_alumno.id_persona.apellido }} - 
-                                    {% if pa.observaciones %}{{ pa.observaciones }}{% else %}Sin obs.{% endif %}
-                                {% empty %}
+                        <td>
+                            <span class="text-muted" style="font-size: 0.9rem;">
+                                {% if pago.pagoalumno_set.all %}
+                                    {% for pa in pago.pagoalumno_set.all %}
+                                        <strong>{{ pa.id_alumno_paquete.id_alumno.id_persona.nombre }} {{ pa.id_alumno_paquete.id_alumno.id_persona.apellido }}</strong> - 
+                                        {% if pa.observaciones %}{{ pa.observaciones }}{% else %}Sin obs.{% endif %}
+                                    {% endfor %}
+                                {% elif pago.comprobante %}
+                                    {{ pago.comprobante }}
+                                {% else %}
                                     --
-                                {% endfor %}
-                            </small>
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <form method="post" action="{% url 'panel_pago_eliminar' pago.id_pago %}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este pago? Esta acción no se puede deshacer.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-delete" title="Eliminar Pago">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-white-50 border-secondary">No hay pagos registrados este mes.</td>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2 text-black-50"></i>
+                            No hay pagos registrados en este mes.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

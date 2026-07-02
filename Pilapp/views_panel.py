@@ -1481,7 +1481,28 @@ def profes_registrar_pago(request, token):
     return redirect("profes_pagos", token=token)
 
 
+
+@require_POST
+def panel_pago_eliminar(request, id_pago):
+    try:
+        pago = get_object_or_404(Pago, pk=id_pago)
+        
+        # Revert AlumnoPaquete status if it exists
+        pago_alumnos = PagoAlumno.objects.filter(id_pago=pago)
+        for pa in pago_alumnos:
+            paquete = pa.id_alumno_paquete
+            paquete.estado_pago = 'pendiente'
+            paquete.save()
+            
+        pago.delete()
+        messages.success(request, "Pago eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar pago: {e}")
+        
+    return redirect(request.META.get('HTTP_REFERER', 'panel_resumen_pagos'))
+
 def panel_resumen_pagos(request):
+
     mes_str = request.GET.get("mes")
     if mes_str:
         try:

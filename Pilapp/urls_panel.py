@@ -32,6 +32,7 @@ urlpatterns = [
     # Pagos
     path('pagos/', views_panel.panel_pagos, name='panel_pagos'),
     path('resumen-pagos/', views_panel.panel_resumen_pagos, name='panel_resumen_pagos'),
+    path('pagos/<int:id_pago>/eliminar/', views_panel.panel_pago_eliminar, name='panel_pago_eliminar'),
     
     # Prospectos
     path('prospectos/', views_panel.panel_prospectos, name='panel_prospectos'),
