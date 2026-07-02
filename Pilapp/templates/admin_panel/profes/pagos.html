@@ -106,103 +106,74 @@
         </div>
         {% endif %}
 
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header border-bottom border-secondary p-3">
-                <h6 class="mb-0">Alumnas con deudas o vencimientos</h6>
+        <div class="card mb-4 shadow-sm" style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+            <div class="card-header bg-white text-dark py-3" style="border-bottom: 2px solid #f0f0f0; border-radius: 11px 11px 0 0;">
+                <h6 class="mb-0 fw-bold text-center" style="color: #4a4a4a;">
+                    <span style="font-size: 1.1rem; margin-right: 5px;">💰</span> REGISTRO DE PAGOS
+                </h6>
             </div>
-            <div class="card-body p-0">
-                {% if paquetes_deudores %}
-                    {% for paquete in paquetes_deudores %}
-                    <div class="alumno-item">
-                        <div>
-                            <div class="fw-semibold mb-1" style="font-size: 0.95rem;">
-                                {{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }}
-                            </div>
-                            <span class="text-white-50" style="font-size: 0.8rem;">
-                                Paquete: {{ paquete.id_paquete.nombre }} (Gs. {{ paquete.id_paquete.costo|floatformat:"0" }})
-                            </span><br>
-                            {% if paquete.estado_pago == 'pendiente' %}
-                                <span class="deuda-badge mt-1 d-inline-block">Debe Gs. {{ paquete.id_paquete.costo|floatformat:"0" }}</span>
-                            {% else %}
-                                <span class="deuda-badge mt-1 d-inline-block bg-warning text-dark border-0">Pago parcial</span>
-                            {% endif %}
-                        </div>
-                        
-                        <button class="btn btn-cobrar" data-bs-toggle="modal" data-bs-target="#modalCobro{{ paquete.id_alumno_paquete }}">
-                            Cobrar
-                        </button>
+            <div class="card-body bg-white text-dark p-4">
+                <form method="post" action="{% url 'profes_registrar_pago' token %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">PROFESORA</label>
+                        <select name="id_profesora" class="form-select border-secondary-subtle" required style="font-size: 0.9rem;">
+                            <option value="">-- Selecciona tu nombre --</option>
+                            {% for profe in instructoras %}
+                            <option value="{{ profe.id_instructor }}">{{ profe.id_persona.nombre }} {{ profe.id_persona.apellido }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
 
-                    <!-- Modal de Cobro -->
-                    <div class="modal fade" id="modalCobro{{ paquete.id_alumno_paquete }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content bg-dark text-white border-secondary">
-                                <div class="modal-header border-secondary">
-                                    <h5 class="modal-title">Registrar Cobro</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <form method="post" action="{% url 'profes_registrar_pago' token %}">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="id_alumno_paquete" value="{{ paquete.id_alumno_paquete }}">
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label text-white-50 small">Alumna</label>
-                                            <input type="text" class="form-control bg-secondary text-white border-0" value="{{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }}" readonly>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label small">¿Quién recibe este pago?</label>
-                                            <select name="id_profesora" class="form-select bg-dark text-white border-secondary" required>
-                                                <option value="">-- Selecciona tu nombre --</option>
-                                                {% for profe in instructoras %}
-                                                <option value="{{ profe.id_instructor }}">{{ profe.id_persona.nombre }} {{ profe.id_persona.apellido }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">ALUMNA</label>
+                        <select name="id_alumno_paquete" class="form-select border-secondary-subtle" required style="font-size: 0.9rem;">
+                            <option value="">Buscar alumna...</option>
+                            {% for paquete in paquetes_deudores %}
+                            <option value="{{ paquete.id_alumno_paquete }}">
+                                {{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }} - {{ paquete.id_paquete.nombre }} (Gs. {{ paquete.id_paquete.costo|floatformat:"0" }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                                        <div class="mb-3">
-                                            <label class="form-label small">¿Qué está pagando?</label>
-                                            <select name="tipo_pago" class="form-select bg-dark text-white border-secondary select-tipo-pago" required>
-                                                <option value="saldar">Saldando deuda actual</option>
-                                                <option value="renovar">Renovando / Comprando nuevo paquete</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3 row-fecha-inicio" style="display: none;">
-                                            <label class="form-label small">¿Cuándo empieza el paquete?</label>
-                                            <input type="date" name="fecha_inicio" class="form-control bg-dark text-white border-secondary" style="color-scheme: dark;">
-                                            <small class="text-white-50">Por defecto es hoy si lo dejas vacío.</small>
-                                        </div>
-
-                                        <div class="row">
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label small">Monto (Gs.)</label>
-                                                <input type="number" name="monto" class="form-control bg-dark text-white border-secondary" required placeholder="Ej: 250000" value="{{ paquete.id_paquete.costo|floatformat:"0" }}">
-                                            </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label small">Método</label>
-                                                <select name="metodo_pago" class="form-select bg-dark text-white border-secondary" required>
-                                                    <option value="efectivo">Efectivo</option>
-                                                    <option value="transferencia">Transferencia</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer border-secondary">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn" style="background-color: var(--primary-color); color: white;">Guardar Pago</button>
-                                    </div>
-                                </form>
-                            </div>
+                    <div class="row mb-3">
+                        <div class="col-6 pe-2">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">CONCEPTO</label>
+                            <select name="tipo_pago" class="form-select border-secondary-subtle select-tipo-pago" required style="font-size: 0.9rem;">
+                                <option value="renovar">Paquete</option>
+                                <option value="saldar">Saldar Deuda</option>
+                            </select>
+                        </div>
+                        <div class="col-6 ps-2">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">MONTO (Gs.)</label>
+                            <input type="number" name="monto" class="form-control border-secondary-subtle" required placeholder="0" style="font-size: 0.9rem;">
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="p-5 text-center text-white-50">
-                        <i class="bi bi-check-circle fs-1 d-block mb-3 text-success opacity-50"></i>
-                        <p>No hay alumnas con deudas actualmente.</p>
+
+                    <div class="mb-3 row-fecha-inicio">
+                        <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">INICIO DEL PAQUETE</label>
+                        <input type="date" name="fecha_inicio" class="form-control border-secondary-subtle" style="font-size: 0.9rem;">
+                        <small class="text-muted" style="font-size: 0.7rem;">Si queda vacío, inicia hoy.</small>
                     </div>
-                {% endif %}
+
+                    <div class="row mb-4">
+                        <div class="col-6 pe-2">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">MEDIO</label>
+                            <select name="metodo_pago" class="form-select border-secondary-subtle fw-semibold" required style="font-size: 0.9rem;">
+                                <option value="efectivo">EFECTIVO</option>
+                                <option value="transferencia">TRANSFERENCIA</option>
+                            </select>
+                        </div>
+                        <div class="col-6 ps-2">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.75rem;">FECHA PAGO</label>
+                            <input type="date" name="fecha_pago" class="form-control border-secondary-subtle" required value="{% now 'Y-m-d' %}" style="font-size: 0.9rem;">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn w-100 fw-bold py-2" style="background-color: #2c3e50; color: white; border-radius: 8px;">GUARDAR</button>
+                </form>
             </div>
         </div>
     </div>
