@@ -1483,6 +1483,24 @@ def profes_registrar_pago(request, token):
 
 
 @require_POST
+def panel_pago_actualizar_factura(request, id_pago):
+    try:
+        pago = get_object_or_404(Pago, pk=id_pago)
+        nro_factura = request.POST.get("nro_factura", "").strip()
+        
+        if nro_factura:
+            pago.nro_pago = nro_factura
+            pago.save()
+            messages.success(request, "Número de factura actualizado correctamente.")
+        else:
+            messages.warning(request, "El número de factura no puede estar vacío.")
+            
+    except Exception as e:
+        messages.error(request, f"Error al actualizar factura: {e}")
+        
+    return redirect(request.META.get('HTTP_REFERER', 'panel_resumen_pagos'))
+
+@require_POST
 def panel_pago_eliminar(request, id_pago):
     try:
         pago = get_object_or_404(Pago, pk=id_pago)

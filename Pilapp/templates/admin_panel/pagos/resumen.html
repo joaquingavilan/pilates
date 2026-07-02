@@ -126,7 +126,17 @@
                                 <span class="badge badge-pago bg-primary bg-opacity-10 text-primary">Transferencia</span>
                             {% endif %}
                         </td>
-                        <td><span class="text-secondary fw-semibold">{{ pago.nro_pago }}</span></td>
+                        <td>
+                            <form method="post" action="{% url 'panel_pago_actualizar_factura' pago.id_pago %}" class="d-flex align-items-center m-0">
+                                {% csrf_token %}
+                                <div class="input-group input-group-sm" style="max-width: 220px;">
+                                    <input type="text" name="nro_factura" value="{{ pago.nro_pago }}" class="form-control fw-semibold text-secondary shadow-none border-light bg-light" style="font-size: 0.85rem;" title="Clic para editar">
+                                    <button class="btn btn-outline-secondary border-light bg-light" type="submit" title="Guardar cambios">
+                                        <i class="bi bi-check2 text-success fw-bold"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </td>
                         <td>
                             <span class="text-muted" style="font-size: 0.9rem;">
                                 {% if pago.pagoalumno_set.all %}
