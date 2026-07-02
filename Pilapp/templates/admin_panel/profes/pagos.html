@@ -10,19 +10,66 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: #f0f2f5; font-family: system-ui, -apple-system, sans-serif; }
         .page-header { background: #f8f9fa; padding: 1.5rem 1rem 1rem; border-bottom: 1px solid #dee2e6; }
-        .nav-tabs .nav-link { color: #6c757d; border: none; font-weight: 600; padding: 0.75rem 1.5rem; }
+        .nav-tabs .nav-link { color: #6c757d; border: none; font-weight: 600; padding: 0.75rem 1.5rem; text-transform: uppercase; font-size: 0.85rem; }
         .nav-tabs .nav-link.active { color: #0d6efd; background-color: transparent; border-bottom: 3px solid #0d6efd; }
         
-        .card.bg-dark { border-radius: 0.5rem; border-color: #495057 !important; }
-        .card-header.border-secondary { border-bottom-color: #495057 !important; }
-        .alumno-item { border-bottom: 1px solid #495057; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .alumno-item:last-child { border-bottom: none; }
+        .form-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-top: 8px solid #2c3e50;
+            padding: 2rem 1.5rem;
+            margin-top: 1rem;
+        }
         
-        .deuda-badge { font-size: 0.8rem; color: #ff6b6b; background: rgba(220, 53, 69, 0.2); padding: 0.2rem 0.6rem; border-radius: 1rem; font-weight: 600; }
-        .btn-cobrar { background-color: #0d6efd; color: white; border: none; padding: 0.4rem 1rem; border-radius: 2rem; font-weight: 600; font-size: 0.85rem; }
-        .btn-cobrar:hover { background-color: #0b5ed7; color: white; }
+        .form-title {
+            text-align: center;
+            font-weight: 800;
+            color: #000;
+            margin-bottom: 2rem;
+            font-size: 1.3rem;
+            text-transform: uppercase;
+        }
+        
+        .form-label {
+            font-weight: 700;
+            color: #6c757d;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.3rem;
+        }
+        
+        .form-control, .form-select {
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            color: #212529;
+            font-weight: 500;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 0.2rem rgba(44, 62, 80, 0.1);
+        }
+        
+        .btn-guardar {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: 700;
+            border-radius: 8px;
+            padding: 0.8rem;
+            letter-spacing: 1px;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-guardar:hover {
+            background-color: #1a252f;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -48,96 +95,113 @@
         </ul>
     </div>
 
-    <div class="container mt-4 pb-5">
+    <div class="container pb-5">
         {% if messages %}
-        <div class="mb-4">
+        <div class="mt-4 mb-2">
             {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                <small>{{ message }}</small>
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm" role="alert">
+                <strong>{{ message }}</strong>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             {% endfor %}
         </div>
         {% endif %}
 
-        <div class="card bg-dark border-secondary shadow-sm mb-4">
-            <div class="card-header border-secondary p-3">
-                <h6 class="mb-0 text-white"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Alumnas Activas</h6>
-            </div>
-            <div class="card-body p-0">
-                {% if alumnas %}
-                    {% for a in alumnas %}
-                    <div class="alumno-item">
-                        <div>
-                            <div class="text-white fw-semibold mb-1">{{ a.id_persona.nombre }} {{ a.id_persona.apellido }}</div>
-                            {% if a.tiene_deuda %}
-                                <span class="deuda-badge"><i class="bi bi-exclamation-circle me-1"></i>Paquete sin pagar</span>
-                            {% else %}
-                                <small class="text-success"><i class="bi bi-check-circle me-1"></i>Al día</small>
-                            {% endif %}
-                        </div>
-                        <button class="btn-cobrar" data-bs-toggle="modal" data-bs-target="#cobroModal{{ a.id }}">
-                            Cobrar
-                        </button>
+        <div class="form-card mx-auto" style="max-width: 500px;">
+            <h2 class="form-title">💰 REGISTRO DE PAGOS</h2>
+            
+            <form method="post" action="{% url 'profes_registrar_pago' token %}">
+                {% csrf_token %}
+                
+                <input type="hidden" name="id_alumno_paquete" id="id_alumno_paquete" value="">
+                
+                <div class="mb-3">
+                    <label class="form-label">PROFE</label>
+                    <input class="form-control" list="profeOptions" id="profeData" name="profe_nombre" placeholder="Nombre de la profe..." autocomplete="off" required>
+                    <datalist id="profeOptions">
+                        {% for profe in instructoras %}
+                        <option value="{{ profe.id_persona.nombre }} {{ profe.id_persona.apellido }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">ALUMNA</label>
+                    <input class="form-control" list="alumnaOptions" id="alumnaData" name="alumna_nombre" placeholder="Buscar alumna..." autocomplete="off" required>
+                    <datalist id="alumnaOptions">
+                        {% for paquete in paquetes %}
+                        <option data-id="{{ paquete.id }}" value="{{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }} - {{ paquete.id_paquete.nombre }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label">CONCEPTO</label>
+                        <select name="concepto" id="conceptoSelect" class="form-select" required>
+                            <option value="Paquete">Paquete</option>
+                            <option value="Inscripción">Inscripción</option>
+                            <option value="Clase Suelta">Clase Suelta</option>
+                            <option value="Otros">Otros</option>
+                        </select>
                     </div>
-
-                    <!-- Modal Cobro -->
-                    <div class="modal fade" id="cobroModal{{ a.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content bg-dark text-white border-secondary">
-                                <div class="modal-header border-secondary">
-                                    <h5 class="modal-title fs-6">Registrar Pago: {{ a.id_persona.nombre }}</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form method="post" action="{% url 'profes_pagos' token %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="alumno_id" value="{{ a.id }}">
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label text-white-50 small mb-1">Paquete a Pagar</label>
-                                            <select name="paquete_id" class="form-select bg-dark text-white border-secondary" required>
-                                                {% for paquete in a.paquetes_activos %}
-                                                <option value="{{ paquete.id }}">
-                                                    Paquete: {{ paquete.id_paquete.nombre }} 
-                                                    {% if not paquete.pagado %}(Pendiente){% endif %}
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label text-white-50 small mb-1">Monto a Registrar (Gs.)</label>
-                                            <input type="number" name="monto" class="form-control bg-dark text-white border-secondary" required placeholder="Ej: 200000">
-                                        </div>
-
-                                        <div class="mb-4">
-                                            <label class="form-label text-white-50 small mb-1">Método de Pago</label>
-                                            <select name="metodo_pago" class="form-select bg-dark text-white border-secondary" required>
-                                                <option value="efectivo">Efectivo</option>
-                                                <option value="transferencia">Transferencia</option>
-                                                <option value="tarjeta">Tarjeta</option>
-                                            </select>
-                                        </div>
-
-                                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Confirmar Pago</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="col-6">
+                        <label class="form-label">MONTO (GS.)</label>
+                        <input type="number" name="monto" class="form-control" required>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="p-4 text-center text-white-50">
-                        <i class="bi bi-check2-circle fs-2 d-block mb-2 text-success"></i>
-                        <small>No hay alumnas registradas</small>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <label class="form-label">MEDIO</label>
+                        <select name="metodo_pago" class="form-select" required>
+                            <option value="efectivo">EFECTIVO</option>
+                            <option value="transferencia">TRANSFERENCIA</option>
+                            <option value="tarjeta">TARJETA</option>
+                        </select>
                     </div>
-                {% endif %}
-            </div>
+                    <div class="col-6">
+                        <label class="form-label">FECHA</label>
+                        <input type="date" name="fecha" class="form-control" id="fechaInput" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn w-100 btn-guardar">GUARDAR</button>
+            </form>
         </div>
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Set today's date automatically
+        document.getElementById('fechaInput').valueAsDate = new Date();
+        
+        // Link datalist selection to hidden input for id_alumno_paquete
+        const alumnaInput = document.getElementById('alumnaData');
+        const idPaqueteInput = document.getElementById('id_alumno_paquete');
+        
+        alumnaInput.addEventListener('input', function(e) {
+            const val = this.value;
+            const listId = this.getAttribute('list');
+            const datalist = document.getElementById(listId);
+            const options = datalist.getElementsByTagName('option');
+            
+            let matchedId = '';
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === val) {
+                    matchedId = options[i].getAttribute('data-id');
+                    break;
+                }
+            }
+            idPaqueteInput.value = matchedId;
+            
+            // If it matched a package, force concept to "Paquete"
+            if(matchedId) {
+                document.getElementById('conceptoSelect').value = 'Paquete';
+            }
+        });
+    </script>
 </body>
 </html>

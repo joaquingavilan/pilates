@@ -1404,18 +1404,17 @@ def profes_pagos(request, token):
     if token != "acceso-profes":
         return HttpResponse("Acceso denegado.", status=403)
         
-    # Obtener alumnos con paquetes pendientes o parciales
-    paquetes_deudores = AlumnoPaquete.objects.filter(
-        estado='activo',
-        estado_pago__in=['pendiente', 'parcial']
+    # All active packages to show in datalist
+    paquetes = AlumnoPaquete.objects.filter(
+        estado='activo'
     ).select_related('id_alumno__id_persona', 'id_paquete')
     
-    # Obtener lista de instructoras para el selector
+    # All instructores for datalist
     instructoras = Instructor.objects.select_related('id_persona').all()
     
     context = {
         'token': token,
-        'paquetes_deudores': paquetes_deudores,
+        'paquetes': paquetes,
         'instructoras': instructoras,
     }
     return render(request, "admin_panel/profes/pagos.html", context)
@@ -1428,38 +1427,26 @@ def profes_registrar_pago(request, token):
         return HttpResponse("Acceso denegado.", status=403)
         
     id_alumno_paquete = request.POST.get("id_alumno_paquete")
+    alumna_nombre = request.POST.get("alumna_nombre")
     monto_raw = request.POST.get("monto")
     metodo_pago = request.POST.get("metodo_pago")
-    id_profesora = request.POST.get("id_profesora")
-    tipo_pago = request.POST.get("tipo_pago") # "saldar" o "renovar"
-    fecha_inicio_str = request.POST.get("fecha_inicio")
+    profe_nombre = request.POST.get("profe_nombre")
+    concepto = request.POST.get("concepto")
+    fecha_str = request.POST.get("fecha")
     
     try:
-        monto = Decimal(monto_raw)
-        paquete_actual = AlumnoPaquete.objects.get(pk=id_alumno_paquete)
-        profesora = Instructor.objects.get(pk=id_profesora)
-        nombre_profe = f"{profesora.id_persona.nombre} {profesora.id_persona.apellido}"
-        observaciones_pago = f"Cobrado por: {nombre_profe}"
+        monto = Decimal(monto_raw) if monto_raw else Decimal(0)
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date() if fecha_str else timezone.now().date()
         
-        if tipo_pago == "renovar":
-            # Renovar paquete
-            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date() if fecha_inicio_str else timezone.now().date()
+        observaciones_pago = f"Cobrado por: {profe_nombre}"
+        
+        if id_alumno_paquete:
+            # Pago asociado a un paquete real
+            paquete_actual = AlumnoPaquete.objects.get(pk=id_alumno_paquete)
             
-            from .models import RenovadorPaqueteService
-            service = RenovadorPaqueteService(
-                alumno_obj=paquete_actual.id_alumno,
-                paquete_base_obj=paquete_actual.id_paquete,
-                monto_pago=monto, 
-                metodo_pago=metodo_pago,
-                fecha_inicio=fecha_inicio,
-                observaciones_pago=observaciones_pago
-            )
-            service.ejecutar()
-            messages.success(request, "Paquete renovado y cobrado con éxito.")
-        else:
-            # Saldar deuda
+            # Asumimos que salda la deuda (si el frontend no maneja renovar por ahora)
             nuevo_pago = Pago.objects.create(
-                fecha=timezone.now().date(),
+                fecha=fecha,
                 monto=monto,
                 metodo_pago=metodo_pago,
                 estado="pagado",
@@ -1472,7 +1459,21 @@ def profes_registrar_pago(request, token):
             )
             paquete_actual.estado_pago = "pagado"
             paquete_actual.save()
-            messages.success(request, "Deuda saldada con éxito.")
+            messages.success(request, f"Pago registrado con éxito a {paquete_actual.id_alumno.id_persona.nombre}.")
+        else:
+            # Pago genérico/manual sin paquete asociado
+            # Creamos un pago genérico con comprobante/notas
+            observaciones_completas = f"Alumna (manual): {alumna_nombre} | Concepto: {concepto} | {observaciones_pago}"
+            nuevo_pago = Pago.objects.create(
+                fecha=fecha,
+                monto=monto,
+                metodo_pago=metodo_pago,
+                estado="pagado",
+                nro_pago=f"MANUAL-{int(timezone.now().timestamp())}",
+                comprobante=observaciones_completas
+            )
+            # No creamos PagoAlumno porque no hay paquete
+            messages.success(request, f"Pago manual registrado con éxito para {alumna_nombre}.")
             
     except Exception as e:
         messages.error(request, f"Error al procesar el pago: {e}")
