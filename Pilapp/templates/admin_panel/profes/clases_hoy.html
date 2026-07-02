@@ -160,25 +160,27 @@
                         {% for alumno_info in c.alumnos %}
                         <div class="alumno-item">
                             <div>
-                                <div class="alumno-name">{{ alumno_info.turno.id_alumno_paquete.id_alumno.id_persona.nombre }} {{ alumno_info.turno.id_alumno_paquete.id_alumno.id_persona.apellido }}</div>
-                                <span class="status-badge status-{{ alumno_info.turno.estado|lower }}">{{ alumno_info.turno.estado }}</span>
+                                <div class="alumno-name">{{ alumno_info.nombre_completo }}</div>
+                                <span class="status-badge status-{{ alumno_info.estado|lower }}">{{ alumno_info.estado }}</span>
                             </div>
                             <div class="d-flex gap-2">
-                                <form method="post" action="{% url 'profes_clases_hoy' token %}" class="m-0">
+                                <form method="post" action="{% url 'profes_marcar_asistencia' token %}" class="m-0">
                                     {% csrf_token %}
-                                    <input type="hidden" name="turno_id" value="{{ alumno_info.turno.id }}">
-                                    <input type="hidden" name="nuevo_estado" value="Asistió">
-                                    <input type="hidden" name="fecha_actual" value="{{ fecha_hoy|date:'Y-m-d' }}">
-                                    <button type="submit" class="btn-action btn-asistio {% if alumno_info.turno.estado == 'Asistió' %}active{% endif %}">
+                                    <input type="hidden" name="tipo" value="{{ alumno_info.tipo }}">
+                                    <input type="hidden" name="id_relacion" value="{{ alumno_info.id_relacion }}">
+                                    <input type="hidden" name="estado" value="Asistió">
+                                    <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
+                                    <button type="submit" class="btn-action btn-asistio {% if alumno_info.estado == 'Asistió' %}active{% endif %}">
                                         <i class="bi bi-check-lg fs-5"></i>
                                     </button>
                                 </form>
-                                <form method="post" action="{% url 'profes_clases_hoy' token %}" class="m-0">
+                                <form method="post" action="{% url 'profes_marcar_asistencia' token %}" class="m-0">
                                     {% csrf_token %}
-                                    <input type="hidden" name="turno_id" value="{{ alumno_info.turno.id }}">
-                                    <input type="hidden" name="nuevo_estado" value="Faltó">
-                                    <input type="hidden" name="fecha_actual" value="{{ fecha_hoy|date:'Y-m-d' }}">
-                                    <button type="submit" class="btn-action btn-falto {% if alumno_info.turno.estado == 'Faltó' %}active{% endif %}">
+                                    <input type="hidden" name="tipo" value="{{ alumno_info.tipo }}">
+                                    <input type="hidden" name="id_relacion" value="{{ alumno_info.id_relacion }}">
+                                    <input type="hidden" name="estado" value="Faltó">
+                                    <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
+                                    <button type="submit" class="btn-action btn-falto {% if alumno_info.estado == 'Faltó' %}active{% endif %}">
                                         <i class="bi bi-x-lg fs-5"></i>
                                     </button>
                                 </form>
