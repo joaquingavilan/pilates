@@ -1433,7 +1433,6 @@ def profes_registrar_pago(request, token):
     profe_nombre = request.POST.get("profe_nombre")
     concepto = request.POST.get("concepto")
     fecha_str = request.POST.get("fecha")
-    nro_factura = request.POST.get("nro_factura", "")
     
     try:
         monto = Decimal(monto_raw) if monto_raw else Decimal(0)
@@ -1446,13 +1445,12 @@ def profes_registrar_pago(request, token):
             paquete_actual = AlumnoPaquete.objects.get(pk=id_alumno_paquete)
             
             # Asumimos que salda la deuda (si el frontend no maneja renovar por ahora)
-            nro_comprobante = nro_factura if nro_factura else f"SALDO-{paquete_actual.id_alumno_paquete}"
             nuevo_pago = Pago.objects.create(
                 fecha=fecha,
                 monto=monto,
                 metodo_pago=metodo_pago,
                 estado="pagado",
-                nro_pago=nro_comprobante
+                nro_pago=f"SALDO-{paquete_actual.id_alumno_paquete}"
             )
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
@@ -1466,13 +1464,12 @@ def profes_registrar_pago(request, token):
             # Pago genérico/manual sin paquete asociado
             # Creamos un pago genérico con comprobante/notas
             observaciones_completas = f"Alumna (manual): {alumna_nombre} | Concepto: {concepto} | {observaciones_pago}"
-            nro_comprobante = nro_factura if nro_factura else f"MANUAL-{int(timezone.now().timestamp())}"
             nuevo_pago = Pago.objects.create(
                 fecha=fecha,
                 monto=monto,
                 metodo_pago=metodo_pago,
                 estado="pagado",
-                nro_pago=nro_comprobante,
+                nro_pago=f"MANUAL-{int(timezone.now().timestamp())}",
                 comprobante=observaciones_completas
             )
             # No creamos PagoAlumno porque no hay paquete
