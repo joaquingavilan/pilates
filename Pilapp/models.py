@@ -544,11 +544,13 @@ from django.utils import timezone
 from .models import AlumnoPaquete, Pago, PagoAlumno, AlumnoPaqueteTurno
 
 class RenovadorPaqueteService:
-    def __init__(self, alumno_obj, paquete_base_obj, monto_pago, metodo_pago):
+    def __init__(self, alumno_obj, paquete_base_obj, monto_pago, metodo_pago, fecha_inicio=None, observaciones_pago=""):
         self.alumno = alumno_obj
         self.paquete_base = paquete_base_obj
         self.monto = monto_pago
         self.metodo = metodo_pago
+        self.fecha_inicio = fecha_inicio or timezone.now().date()
+        self.observaciones_pago = observaciones_pago
 
     def ejecutar(self):
         with transaction.atomic():
@@ -570,7 +572,7 @@ class RenovadorPaqueteService:
                 id_paquete=self.paquete_base,
                 estado="activo",
                 estado_pago="pendiente",
-                fecha_inicio=timezone.now().date()
+                fecha_inicio=self.fecha_inicio
             )
 
             # 3. TRASPASO DE TURNOS AL NUEVO PAQUETE
@@ -598,7 +600,7 @@ class RenovadorPaqueteService:
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
                 id_alumno_paquete=nuevo_paquete,
-                observaciones="Renovación procesada con éxito y traspaso de turnos"
+                observaciones=self.observaciones_pago or "Renovación procesada con éxito y traspaso de turnos"
             )
 
             # 6. FINALIZAR: Marcamos como pagado el nuevo paquete
@@ -609,10 +611,10 @@ class RenovadorPaqueteService:
             # Esto es lo que activa el contador 4/4 en la web
             from .models import Clase, AlumnoClase
             
-            # Buscamos clases desde hoy en adelante que coincidan con los turnos del paquete
+            # Buscamos clases desde la fecha de inicio en adelante que coincidan con los turnos del paquete
             clases_futuras = Clase.objects.filter(
                 id_turno_id__in=turnos_a_mantener,
-                fecha__gte=timezone.now().date()
+                fecha__gte=self.fecha_inicio
             ).order_by('fecha')[:self.paquete_base.cantidad_clases]
 
             for clase in clases_futuras:
