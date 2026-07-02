@@ -1398,3 +1398,122 @@ def profes_marcar_asistencia(request, token):
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
+
+
+def profes_pagos(request, token):
+    if token != "acceso-profes":
+        return HttpResponse("Acceso denegado.", status=403)
+        
+    # Obtener alumnos con paquetes pendientes o parciales
+    paquetes_deudores = AlumnoPaquete.objects.filter(
+        estado='activo',
+        estado_pago__in=['pendiente', 'parcial']
+    ).select_related('id_alumno__id_persona', 'id_paquete')
+    
+    # Obtener lista de instructoras para el selector
+    instructoras = Instructor.objects.select_related('id_persona').all()
+    
+    context = {
+        'token': token,
+        'paquetes_deudores': paquetes_deudores,
+        'instructoras': instructoras,
+    }
+    return render(request, "admin_panel/profes/pagos.html", context)
+
+
+@require_POST
+@transaction.atomic
+def profes_registrar_pago(request, token):
+    if token != "acceso-profes":
+        return HttpResponse("Acceso denegado.", status=403)
+        
+    id_alumno_paquete = request.POST.get("id_alumno_paquete")
+    monto_raw = request.POST.get("monto")
+    metodo_pago = request.POST.get("metodo_pago")
+    id_profesora = request.POST.get("id_profesora")
+    tipo_pago = request.POST.get("tipo_pago") # "saldar" o "renovar"
+    fecha_inicio_str = request.POST.get("fecha_inicio")
+    
+    try:
+        monto = Decimal(monto_raw)
+        paquete_actual = AlumnoPaquete.objects.get(pk=id_alumno_paquete)
+        profesora = Instructor.objects.get(pk=id_profesora)
+        nombre_profe = f"{profesora.id_persona.nombre} {profesora.id_persona.apellido}"
+        observaciones_pago = f"Cobrado por: {nombre_profe}"
+        
+        if tipo_pago == "renovar":
+            # Renovar paquete
+            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date() if fecha_inicio_str else timezone.now().date()
+            
+            from .models import RenovadorPaqueteService
+            service = RenovadorPaqueteService(
+                alumno_obj=paquete_actual.id_alumno,
+                paquete_base_obj=paquete_actual.id_paquete,
+                monto_pago=monto, 
+                metodo_pago=metodo_pago,
+                fecha_inicio=fecha_inicio,
+                observaciones_pago=observaciones_pago
+            )
+            service.ejecutar()
+            messages.success(request, "Paquete renovado y cobrado con éxito.")
+        else:
+            # Saldar deuda
+            nuevo_pago = Pago.objects.create(
+                fecha=timezone.now().date(),
+                monto=monto,
+                metodo_pago=metodo_pago,
+                estado="pagado",
+                nro_pago=f"SALDO-{paquete_actual.id_alumno_paquete}"
+            )
+            PagoAlumno.objects.create(
+                id_pago=nuevo_pago,
+                id_alumno_paquete=paquete_actual,
+                observaciones=observaciones_pago
+            )
+            paquete_actual.estado_pago = "pagado"
+            paquete_actual.save()
+            messages.success(request, "Deuda saldada con éxito.")
+            
+    except Exception as e:
+        messages.error(request, f"Error al procesar el pago: {e}")
+        
+    return redirect("profes_pagos", token=token)
+
+
+def panel_resumen_pagos(request):
+    mes_str = request.GET.get("mes")
+    if mes_str:
+        try:
+            mes_actual = datetime.strptime(mes_str, "%Y-%m").date()
+        except ValueError:
+            mes_actual = timezone.now().date().replace(day=1)
+    else:
+        mes_actual = timezone.now().date().replace(day=1)
+        
+    # Obtener el primer y último día del mes
+    import calendar
+    _, last_day = calendar.monthrange(mes_actual.year, mes_actual.month)
+    fin_mes = mes_actual.replace(day=last_day)
+    
+    pagos = Pago.objects.filter(
+        fecha__gte=mes_actual,
+        fecha__lte=fin_mes,
+        estado__in=["pagado", "parcial"]
+    ).order_by("-fecha")
+    
+    # Calcular totales
+    total_efectivo = pagos.filter(metodo_pago="efectivo").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_transferencia = pagos.filter(metodo_pago="transferencia").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_tarjeta = pagos.filter(metodo_pago="tarjeta").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_general = total_efectivo + total_transferencia + total_tarjeta
+    
+    context = {
+        "mes_actual": mes_actual,
+        "pagos": pagos,
+        "total_efectivo": total_efectivo,
+        "total_transferencia": total_transferencia,
+        "total_tarjeta": total_tarjeta,
+        "total_general": total_general,
+    }
+    return render(request, "admin_panel/pagos/resumen.html", context)
+

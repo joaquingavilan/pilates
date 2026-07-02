@@ -1,0 +1,102 @@
+{% extends 'admin_panel/base.html' %}
+{% load humanize %}
+
+{% block title %}Resumen de Facturación{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">Resumen de Facturación</h4>
+    
+    <form method="get" class="d-flex gap-2">
+        <input type="month" name="mes" value="{{ mes_actual|date:'Y-m' }}" class="form-control form-control-sm bg-dark text-white border-secondary" style="color-scheme: dark;">
+        <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-body">
+                <h6 class="text-white-50 mb-2">Total General</h6>
+                <h3 class="mb-0 fw-bold text-white">Gs. {{ total_general|floatformat:"0"|intcomma }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-body">
+                <h6 class="text-white-50 mb-2">Efectivo</h6>
+                <h4 class="mb-0 text-success">Gs. {{ total_efectivo|floatformat:"0"|intcomma }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-body">
+                <h6 class="text-white-50 mb-2">Transferencia</h6>
+                <h4 class="mb-0 text-info">Gs. {{ total_transferencia|floatformat:"0"|intcomma }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-secondary h-100">
+            <div class="card-body">
+                <h6 class="text-white-50 mb-2">Tarjeta</h6>
+                <h4 class="mb-0 text-warning">Gs. {{ total_tarjeta|floatformat:"0"|intcomma }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary">
+    <div class="card-header border-secondary p-3">
+        <h6 class="mb-0">Detalle de Pagos - {{ mes_actual|date:"F Y" }}</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="text-white-50 border-secondary">Fecha</th>
+                        <th class="text-white-50 border-secondary">Monto</th>
+                        <th class="text-white-50 border-secondary">Método</th>
+                        <th class="text-white-50 border-secondary">Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pago in pagos %}
+                    <tr>
+                        <td class="border-secondary">{{ pago.fecha|date:"d/m/Y" }}</td>
+                        <td class="border-secondary fw-semibold">Gs. {{ pago.monto|floatformat:"0"|intcomma }}</td>
+                        <td class="border-secondary">
+                            {% if pago.metodo_pago == 'efectivo' %}
+                                <span class="badge bg-success text-white">Efectivo</span>
+                            {% elif pago.metodo_pago == 'transferencia' %}
+                                <span class="badge bg-info text-dark">Transferencia</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Tarjeta</span>
+                            {% endif %}
+                        </td>
+                        <td class="border-secondary">
+                            <small class="text-white-50">
+                                {% for pa in pago.pagoalumno_set.all %}
+                                    {{ pa.id_alumno_paquete.id_alumno.id_persona.nombre }} {{ pa.id_alumno_paquete.id_alumno.id_persona.apellido }} - 
+                                    {% if pa.observaciones %}{{ pa.observaciones }}{% else %}Sin obs.{% endif %}
+                                {% empty %}
+                                    --
+                                {% endfor %}
+                            </small>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-white-50 border-secondary">No hay pagos registrados este mes.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

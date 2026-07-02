@@ -31,6 +31,7 @@ urlpatterns = [
     
     # Pagos
     path('pagos/', views_panel.panel_pagos, name='panel_pagos'),
+    path('resumen-pagos/', views_panel.panel_resumen_pagos, name='panel_resumen_pagos'),
     
     # Prospectos
     path('prospectos/', views_panel.panel_prospectos, name='panel_prospectos'),
@@ -52,4 +53,6 @@ urlpatterns = [
     # Vista Mágica Profes
     path('profes/<str:token>/clases/', views_panel.profes_clases_hoy, name='profes_clases_hoy'),
     path('profes/<str:token>/asistencia/', views_panel.profes_marcar_asistencia, name='profes_marcar_asistencia'),
+    path('profes/<str:token>/pagos/', views_panel.profes_pagos, name='profes_pagos'),
+    path('profes/<str:token>/pagos/registrar/', views_panel.profes_registrar_pago, name='profes_registrar_pago'),
 ]

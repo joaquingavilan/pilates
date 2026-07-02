@@ -108,7 +108,23 @@
         </form>
     </div>
 
-    <div class="container mt-4">
+    <!-- Navigation Tabs -->
+    <div class="bg-dark px-3 pt-3 border-bottom border-secondary mb-4 sticky-top" style="top: 76px; z-index: 90;">
+        <ul class="nav nav-tabs border-0" style="margin-bottom: -1px;">
+            <li class="nav-item">
+                <a class="nav-link active bg-dark text-white border-secondary border-bottom-0 fw-semibold" href="{% url 'profes_clases_hoy' token %}">
+                    <i class="bi bi-calendar-check me-2"></i>Asistencias
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white-50 border-0" href="{% url 'profes_pagos' token %}">
+                    <i class="bi bi-cash-coin me-2"></i>Cobros
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="container mt-3">
         {% if messages %}
         <div class="mb-3">
             {% for message in messages %}
