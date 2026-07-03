@@ -143,6 +143,13 @@
                                     {% for pa in pago.pagoalumno_set.all %}
                                         <strong>{{ pa.id_alumno_paquete.id_alumno.id_persona.nombre }} {{ pa.id_alumno_paquete.id_alumno.id_persona.apellido }}</strong> - 
                                         {% if pa.observaciones %}{{ pa.observaciones }}{% else %}Sin obs.{% endif %}
+                                        {% if pa.id_alumno_paquete.id_alumno.id_persona.ruc or pa.id_alumno_paquete.id_alumno.id_persona.razon_social %}
+                                        <br>
+                                        <span class="text-primary" style="font-size: 0.8rem;">
+                                            <i class="bi bi-receipt"></i> 
+                                            Facturar a: {{ pa.id_alumno_paquete.id_alumno.id_persona.razon_social|default:"(Sin Razón Social)" }} - RUC: {{ pa.id_alumno_paquete.id_alumno.id_persona.ruc|default:"(Sin RUC)" }}
+                                        </span>
+                                        {% endif %}
                                     {% endfor %}
                                 {% elif pago.comprobante %}
                                     {{ pago.comprobante }}

@@ -1535,11 +1535,23 @@ def panel_resumen_pagos(request):
     _, last_day = calendar.monthrange(mes_actual.year, mes_actual.month)
     fin_mes = mes_actual.replace(day=last_day)
     
+    from django.db.models import Q
     pagos = Pago.objects.filter(
         fecha__gte=mes_actual,
         fecha__lte=fin_mes,
         estado__in=["pagado", "parcial"]
-    ).order_by("-fecha")
+    )
+    
+    falta_facturar = request.GET.get('falta_facturar')
+    if falta_facturar == '1':
+        pagos = pagos.filter(
+            Q(nro_pago__isnull=True) | 
+            Q(nro_pago__exact="") | 
+            Q(nro_pago__startswith="MANUAL-") | 
+            Q(nro_pago__startswith="APQ-")
+        )
+        
+    pagos = pagos.order_by("-fecha")
     
     # Calcular totales
     total_efectivo = pagos.filter(metodo_pago="efectivo").aggregate(total=Sum("monto"))["total"] or Decimal("0")

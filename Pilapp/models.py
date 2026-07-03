@@ -52,6 +52,7 @@ class Persona(models.Model):
     apellido = models.CharField(max_length=100)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     ruc = models.CharField(max_length=20, blank=True, null=True)
+    razon_social = models.CharField(max_length=150, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
 
     def __str__(self):
