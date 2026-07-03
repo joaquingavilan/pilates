@@ -60,6 +60,11 @@
     </div>
     
     <form method="get" class="d-flex gap-2 align-items-center bg-white p-2 rounded-3 shadow-sm border border-light">
+        <select name="estado_factura" class="form-select form-select-sm border-0 bg-light fw-medium" style="width: auto;">
+            <option value="">Todas las facturas</option>
+            <option value="falta" {% if request.GET.estado_factura == 'falta' %}selected{% endif %}>Falta Facturar</option>
+            <option value="facturado" {% if request.GET.estado_factura == 'facturado' %}selected{% endif %}>Ya Facturados</option>
+        </select>
         <input type="month" name="mes" value="{{ mes_actual|date:'Y-m' }}" class="form-control form-control-sm border-0 bg-light fw-medium">
         <button type="submit" class="btn btn-sm btn-dark px-3 rounded-2 fw-semibold">Filtrar</button>
     </form>

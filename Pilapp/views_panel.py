@@ -1524,9 +1524,16 @@ def panel_resumen_pagos(request):
         estado__in=["pagado", "parcial"]
     )
     
-    falta_facturar = request.GET.get('falta_facturar')
-    if falta_facturar == '1':
+    estado_factura = request.GET.get('estado_factura')
+    if estado_factura == 'falta':
         pagos = pagos.filter(
+            Q(nro_pago__isnull=True) | 
+            Q(nro_pago__exact="") | 
+            Q(nro_pago__startswith="MANUAL-") | 
+            Q(nro_pago__startswith="APQ-")
+        )
+    elif estado_factura == 'facturado':
+        pagos = pagos.exclude(
             Q(nro_pago__isnull=True) | 
             Q(nro_pago__exact="") | 
             Q(nro_pago__startswith="MANUAL-") | 
