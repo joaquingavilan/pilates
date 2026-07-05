@@ -190,6 +190,10 @@
                    href="{% url 'panel_resumen_pagos' %}">
                     <i class="bi bi-graph-up-arrow"></i> Resumen de Facturación
                 </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'panel_vencimientos' %}active{% endif %}" 
+                   href="{% url 'panel_vencimientos' %}">
+                    <i class="bi bi-hourglass-split"></i> Vencimientos y Restantes
+                </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if request.resolver_match.url_name == 'panel_prospectos' %}active{% endif %}" 
