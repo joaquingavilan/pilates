@@ -383,6 +383,26 @@ def panel_alumno_editar(request, id_alumno):
     }
     return render(request, "admin_panel/alumnos/editar.html", context)
 
+@require_POST
+def panel_alumno_paquete_eliminar(request, id_alumno, id_alumno_paquete):
+    """Vista para eliminar un paquete."""
+    from .models import AlumnoPaquete
+    paquete_alumno = get_object_or_404(AlumnoPaquete, id_alumno_paquete=id_alumno_paquete, id_alumno_id=id_alumno)
+    
+    with transaction.atomic():
+        # Al eliminar el paquete (on_delete=CASCADE suele estar en las dependencias, pero lo hacemos explícito por las dudas)
+        # Se borran turnos asignados
+        paquete_alumno.alumnopaqueteturno_set.all().delete()
+        # Se borran clases
+        paquete_alumno.alumnoclase_set.all().delete()
+        # Se borran pagos 
+        paquete_alumno.pagoalumno_set.all().delete()
+        # Borrar el paquete del alumno
+        paquete_alumno.delete()
+        
+    messages.success(request, "Paquete eliminado exitosamente.")
+    return redirect("panel_alumno_detalle", id_alumno=id_alumno)
+
 def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
     """Vista para editar el paquete, estado y pago."""
     from .models import AlumnoPaquete, Paquete

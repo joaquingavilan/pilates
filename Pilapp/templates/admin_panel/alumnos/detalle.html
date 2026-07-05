@@ -172,9 +172,15 @@
                                             data-id="{{ paquete.id_alumno_paquete }}" 
                                             data-paquete="{{ paquete.id_paquete.id_paquete }}"
                                             data-estado="{{ paquete.estado }}" 
-                                            data-pago="{{ paquete.estado_pago }}">
+                                            data-pago="{{ paquete.estado_pago }}" title="Editar Paquete">
                                         <i class="bi bi-pencil"></i>
                                     </button>
+                                    <form method="post" action="{% url 'panel_alumno_paquete_eliminar' alumno.id_alumno paquete.id_alumno_paquete %}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este paquete? Esta acción eliminará también sus clases y pagos asociados de manera permanente.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger mb-1" title="Eliminar Paquete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
