@@ -288,6 +288,9 @@ def panel_alumno_crear(request):
         apellido = request.POST.get("apellido", "").strip()
         telefono = request.POST.get("telefono", "").strip()
         canal = request.POST.get("canal_captacion", "").strip()
+        ruc = request.POST.get("ruc", "").strip()
+        razon_social = request.POST.get("razon_social", "").strip()
+        razon_social = request.POST.get("razon_social", "").strip()
         
         paquete_val = request.POST.get("paquete")
         turnos_seleccionados = request.POST.getlist("turnos")
@@ -303,7 +306,9 @@ def panel_alumno_crear(request):
                     persona = Persona.objects.create(
                         nombre=nombre,
                         apellido=apellido,
-                        telefono=telefono
+                        telefono=telefono,
+                        ruc=ruc,
+                        razon_social=razon_social
                     )
                     alumno = Alumno.objects.create(
                         id_persona=persona,
@@ -352,8 +357,12 @@ def panel_alumno_editar(request, id_alumno):
         apellido = request.POST.get("apellido", "").strip()
         telefono = request.POST.get("telefono", "").strip()
         ruc = request.POST.get("ruc", "").strip()
+        razon_social = request.POST.get("razon_social", "").strip()
         estado = request.POST.get("estado", "ocasional")
         canal = request.POST.get("canal_captacion", "").strip()
+        ruc = request.POST.get("ruc", "").strip()
+        razon_social = request.POST.get("razon_social", "").strip()
+        razon_social = request.POST.get("razon_social", "").strip()
         observaciones = request.POST.get("observaciones", "").strip()
         
         if not nombre or not apellido:
@@ -365,6 +374,7 @@ def panel_alumno_editar(request, id_alumno):
                     persona.apellido = apellido
                     persona.telefono = telefono
                     persona.ruc = ruc
+                    persona.razon_social = razon_social
                     persona.observaciones = observaciones
                     persona.save()
                     
