@@ -207,6 +207,68 @@ def api_calendario(request):
 
     return JsonResponse(result)
 
+
+@require_GET
+def panel_vencimientos(request):
+    """Vista para ver vencimientos de paquetes activos y clases restantes."""
+    from .models import AlumnoPaquete, AlumnoClase
+    from datetime import timedelta
+    from django.utils import timezone
+    
+    paquetes_activos = AlumnoPaquete.objects.filter(estado='activo').select_related('id_alumno__id_persona', 'id_paquete')
+    
+    vencimientos = []
+    hoy = timezone.now().date()
+    
+    filtro_dias = request.GET.get('filtro_dias')
+    filtro_restantes = request.GET.get('filtro_restantes')
+    
+    for paquete in paquetes_activos:
+        clases_usadas = AlumnoClase.objects.filter(
+            id_alumno_paquete=paquete,
+            estado__in=['asistió', 'faltó', 'recuperó']
+        ).count()
+        
+        paquete_total = paquete.id_paquete.cantidad_clases
+        clases_restantes = paquete_total - clases_usadas
+        if clases_restantes < 0:
+            clases_restantes = 0
+            
+        fecha_venc = None
+        dias_vencer = 9999
+        if paquete.fecha_inicio:
+            fecha_venc = paquete.fecha_inicio + timedelta(days=30)
+            dias_vencer = (fecha_venc - hoy).days
+            
+        # Filtros
+        if filtro_dias:
+            if dias_vencer > int(filtro_dias):
+                continue
+                
+        if filtro_restantes:
+            if filtro_restantes == '2':
+                if clases_restantes > 2:
+                    continue
+            else:
+                if clases_restantes != int(filtro_restantes):
+                    continue
+                    
+        vencimientos.append({
+            'alumno': paquete.id_alumno,
+            'fecha_inicio': paquete.fecha_inicio,
+            'fecha_venc': fecha_venc,
+            'dias_vencer': dias_vencer,
+            'paquete_total': paquete_total,
+            'clases_restantes': clases_restantes
+        })
+        
+    # Ordenar por clases restantes ascendente y dias_vencer ascendente
+    vencimientos.sort(key=lambda x: (x['clases_restantes'], x['dias_vencer']))
+    
+    return render(request, "admin_panel/alumnos/vencimientos.html", {
+        "vencimientos": vencimientos
+    })
+
 def panel_alumnos(request):
     """Lista de alumnos con filtros."""
     from .models import AlumnoPaqueteTurno
