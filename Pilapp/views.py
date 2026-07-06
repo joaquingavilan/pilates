@@ -1696,8 +1696,7 @@ def registrar_alumno_datos(data):
                     clase = Clase.objects.create(
                         id_instructor=Instructor.objects.first(), # Obtener la primera instructora por defecto
                         id_turno=turno,
-                        fecha=fecha_clase,
-                        feriado=False
+                        fecha=fecha_clase
                     )
                     clases_a_reservar.append((turno, clase))
                     logging.info(f"[registrar_alumno_datos] Clase auto-creada y reservada: {fecha_clase} {turno.horario}")
