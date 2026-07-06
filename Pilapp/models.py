@@ -191,9 +191,15 @@ class Turno(models.Model):
         ('Sábado', 'Sábado'),
     ]
 
+    DISCIPLINA_CHOICES = [
+        ('Reformer', 'Reformer'),
+        ('MAT', 'MAT'),
+    ]
+
     id_turno = models.AutoField(primary_key=True)
     horario = models.TimeField()
-    dia = models.CharField(max_length=10, choices=DIAS_CHOICES)
+    dia = models.CharField(max_length=20, choices=DIAS_CHOICES)
+    disciplina = models.CharField(max_length=50, choices=DISCIPLINA_CHOICES, default='Reformer')
 
     def __str__(self):
         return f"{self.dia} - {self.horario.strftime('%H:%M')}"

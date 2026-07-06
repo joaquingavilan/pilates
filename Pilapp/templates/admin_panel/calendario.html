@@ -20,6 +20,14 @@
     </div>
 </div>
 
+<!-- Filtro de Disciplina -->
+<div class="mb-4">
+    <div class="btn-group" role="group">
+        <a href="?disciplina=Reformer{% if request.GET.semana %}&semana={{ request.GET.semana }}{% endif %}" class="btn btn-outline-primary {% if disciplina_activa == 'Reformer' %}active{% endif %}">Reformer</a>
+        <a href="?disciplina=MAT{% if request.GET.semana %}&semana={{ request.GET.semana }}{% endif %}" class="btn btn-outline-primary {% if disciplina_activa == 'MAT' %}active{% endif %}">Pilates MAT</a>
+    </div>
+</div>
+
 <!-- Leyenda -->
 <div class="mb-3">
     <span class="badge bg-success me-2">Disponible</span>

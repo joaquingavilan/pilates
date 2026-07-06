@@ -28,30 +28,72 @@
             
             <p class="text-muted mb-4">Selecciona los turnos semanales a los que asistirá la alumna a partir de hoy.</p>
             
-            <div class="row g-3">
-                {% for dia, turnos_dia in turnos_por_dia.items %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="card border-0 bg-light h-100">
-                        <div class="card-body p-3">
-                            <h6 class="card-title text-primary border-bottom pb-2 mb-3">{{ dia }}</h6>
-                            {% for t in turnos_dia %}
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" name="turnos" 
-                                       value="{{ t.dia }} {{ t.horario|time:'H:i' }}" 
-                                       id="turno_{{ t.id_turno }}"
-                                       {% if t.id_turno in turnos_asignados_ids %}checked{% endif %}>
-                                <label class="form-check-label d-flex justify-content-between align-items-center" for="turno_{{ t.id_turno }}">
-                                    <span>{{ t.horario|time:"H:i" }}</span>
-                                    {% if t.id_turno in turnos_asignados_ids %}
-                                        <span class="badge bg-success" style="font-size: 0.7em;">Actual</span>
-                                    {% endif %}
-                                </label>
+            <!-- Nav tabs -->
+            <ul class="nav nav-tabs mb-3" id="turnosTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="reformer-tab" data-bs-toggle="tab" data-bs-target="#reformer" type="button" role="tab">Reformer</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="mat-tab" data-bs-toggle="tab" data-bs-target="#mat" type="button" role="tab">Pilates MAT</button>
+                </li>
+            </ul>
+
+            <!-- Tab panes -->
+            <div class="tab-content" id="turnosTabContent">
+                <div class="tab-pane fade show active" id="reformer" role="tabpanel">
+                    <div class="row g-3">
+                        {% for dia, turnos_dia in turnos_reformer.items %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title text-primary border-bottom pb-2 mb-3">{{ dia }}</h6>
+                                    {% for t in turnos_dia %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="turnos" 
+                                               value="{{ t.dia }} {{ t.horario|time:'H:i' }}" 
+                                               id="turno_{{ t.id_turno }}"
+                                               {% if t.id_turno in turnos_asignados_ids %}checked{% endif %}>
+                                        <label class="form-check-label d-flex justify-content-between align-items-center" for="turno_{{ t.id_turno }}">
+                                            <span>{{ t.horario|time:"H:i" }}</span>
+                                            {% if t.id_turno in turnos_asignados_ids %}
+                                                <span class="badge bg-success" style="font-size: 0.7em;">Actual</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
-                            {% endfor %}
                         </div>
+                        {% endfor %}
                     </div>
                 </div>
-                {% endfor %}
+                <div class="tab-pane fade" id="mat" role="tabpanel">
+                    <div class="row g-3">
+                        {% for dia, turnos_dia in turnos_mat.items %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title text-primary border-bottom pb-2 mb-3">{{ dia }}</h6>
+                                    {% for t in turnos_dia %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="turnos" 
+                                               value="{{ t.dia }} {{ t.horario|time:'H:i' }}" 
+                                               id="turno_{{ t.id_turno }}"
+                                               {% if t.id_turno in turnos_asignados_ids %}checked{% endif %}>
+                                        <label class="form-check-label d-flex justify-content-between align-items-center" for="turno_{{ t.id_turno }}">
+                                            <span>{{ t.horario|time:"H:i" }}</span>
+                                            {% if t.id_turno in turnos_asignados_ids %}
+                                                <span class="badge bg-success" style="font-size: 0.7em;">Actual</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             <div class="d-flex justify-content-end mt-4 pt-3 border-top">

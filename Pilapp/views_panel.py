@@ -339,11 +339,18 @@ def panel_alumno_crear(request):
     turnos = Turno.objects.all().order_by('dia', 'horario')
     
     dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    turnos_por_dia = {dia: [] for dia in dias_orden}
+    turnos_reformer = {dia: [] for dia in dias_orden}
+    turnos_mat = {dia: [] for dia in dias_orden}
     for t in turnos:
-        if t.dia in turnos_por_dia:
-            turnos_por_dia[t.dia].append(t)
-    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+        if t.disciplina == 'MAT':
+            if t.dia in turnos_mat:
+                turnos_mat[t.dia].append(t)
+        else:
+            if t.dia in turnos_reformer:
+                turnos_reformer[t.dia].append(t)
+                
+    turnos_reformer = {k: v for k, v in turnos_reformer.items() if v}
+    turnos_mat = {k: v for k, v in turnos_mat.items() if v}
 
     if request.method == "POST":
         nombre = request.POST.get("nombre", "").strip()
@@ -360,7 +367,7 @@ def panel_alumno_crear(request):
         
         if not nombre or not apellido:
             messages.error(request, "Nombre y apellido son obligatorios.")
-            return render(request, "admin_panel/alumnos/crear.html", {"paquetes": paquetes, "turnos_por_dia": turnos_por_dia})
+            return render(request, "admin_panel/alumnos/crear.html", {"paquetes": paquetes, "turnos_reformer": turnos_reformer, "turnos_mat": turnos_mat})
             
         try:
             if paquete_val == "ocasional" or not paquete_val:
@@ -406,7 +413,8 @@ def panel_alumno_crear(request):
             
     return render(request, "admin_panel/alumnos/crear.html", {
         "paquetes": paquetes,
-        "turnos_por_dia": turnos_por_dia
+        "turnos_reformer": turnos_reformer,
+        "turnos_mat": turnos_mat
     })
 
 def panel_alumno_editar(request, id_alumno):
@@ -741,12 +749,20 @@ def panel_alumno_editar_turnos(request, id_alumno):
         return redirect("panel_alumno_detalle", id_alumno=id_alumno)
         
     turnos = Turno.objects.all().order_by('dia', 'horario')
+    
     dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    turnos_por_dia = {dia: [] for dia in dias_orden}
+    turnos_reformer = {dia: [] for dia in dias_orden}
+    turnos_mat = {dia: [] for dia in dias_orden}
     for t in turnos:
-        if t.dia in turnos_por_dia:
-            turnos_por_dia[t.dia].append(t)
-    turnos_por_dia = {k: v for k, v in turnos_por_dia.items() if v}
+        if t.disciplina == 'MAT':
+            if t.dia in turnos_mat:
+                turnos_mat[t.dia].append(t)
+        else:
+            if t.dia in turnos_reformer:
+                turnos_reformer[t.dia].append(t)
+                
+    turnos_reformer = {k: v for k, v in turnos_reformer.items() if v}
+    turnos_mat = {k: v for k, v in turnos_mat.items() if v}
     
     turnos_asignados_ids = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete).values_list('id_turno_id', flat=True)
     
@@ -773,7 +789,8 @@ def panel_alumno_editar_turnos(request, id_alumno):
     context = {
         'alumno': alumno,
         'alumno_paquete': alumno_paquete,
-        'turnos_por_dia': turnos_por_dia,
+        'turnos_reformer': turnos_reformer,
+        'turnos_mat': turnos_mat,
         'turnos_asignados_ids': list(turnos_asignados_ids)
     }
     return render(request, "admin_panel/alumnos/editar_turnos.html", context)
@@ -969,7 +986,8 @@ def panel_turnos(request):
     """Vista de todos los turnos."""
     from .models import AlumnoPaqueteTurno
     
-    turnos = Turno.objects.all().order_by('dia', 'horario')
+    disciplina_activa = request.GET.get('disciplina', 'Reformer')
+    turnos = Turno.objects.filter(disciplina=disciplina_activa).order_by('dia', 'horario')
     
     # Contar alumnos por turno (solo paquetes activos)
     conteo = {}
@@ -1002,6 +1020,7 @@ def panel_turnos(request):
     
     return render(request, 'admin_panel/turnos.html', {
         'turnos_por_dia': turnos_ordenados,
+        'disciplina_activa': disciplina_activa,
     })
 
 
