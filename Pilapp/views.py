@@ -1615,17 +1615,23 @@ def registrar_alumno_datos(data):
     turnos_asignados = []
     clases_a_reservar = []  # Nuevo: para preparar las clases validadas
 
-    # 📌 Validar turnos
+    # ✅ Validar turnos
     logging.info(f"[registrar_alumno_datos] Validando turnos: {data.get('turnos')}")
     for turno_str in data["turnos"]:
         try:
-            dia, horario = turno_str.split()
-            logging.debug(f"[registrar_alumno_datos] Buscando turno: dia={dia}, horario={horario}")
-            turno = Turno.objects.get(dia=dia, horario=horario)
+            if str(turno_str).isdigit():
+                # Viene desde el panel web (id_turno)
+                turno = Turno.objects.get(id_turno=int(turno_str))
+            else:
+                # Viene desde el bot (string como "Jueves 19:30")
+                dia, horario = turno_str.split()
+                # Bot solo soporta Reformer por defecto
+                turno = Turno.objects.get(dia=dia, horario=horario, disciplina='Reformer')
+                
             logging.debug(f"[registrar_alumno_datos] Turno encontrado: {turno}, estado={turno.estado}")
             if turno.estado == "Ocupado":
                 logging.warning(f"[registrar_alumno_datos] Turno {turno_str} ocupado")
-                errores.append(f"El turno {turno_str} ya tiene su cupo general completo.")
+                errores.append(f"El turno {turno.dia} {turno.horario} ya tiene su cupo general completo.")
             else:
                 turnos_asignados.append(turno)
                 logging.info(f"[registrar_alumno_datos] Turno {turno_str} asignado correctamente")
@@ -1633,7 +1639,7 @@ def registrar_alumno_datos(data):
             logging.error(f"[registrar_alumno_datos] Turno {turno_str} no existe")
             errores.append(f"El turno {turno_str} no existe.")
 
-    # 📌 Validar paquete
+    # ✅ Validar paquete
     logging.info(f"[registrar_alumno_datos] Validando paquete: {data.get('paquete')} clases")
     try:
         paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
@@ -1645,7 +1651,7 @@ def registrar_alumno_datos(data):
     if not turnos_asignados:
         errores.append("Debes seleccionar al menos un turno para registrar el paquete.")
 
-    # 📌 Validar clases específicas
+    # ✅ Validar clases específicas
     if not errores:
         cantidad_clases = paquete.cantidad_clases
         cantidad_turnos = len(turnos_asignados)
@@ -1674,7 +1680,6 @@ def registrar_alumno_datos(data):
                 logging.debug(f"[registrar_alumno_datos] Validando clase para fecha: {fecha_clase}")
                 try:
                     clase = Clase.objects.get(
-                        id_instructor=Instructor.objects.get(id_instructor=1),
                         id_turno=turno,
                         fecha=fecha_clase
                     )
@@ -1686,8 +1691,16 @@ def registrar_alumno_datos(data):
                         clases_a_reservar.append((turno, clase))
                         logging.info(f"[registrar_alumno_datos] Clase reservada: {fecha_clase} {turno.horario}")
                 except Clase.DoesNotExist:
-                    logging.error(f"[registrar_alumno_datos] No existe clase para {fecha_clase} en turno {turno.dia} {turno.horario}")
-                    errores.append(f"No existe clase programada para {fecha_clase} en el turno {turno.dia} {turno.horario}.")
+                    logging.warning(f"[registrar_alumno_datos] No existe clase para {fecha_clase} en turno {turno.dia} {turno.horario}. Creando clase on-the-fly...")
+                    # Crear clase on the fly
+                    clase = Clase.objects.create(
+                        id_instructor=Instructor.objects.first(), # Obtener la primera instructora por defecto
+                        id_turno=turno,
+                        fecha=fecha_clase,
+                        feriado=False
+                    )
+                    clases_a_reservar.append((turno, clase))
+                    logging.info(f"[registrar_alumno_datos] Clase auto-creada y reservada: {fecha_clase} {turno.horario}")
 
     # 📌 Si hay errores, devolverlos todos juntos
     if errores:
