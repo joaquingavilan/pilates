@@ -1400,12 +1400,8 @@ def panel_feriados_eliminar(request, fecha_str):
 # --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
 
 def profes_clases_hoy(request, token):
-    # Validar token y disciplina
-    if token == "acceso-profes":
-        disciplina_activa = "Reformer"
-    elif token == "acceso-profes-mat":
-        disciplina_activa = "MAT"
-    else:
+    # Validar token (ambos tokens ahora muestran ambas disciplinas)
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
         
     # Obtener fecha
@@ -1421,8 +1417,8 @@ def profes_clases_hoy(request, token):
     else:
         hoy = timezone.now().date()
     
-    # Buscar todas las clases de hoy ordenadas por horario del turno (y por disciplina)
-    clases_hoy = Clase.objects.filter(fecha=hoy, id_turno__disciplina=disciplina_activa).select_related('id_turno').order_by('id_turno__horario')
+    # Buscar todas las clases de hoy ordenadas por horario del turno (SIN FILTRAR DISCIPLINA)
+    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
     
     clases_data = []
     
@@ -1458,6 +1454,7 @@ def profes_clases_hoy(request, token):
         clases_data.append({
             'clase': clase,
             'horario': clase.id_turno.horario.strftime('%H:%M') if clase.id_turno else 'S/H',
+            'disciplina': clase.id_turno.disciplina if clase.id_turno else 'Reformer',
             'alumnos': alumnos_lista
         })
         
