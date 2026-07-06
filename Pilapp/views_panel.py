@@ -857,6 +857,7 @@ def panel_alumno_detalle(request, id_alumno):
             'id_clase': ac.id_clase.id_clase,
             'fecha': ac.id_clase.fecha,
             'horario': ac.id_clase.id_turno.horario.strftime('%H:%M'),
+            'disciplina': ac.id_clase.id_turno.disciplina,
             'tipo': 'regular',
             'estado': ac.estado,
         })
@@ -871,6 +872,7 @@ def panel_alumno_detalle(request, id_alumno):
             'id_clase': ao.id_clase.id_clase,
             'fecha': ao.id_clase.fecha,
             'horario': ao.id_clase.id_turno.horario.strftime('%H:%M'),
+            'disciplina': ao.id_clase.id_turno.disciplina,
             'tipo': 'ocasional',
             'estado': ao.estado,
         })

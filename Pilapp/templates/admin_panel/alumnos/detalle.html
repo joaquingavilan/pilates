@@ -101,6 +101,11 @@
                         <span>
                             <i class="bi bi-calendar-event text-primary me-2"></i>
                             {{ asignacion.id_turno.dia }}
+                            {% if asignacion.id_turno.disciplina == 'MAT' %}
+                                <span class="badge bg-info ms-1">MAT</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-1">Reformer</span>
+                            {% endif %}
                         </span>
                         <span class="badge bg-primary">{{ asignacion.id_turno.horario|time:"H:i" }}</span>
                     </li>
@@ -212,6 +217,7 @@
                             <tr>
                                 <th>Fecha</th>
                                 <th>Horario</th>
+                                <th>Disciplina</th>
                                 <th>Tipo</th>
                                 <th>Estado</th>
                                 <th></th>
@@ -222,6 +228,13 @@
                             <tr>
                                 <td>{{ clase.fecha|date:"d/m/Y" }}</td>
                                 <td>{{ clase.horario }}</td>
+                                <td>
+                                    {% if clase.disciplina == 'MAT' %}
+                                        <span class="badge bg-info">MAT</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Reformer</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <span class="badge {% if clase.tipo == 'regular' %}bg-success{% else %}bg-info{% endif %} badge-estado">
                                         {{ clase.tipo|title }}
