@@ -198,7 +198,7 @@ class Turno(models.Model):
 
     id_turno = models.AutoField(primary_key=True)
     horario = models.TimeField()
-    dia = models.CharField(max_length=20, choices=DIAS_CHOICES)
+    dia = models.CharField(max_length=10, choices=DIAS_CHOICES)
     disciplina = models.CharField(max_length=50, choices=DISCIPLINA_CHOICES, default='Reformer')
 
     def __str__(self):
