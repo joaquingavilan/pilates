@@ -1398,8 +1398,12 @@ def panel_feriados_eliminar(request, fecha_str):
 # --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
 
 def profes_clases_hoy(request, token):
-    # Hardcoded token de seguridad simple
-    if token != "acceso-profes":
+    # Validar token y disciplina
+    if token == "acceso-profes":
+        disciplina_activa = "Reformer"
+    elif token == "acceso-profes-mat":
+        disciplina_activa = "MAT"
+    else:
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
         
     # Obtener fecha
@@ -1415,8 +1419,8 @@ def profes_clases_hoy(request, token):
     else:
         hoy = timezone.now().date()
     
-    # Buscar todas las clases de hoy ordenadas por horario del turno
-    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
+    # Buscar todas las clases de hoy ordenadas por horario del turno (y por disciplina)
+    clases_hoy = Clase.objects.filter(fecha=hoy, id_turno__disciplina=disciplina_activa).select_related('id_turno').order_by('id_turno__horario')
     
     clases_data = []
     
@@ -1464,7 +1468,7 @@ def profes_clases_hoy(request, token):
     return render(request, "admin_panel/profes/clases_hoy.html", context)
 
 def profes_marcar_asistencia(request, token):
-    if token != "acceso-profes":
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     if request.method == "POST":
@@ -1494,7 +1498,7 @@ def profes_marcar_asistencia(request, token):
 
 
 def profes_pagos(request, token):
-    if token != "acceso-profes":
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     # All active packages to show in datalist
@@ -1516,7 +1520,7 @@ def profes_pagos(request, token):
 @require_POST
 @transaction.atomic
 def profes_registrar_pago(request, token):
-    if token != "acceso-profes":
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     id_alumno_paquete = request.POST.get("id_alumno_paquete")
