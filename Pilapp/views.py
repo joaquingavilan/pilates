@@ -221,9 +221,12 @@ def cambiar_turnos_paquete_datos(data):
     turnos_nuevos_objs = []
     for turno_str in turnos_nuevos_str:
         try:
-            dia, hora = turno_str.split(' ')
-            hora_obj = datetime.strptime(hora, "%H:%M").time()
-            turno_obj = Turno.objects.get(dia=dia, horario=hora_obj)
+            if str(turno_str).isdigit():
+                turno_obj = Turno.objects.get(id_turno=int(turno_str))
+            else:
+                dia, hora = turno_str.split(' ')
+                hora_obj = datetime.strptime(hora, "%H:%M").time()
+                turno_obj = Turno.objects.get(dia=dia, horario=hora_obj, disciplina='Reformer')
             turnos_nuevos_objs.append(turno_obj)
         except ValueError:
             errores.append(f"Formato de turno inválido: {turno_str}")
