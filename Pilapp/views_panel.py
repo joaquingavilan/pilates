@@ -1481,6 +1481,8 @@ def profes_marcar_asistencia(request, token):
         tipo = request.POST.get("tipo")
         id_relacion = request.POST.get("id_relacion")
         nuevo_estado = request.POST.get("estado")
+        if nuevo_estado:
+            nuevo_estado = nuevo_estado.lower()
         
         try:
             if tipo == 'regular':

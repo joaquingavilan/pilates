@@ -178,7 +178,7 @@
                                     <input type="hidden" name="id_relacion" value="{{ alumno_info.id_relacion }}">
                                     <input type="hidden" name="estado" value="Asistió">
                                     <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
-                                    <button type="submit" class="btn-action btn-asistio {% if alumno_info.estado == 'Asistió' %}active{% endif %}">
+                                    <button type="submit" class="btn-action btn-asistio {% if alumno_info.estado|lower == 'asistió' %}active{% endif %}">
                                         <i class="bi bi-check-lg fs-5"></i>
                                     </button>
                                 </form>
@@ -188,7 +188,7 @@
                                     <input type="hidden" name="id_relacion" value="{{ alumno_info.id_relacion }}">
                                     <input type="hidden" name="estado" value="Faltó">
                                     <input type="hidden" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}">
-                                    <button type="submit" class="btn-action btn-falto {% if alumno_info.estado == 'Faltó' %}active{% endif %}">
+                                    <button type="submit" class="btn-action btn-falto {% if alumno_info.estado|lower == 'faltó' %}active{% endif %}">
                                         <i class="bi bi-x-lg fs-5"></i>
                                     </button>
                                 </form>
