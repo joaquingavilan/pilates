@@ -103,7 +103,7 @@ def reprogramar_clase_datos(data):
             return {"errores": ["No existe el turno destino especificado."]}
 
         # Verificar cupos
-        if clase_destino.total_inscriptos >= 4:
+        if clase_destino.obtener_total_inscriptos >= 4:
             return {"errores": ["La clase destino ya está llena."]}
 
         # Verificar duplicados en destino

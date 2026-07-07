@@ -626,8 +626,8 @@ def panel_alumno_clase_crear(request, id_alumno):
                     }
                 )
                 
-                # Validar cupo
-                if clase_destino.total_inscriptos >= 4:
+                # Validar cupo usando el cálculo dinámico (ignora cancelados y feriados)
+                if clase_destino.obtener_total_inscriptos >= 4:
                     messages.error(request, f"No hay cupo disponible para el {fecha_str} a las {horario}.")
                     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
                     
