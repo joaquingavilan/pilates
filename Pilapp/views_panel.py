@@ -1425,10 +1425,13 @@ def profes_clases_hoy(request, token):
     for clase in clases_hoy:
         alumnos_lista = []
         
-        # Alumnos regulares
-        alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase).select_related(
-            'id_alumno_paquete__id_alumno__id_persona'
-        )
+        # Alumnos regulares (excluimos canceló y reprogramó)
+        alumnos_regulares = AlumnoClase.objects.filter(
+            id_clase=clase
+        ).exclude(
+            estado__in=['canceló', 'reprogramó', 'feriado']
+        ).select_related('id_alumno_paquete__id_alumno__id_persona')
+        
         for ac in alumnos_regulares:
             persona = ac.id_alumno_paquete.id_alumno.id_persona
             alumnos_lista.append({
@@ -1438,10 +1441,13 @@ def profes_clases_hoy(request, token):
                 'tipo': 'regular'
             })
             
-        # Alumnos ocasionales
-        alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related(
-            'id_alumno__id_persona'
-        )
+        # Alumnos ocasionales (excluimos canceló)
+        alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(
+            id_clase=clase
+        ).exclude(
+            estado='canceló'
+        ).select_related('id_alumno__id_persona')
+        
         for ao in alumnos_ocasionales:
             persona = ao.id_alumno.id_persona
             alumnos_lista.append({
