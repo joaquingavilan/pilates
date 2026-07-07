@@ -261,7 +261,7 @@ class Clase(models.Model):
         from .models import AlumnoClase, AlumnoClaseOcasional
         cantidad_regulares = AlumnoClase.objects.filter(
             id_clase_id=self.id_clase
-        ).exclude(estado__in={"canceló", "reprogramó"}).count()
+        ).exclude(estado__in={"canceló", "reprogramó", "feriado"}).count()
         cantidad_ocasionales = AlumnoClaseOcasional.objects.filter(
             id_clase_id=self.id_clase
         ).exclude(estado="canceló").count()
