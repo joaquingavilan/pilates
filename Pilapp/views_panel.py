@@ -1484,9 +1484,40 @@ def profes_marcar_asistencia(request, token):
         
         try:
             if tipo == 'regular':
-                rel = AlumnoClase.objects.get(pk=id_relacion)
-                rel.estado = nuevo_estado
-                rel.save()
+                rel = AlumnoClase.objects.select_related('id_alumno_paquete__id_alumno').get(pk=id_relacion)
+                
+                # REASIGNACIÓN AUTOMÁTICA SI EL PAQUETE ESTÁ EXPIRADO
+                if rel.id_alumno_paquete.estado == 'expirado':
+                    paquete_activo = AlumnoPaquete.objects.filter(
+                        id_alumno=rel.id_alumno_paquete.id_alumno,
+                        estado='activo'
+                    ).first()
+                    
+                    if paquete_activo:
+                        # Verificar si el paquete activo ya tiene esta misma clase registrada
+                        existente = AlumnoClase.objects.filter(
+                            id_alumno_paquete=paquete_activo,
+                            id_clase=rel.id_clase
+                        ).first()
+                        
+                        if existente:
+                            # Si ya existe, actualizamos el del paquete activo y eliminamos el duplicado viejo
+                            existente.estado = nuevo_estado
+                            existente.save()
+                            rel.delete()
+                        else:
+                            # Si no existe en el paquete activo, se lo transferimos
+                            rel.id_alumno_paquete = paquete_activo
+                            rel.estado = nuevo_estado
+                            rel.save()
+                    else:
+                        # Si no hay paquete activo, igual guardamos el estado (quedará en el expirado)
+                        rel.estado = nuevo_estado
+                        rel.save()
+                else:
+                    rel.estado = nuevo_estado
+                    rel.save()
+                    
             elif tipo == 'ocasional':
                 rel = AlumnoClaseOcasional.objects.get(pk=id_relacion)
                 rel.estado = nuevo_estado
