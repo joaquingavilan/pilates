@@ -370,9 +370,6 @@ class AlumnoClase(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        clase = self.id_clase
-        clase.total_inscriptos = clase.obtener_total_inscriptos
-        clase.save()
     
     def __str__(self):
         return f"AlumnoClase {self.id_alumno_clase}"
@@ -642,3 +639,20 @@ class Feriado(models.Model):
 
     def __str__(self):
         return f"{self.fecha} - {self.descripcion}"
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+@receiver([post_save, post_delete], sender=AlumnoClase)
+def update_clase_total_regulares(sender, instance, **kwargs):
+    if instance.id_clase_id:
+        clase = Clase.objects.get(pk=instance.id_clase_id)
+        clase.total_inscriptos = clase.obtener_total_inscriptos
+        clase.save(update_fields=['total_inscriptos'])
+
+@receiver([post_save, post_delete], sender=AlumnoClaseOcasional)
+def update_clase_total_ocasionales(sender, instance, **kwargs):
+    if instance.id_clase_id:
+        clase = Clase.objects.get(pk=instance.id_clase_id)
+        clase.total_inscriptos = clase.obtener_total_inscriptos
+        clase.save(update_fields=['total_inscriptos'])

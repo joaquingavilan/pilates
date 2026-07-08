@@ -124,7 +124,6 @@ def reprogramar_clase_datos(data):
             AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
         
         # Incrementar cupo destino
-        Clase.objects.filter(pk=clase_destino.pk).update(total_inscriptos=F('total_inscriptos') + 1)
         msg = "Clase reprogramada correctamente."
 
     else:
@@ -137,7 +136,6 @@ def reprogramar_clase_datos(data):
             alumno_clase_ocasional.save()
 
     # LIBERAR SIEMPRE EL CUPO ORIGEN
-    Clase.objects.filter(pk=clase_origen.pk, total_inscriptos__gt=0).update(total_inscriptos=F('total_inscriptos') - 1)
 
     return {
         "message": msg,
@@ -512,7 +510,6 @@ def renovar_paquete_datos(data):
             AlumnoClase.objects.filter(id_clase=clase).count() +
             AlumnoClaseOcasional.objects.filter(id_clase=clase).count()
         )
-        Clase.objects.filter(pk=clase.pk).update(total_inscriptos=total)
 
         clases_reservadas.append({
             "fecha": str(clase.fecha),
@@ -1743,8 +1740,7 @@ def registrar_alumno_datos(data):
         logging.debug(f"[registrar_alumno_datos] Creando AlumnoClase para clase fecha={clase.fecha}")
         AlumnoClase.objects.create(id_alumno_paquete=alumno_paquete, id_clase=clase, estado="pendiente")
 
-        clase.total_inscriptos = AlumnoClase.objects.filter(id_clase=clase).count()
-        clase.save()
+        # The signals will handle updating total_inscriptos
 
 
     logging.info(f"[registrar_alumno_datos] Proceso completado exitosamente")

@@ -145,10 +145,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                      data-inscriptos="${info.total}">
                      
                      <strong>${info.total}/4</strong>
+                     ${info.disciplina === 'MAT' ? '<br><span class="badge" style="background-color: #0ea5e9; font-size: 0.65rem; margin-top: 2px;">MAT</span>' : ''}
                 </div>`;
             }
         });
     });
+    
+    // Auto-refresh cada 25 minutos
+    setTimeout(() => location.reload(), 25 * 60 * 1000);
 });
 
 

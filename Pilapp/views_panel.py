@@ -197,6 +197,7 @@ def api_calendario(request):
             "id": clase.id_clase,
             "total": total,
             "color": color,
+            "disciplina": clase.id_turno.disciplina,
         }
 
     result = {
@@ -657,8 +658,7 @@ def panel_alumno_clase_crear(request, id_alumno):
                     )
                 
                 # Incrementar inscriptos
-                clase_destino.total_inscriptos = F('total_inscriptos') + 1
-                clase_destino.save()
+                # The signals will handle updating total_inscriptos
                 
                 messages.success(request, f"Clase agendada exitosamente para el {fecha_str} a las {horario}.")
         except Exception as e:
@@ -728,7 +728,7 @@ def panel_alumno_clase_eliminar(request, id_alumno, tipo, id_relacion):
                     return redirect("panel_alumno_detalle", id_alumno=id_alumno)
 
                 # Descontar el cupo si corresponde
-                Clase.objects.filter(pk=id_clase, total_inscriptos__gt=0).update(total_inscriptos=F('total_inscriptos') - 1)
+                # The signals will handle updating total_inscriptos
                 messages.success(request, "Clase eliminada correctamente.")
                 
         except Exception as e:
