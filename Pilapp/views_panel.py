@@ -1144,6 +1144,7 @@ def api_turno_alumnos(request, id_turno):
         alumno_paquete = asig.id_alumno_paquete
         persona = alumno_paquete.id_alumno.id_persona
         alumnos.append({
+            'id_alumno': alumno_paquete.id_alumno.id_alumno,
             'nombre': persona.nombre,
             'apellido': persona.apellido,
             'telefono': persona.telefono,
