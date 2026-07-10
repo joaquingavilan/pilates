@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ocupados = button.dataset.turnoOcupados;
 
         document.getElementById('modalTitulo').textContent = `${turnoDia} ${turnoHora}`;
-        document.getElementById('formEliminarTurno').action = `/panel/turnos/${idTurno}/eliminar/`;
+        document.getElementById('formEliminarTurno').action = `/panel/turnos/${turnoId}/eliminar/`;
         document.getElementById('modalBody').innerHTML = `
             <div class="text-center py-4">
                 <div class="spinner-border text-primary" role="status"></div>
