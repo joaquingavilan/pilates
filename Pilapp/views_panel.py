@@ -1123,6 +1123,20 @@ def api_clase_alumnos(request, id_clase):
 
 
 
+@require_POST
+def panel_turno_eliminar(request, id_turno):
+    """Vista para eliminar un turno. Solo si no tiene alumnos activos."""
+    turno = get_object_or_404(Turno, id_turno=id_turno)
+    
+    if turno.lugares_ocupados > 0:
+        messages.error(request, "No puedes eliminar un turno que tiene alumnos activos asignados.")
+        return redirect('panel_turnos')
+        
+    turno.delete()
+    messages.success(request, "Turno eliminado correctamente.")
+    return redirect('panel_turnos')
+
+
 def api_turno_alumnos(request, id_turno):
     """API para obtener alumnos asignados a un turno (regulares con paquete activo)."""
     turno = get_object_or_404(Turno, id_turno=id_turno)

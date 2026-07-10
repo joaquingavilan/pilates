@@ -30,6 +30,7 @@ urlpatterns = [
     
     # Turnos
     path('turnos/', views_panel.panel_turnos, name='panel_turnos'),
+    path('turnos/<int:id_turno>/eliminar/', views_panel.panel_turno_eliminar, name='panel_turno_eliminar'),
     
     # Pagos
     path('pagos/', views_panel.panel_pagos, name='panel_pagos'),

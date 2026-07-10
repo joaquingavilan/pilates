@@ -72,7 +72,11 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex justify-content-between">
+                <form id="formEliminarTurno" method="POST" action="" onsubmit="return confirm('¿Seguro que deseas eliminar este turno? Si hay alumnos activos, no se podrá borrar.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar Turno</button>
+                </form>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
@@ -93,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ocupados = button.dataset.turnoOcupados;
 
         document.getElementById('modalTitulo').textContent = `${turnoDia} ${turnoHora}`;
+        document.getElementById('formEliminarTurno').action = `/panel/turnos/${idTurno}/eliminar/`;
         document.getElementById('modalBody').innerHTML = `
             <div class="text-center py-4">
                 <div class="spinner-border text-primary" role="status"></div>
