@@ -138,6 +138,25 @@
         </ul>
     </div>
 
+    {% if fechas_alertas %}
+    <div class="container mt-3">
+        <div class="alert alert-warning shadow-sm border-0 d-flex align-items-start p-3 mb-0" role="alert" style="border-radius: 12px; background-color: #fffbeb; color: #d97706;">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>
+                <h6 class="alert-heading fw-bold mb-1" style="font-family: 'Outfit', sans-serif;">Falta registrar asistencia</h6>
+                <p class="mb-2 text-sm" style="font-size: 0.85rem; color: #b45309;">Por favor, registra la asistencia de las siguientes fechas:</p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for f in fechas_alertas %}
+                    <a href="?fecha={{ f|date:'Y-m-d' }}" class="badge bg-white text-dark text-decoration-none border shadow-sm px-2 py-1" style="font-size: 0.8rem;">
+                        {{ f|date:"d M" }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="container mt-4 pb-5">
         {% if messages %}
         <div class="mb-4">

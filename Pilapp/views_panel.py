@@ -1479,10 +1479,33 @@ def profes_clases_hoy(request, token):
             'alumnos': alumnos_lista
         })
         
+    # --- ALERTAS DE ASISTENCIA FALTANTE ---
+    # Buscar clases desde el 6 de julio de 2026 hasta ayer que tengan alumnos sin asistencia marcada
+    fecha_inicio_alerta = datetime(2026, 7, 6).date()
+    
+    # 1. Alumnos Regulares con estado 'pendiente'
+    fechas_regulares = AlumnoClase.objects.filter(
+        id_clase__fecha__gte=fecha_inicio_alerta,
+        id_clase__fecha__lt=hoy,
+        estado='pendiente'
+    ).values_list('id_clase__fecha', flat=True).distinct()
+    
+    # 2. Alumnos Ocasionales con estado 'reservado'
+    fechas_ocasionales = AlumnoClaseOcasional.objects.filter(
+        id_clase__fecha__gte=fecha_inicio_alerta,
+        id_clase__fecha__lt=hoy,
+        estado='reservado'
+    ).values_list('id_clase__fecha', flat=True).distinct()
+    
+    # Unir y ordenar las fechas que tienen faltas de marcado
+    fechas_alertas = sorted(list(set(fechas_regulares) | set(fechas_ocasionales)))
+    # ----------------------------------------
+        
     context = {
         'fecha_hoy': hoy,
         'clases_data': clases_data,
-        'token': token
+        'token': token,
+        'fechas_alertas': fechas_alertas,
     }
     
     return render(request, "admin_panel/profes/clases_hoy.html", context)
