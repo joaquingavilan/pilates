@@ -223,11 +223,7 @@ def panel_vencimientos(request):
     filtro_restantes = request.GET.get('filtro_restantes')
     filtro_estado = request.GET.get('filtro_estado', 'activo')
     
-    paquetes_activos = AlumnoPaquete.objects.select_related('id_alumno__id_persona', 'id_paquete')
-    if filtro_estado == 'activo':
-        paquetes_activos = paquetes_activos.filter(estado='activo')
-    elif filtro_estado == 'vencido':
-        paquetes_activos = paquetes_activos.filter(estado='expirado')
+    paquetes_activos = AlumnoPaquete.objects.filter(estado='activo').select_related('id_alumno__id_persona', 'id_paquete')
     
     for paquete in paquetes_activos:
         clases_usadas = AlumnoClase.objects.filter(
@@ -246,7 +242,17 @@ def panel_vencimientos(request):
             fecha_venc = paquete.fecha_inicio + timedelta(days=30)
             dias_vencer = (fecha_venc - hoy).days
             
-        # Filtros
+        # Filtro estado (vencidos reales vs al día)
+        if filtro_estado == 'vencido':
+            # Solo mostrar los que tienen 0 clases o días < 0
+            if clases_restantes > 0 and dias_vencer >= 0:
+                continue
+        elif filtro_estado == 'activo':
+            # Solo mostrar los que NO están vencidos
+            if clases_restantes == 0 or dias_vencer < 0:
+                continue
+                
+        # Filtros adicionales
         if filtro_dias:
             if dias_vencer > int(filtro_dias):
                 continue
