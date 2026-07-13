@@ -117,13 +117,16 @@
                 <h4 class="mb-0">Clases del Día</h4>
                 <small class="text-white-50" style="font-weight: 500;">{{ fecha_hoy|date:"l d \d\e F" }}</small>
             </div>
+            {% if not es_reemplazo %}
             <form method="get" action="{% url 'profes_clases_hoy' token %}" class="m-0">
                 <input type="date" name="fecha" value="{{ fecha_hoy|date:'Y-m-d' }}" 
                        class="form-control form-control-sm date-input" 
                        onchange="this.form.submit()">
             </form>
+            {% endif %}
         </div>
         
+        {% if not es_reemplazo %}
         <ul class="nav nav-tabs">
             <li class="nav-item">
                 <a class="nav-link active" href="{% url 'profes_clases_hoy' token %}">
@@ -136,6 +139,10 @@
                 </a>
             </li>
         </ul>
+        {% else %}
+        <!-- Add a bit of padding at the bottom of the header since there are no tabs -->
+        <div class="pb-3"></div>
+        {% endif %}
     </div>
 
     {% if fechas_alertas %}

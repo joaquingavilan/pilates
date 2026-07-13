@@ -1436,15 +1436,17 @@ def panel_feriados_eliminar(request, fecha_str):
 
 def profes_clases_hoy(request, token):
     # Validar token (ambos tokens ahora muestran ambas disciplinas)
-    if token not in ["acceso-profes", "acceso-profes-mat"]:
+    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    es_reemplazo = (token == "reemplazo-hoy")
         
     # Obtener fecha
     from django.utils import timezone
     from datetime import datetime
     
     fecha_str = request.GET.get("fecha")
-    if fecha_str:
+    if fecha_str and not es_reemplazo:
         try:
             hoy = datetime.strptime(fecha_str, "%Y-%m-%d").date()
         except ValueError:
@@ -1526,39 +1528,41 @@ def profes_clases_hoy(request, token):
     # Ordenar por horario
     clases_data.sort(key=lambda x: x['orden'])
         
-    # --- ALERTAS DE ASISTENCIA FALTANTE ---
-    # Buscar clases desde el 6 de julio de 2026 hasta ayer que tengan alumnos sin asistencia marcada
-    fecha_inicio_alerta = datetime(2026, 7, 6).date()
-    
-    # 1. Alumnos Regulares con estado 'pendiente'
-    fechas_regulares = AlumnoClase.objects.filter(
-        id_clase__fecha__gte=fecha_inicio_alerta,
-        id_clase__fecha__lt=hoy,
-        estado='pendiente'
-    ).values_list('id_clase__fecha', flat=True).distinct()
-    
-    # 2. Alumnos Ocasionales con estado 'reservado'
-    fechas_ocasionales = AlumnoClaseOcasional.objects.filter(
-        id_clase__fecha__gte=fecha_inicio_alerta,
-        id_clase__fecha__lt=hoy,
-        estado='reservado'
-    ).values_list('id_clase__fecha', flat=True).distinct()
-    
-    # Unir y ordenar las fechas que tienen faltas de marcado
-    fechas_alertas = sorted(list(set(fechas_regulares) | set(fechas_ocasionales)))
-    # ----------------------------------------
+    # -----------------------------------------------------
+    # ALERTAS DE ASISTENCIA PENDIENTE (SOLO PARA PROFES REGULARES)
+    # -----------------------------------------------------
+    fechas_alertas = set()
+    if not es_reemplazo:
+        # Últimos 7 días (excluyendo domingos y hoy)
+        from datetime import timedelta
         
-    context = {
-        'fecha_hoy': hoy,
-        'clases_data': clases_data,
-        'token': token,
-        'fechas_alertas': fechas_alertas,
-    }
-    
-    return render(request, "admin_panel/profes/clases_hoy.html", context)
+        for i in range(1, 8):
+            fecha_check = hoy - timedelta(days=i)
+            # Solo verificamos si no es domingo (weekday() == 6)
+            if fecha_check.weekday() != 6: 
+                nombre_d = dias_semana[fecha_check.weekday()]
+                hay_clases_ese_dia = Turno.objects.filter(dia__iexact=nombre_d).exists()
+                
+                if hay_clases_ese_dia:
+                    # ¿Hay algún AlumnoClase en estado 'reservado' en esa fecha?
+                    hay_pendientes = AlumnoClase.objects.filter(
+                        id_clase__fecha=fecha_check,
+                        estado='reservado'
+                    ).exists()
+                    
+                    if hay_pendientes:
+                        fechas_alertas.add(fecha_check)
+
+    return render(request, "admin_panel/profes/clases_hoy.html", {
+        "clases_data": clases_data,
+        "fecha_hoy": hoy,
+        "token": token,
+        "fechas_alertas": sorted(list(fechas_alertas)),
+        "es_reemplazo": es_reemplazo,
+    })
 
 def profes_marcar_asistencia(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat"]:
+    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     if request.method == "POST":
@@ -1621,7 +1625,7 @@ def profes_marcar_asistencia(request, token):
 
 
 def profes_pagos(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat"]:
+    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     # All active packages to show in datalist
@@ -1643,7 +1647,7 @@ def profes_pagos(request, token):
 @require_POST
 @transaction.atomic
 def profes_registrar_pago(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat"]:
+    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     id_alumno_paquete = request.POST.get("id_alumno_paquete")
