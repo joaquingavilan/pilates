@@ -1435,16 +1435,20 @@ def panel_feriados_eliminar(request, fecha_str):
 # --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
 
 def profes_clases_hoy(request, token):
-    # Validar token (ambos tokens ahora muestran ambas disciplinas)
-    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
-        return HttpResponse("Acceso denegado. Token inválido.", status=403)
-        
-    es_reemplazo = (token == "reemplazo-hoy")
-        
-    # Obtener fecha
     from django.utils import timezone
     from datetime import datetime
     
+    # Validar token (ambos tokens ahora muestran ambas disciplinas)
+    es_reemplazo = False
+    if token.startswith("reemplazo-"):
+        fecha_token = token.replace("reemplazo-", "")
+        if fecha_token != timezone.now().date().isoformat():
+            return HttpResponse("Este enlace temporal ha expirado o no corresponde al día de hoy.", status=403)
+        es_reemplazo = True
+    elif token not in ["acceso-profes", "acceso-profes-mat"]:
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    # Obtener fecha
     fecha_str = request.GET.get("fecha")
     if fecha_str and not es_reemplazo:
         try:
@@ -1562,7 +1566,12 @@ def profes_clases_hoy(request, token):
     })
 
 def profes_marcar_asistencia(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
+    from django.utils import timezone
+    if token.startswith("reemplazo-"):
+        fecha_token = token.replace("reemplazo-", "")
+        if fecha_token != timezone.now().date().isoformat():
+            return HttpResponse("Acceso denegado. Enlace expirado.", status=403)
+    elif token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     if request.method == "POST":
@@ -1625,7 +1634,9 @@ def profes_marcar_asistencia(request, token):
 
 
 def profes_pagos(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
+    if token.startswith("reemplazo-"):
+        return HttpResponse("Acceso denegado para reemplazos.", status=403)
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     # All active packages to show in datalist
@@ -1647,7 +1658,9 @@ def profes_pagos(request, token):
 @require_POST
 @transaction.atomic
 def profes_registrar_pago(request, token):
-    if token not in ["acceso-profes", "acceso-profes-mat", "reemplazo-hoy"]:
+    if token.startswith("reemplazo-"):
+        return HttpResponse("Acceso denegado para reemplazos.", status=403)
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
     id_alumno_paquete = request.POST.get("id_alumno_paquete")
