@@ -1432,7 +1432,46 @@ def panel_feriados_eliminar(request, fecha_str):
             
     return redirect("panel_feriados")
 
+
+@require_http_methods(["GET", "POST"])
+def panel_reemplazos(request):
+    from .models import ReemplazoDia
+    from datetime import datetime
+    
+    if request.method == "POST":
+        fecha_str = request.POST.get("fecha")
+        if fecha_str:
+            try:
+                fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+                ReemplazoDia.objects.get_or_create(fecha=fecha)
+                messages.success(request, f"Día de reemplazo agregado para el {fecha.strftime('%d/%m/%Y')}.")
+            except ValueError:
+                messages.error(request, "Fecha inválida.")
+            except Exception as e:
+                messages.error(request, f"Error: {e}")
+        return redirect("panel_reemplazos")
+        
+    reemplazos = ReemplazoDia.objects.all().order_by("-fecha")
+    return render(request, "admin_panel/reemplazos.html", {"reemplazos": reemplazos})
+
+@require_POST
+def panel_reemplazos_eliminar(request, fecha_str):
+    from .models import ReemplazoDia
+    from datetime import datetime
+    
+    try:
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        ReemplazoDia.objects.filter(fecha=fecha).delete()
+        messages.success(request, f"Día de reemplazo ({fecha.strftime('%d/%m/%Y')}) eliminado.")
+    except ValueError:
+        messages.error(request, "Fecha inválida.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar: {e}")
+        
+    return redirect("panel_reemplazos")
+
 # --- VISTAS PARA PROFES (ACCESO DIRECTO MAGICO) ---
+
 
 def profes_clases_hoy(request, token):
     from django.utils import timezone

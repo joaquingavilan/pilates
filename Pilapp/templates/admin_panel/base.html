@@ -211,6 +211,12 @@
                     <i class="bi bi-calendar-x"></i> Feriados
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'reemplazo' in request.resolver_match.url_name %}active{% endif %}" 
+                   href="{% url 'panel_reemplazos' %}">
+                    <i class="bi bi-person-badge"></i> Reemplazos
+                </a>
+            </li>
         </ul>
     </nav>
 

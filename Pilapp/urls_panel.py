@@ -55,6 +55,11 @@ urlpatterns = [
     path('feriados/', views_panel.panel_feriados, name='panel_feriados'),
     path('feriados/<str:fecha_str>/eliminar/', views_panel.panel_feriados_eliminar, name='panel_feriados_eliminar'),
     
+    # Reemplazos
+    path('reemplazos/', views_panel.panel_reemplazos, name='panel_reemplazos'),
+    path('reemplazos/<str:fecha_str>/eliminar/', views_panel.panel_reemplazos_eliminar, name='panel_reemplazos_eliminar'),
+
+    
     # Vista Mágica Profes
     path('profes/<str:token>/clases/', views_panel.profes_clases_hoy, name='profes_clases_hoy'),
     path('profes/<str:token>/asistencia/', views_panel.profes_marcar_asistencia, name='profes_marcar_asistencia'),
