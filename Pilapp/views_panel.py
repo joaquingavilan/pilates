@@ -11,7 +11,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Count, Sum, DecimalField
 from django.db.models.functions import Coalesce
 from django.template import loader
-from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.http import require_POST, require_GET, require_http_methods
 from django.db import transaction
 from django.contrib import messages
 from django.utils import timezone
