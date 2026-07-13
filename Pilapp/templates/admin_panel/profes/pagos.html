@@ -169,7 +169,7 @@
                     <input class="form-control" list="alumnaOptions" id="alumnaData" name="alumna_nombre" placeholder="Busca una alumna o ingresa el nombre..." autocomplete="off" required>
                     <datalist id="alumnaOptions">
                         {% for paquete in paquetes %}
-                        <option data-id="{{ paquete.id }}" value="{{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }} - {{ paquete.id_paquete.nombre }}">
+                        <option data-id="{{ paquete.pk }}" value="{{ paquete.id_alumno.id_persona.nombre }} {{ paquete.id_alumno.id_persona.apellido }} - {{ paquete.id_paquete.nombre }}">
                         {% endfor %}
                     </datalist>
                 </div>
