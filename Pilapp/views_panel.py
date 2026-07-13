@@ -1298,8 +1298,13 @@ def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
 
 @require_POST
 @transaction.atomic
-def panel_registrar_pago_alumno(request, id_alumno, id_alumno_paquete):
+def panel_registrar_pago_alumno(request, id_alumno):
     alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
+    id_alumno_paquete = request.POST.get("id_alumno_paquete")
+    if not id_alumno_paquete:
+        messages.error(request, "Debes seleccionar un paquete para el pago.")
+        return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
+        
     alumno_paquete = get_object_or_404(
         AlumnoPaquete,
         id_alumno_paquete=id_alumno_paquete,
