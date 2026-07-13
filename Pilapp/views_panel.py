@@ -1029,6 +1029,7 @@ def panel_turnos(request):
 def panel_pagos(request):
     """Lista de paquetes y su estado de pago."""
     estado_pago = request.GET.get('estado', '')
+    estado_paquete = request.GET.get('estado_paquete', '')
     
     paquetes = AlumnoPaquete.objects.select_related(
         'id_alumno__id_persona', 'id_paquete'
@@ -1036,6 +1037,8 @@ def panel_pagos(request):
     
     if estado_pago:
         paquetes = paquetes.filter(estado_pago=estado_pago)
+    if estado_paquete:
+        paquetes = paquetes.filter(estado=estado_paquete)
     
     # Calcular restante y total_pagado para cada paquete
     paquetes_con_info = []
@@ -1061,6 +1064,7 @@ def panel_pagos(request):
     return render(request, 'admin_panel/pagos.html', {
         'paquetes': paquetes_con_info,
         'estado_pago': estado_pago,
+        'estado_paquete': estado_paquete,
     })
 
 def panel_prospectos(request):
