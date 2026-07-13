@@ -47,6 +47,11 @@
     </div>
     
     <form method="get" class="d-flex gap-2 align-items-center bg-white p-2 rounded-3 shadow-sm border border-light">
+        <select name="filtro_estado" class="form-select form-select-sm border-0 bg-light fw-medium">
+            <option value="activo" {% if request.GET.filtro_estado == 'activo' or not request.GET.filtro_estado %}selected{% endif %}>Activos</option>
+            <option value="vencido" {% if request.GET.filtro_estado == 'vencido' %}selected{% endif %}>Vencidos</option>
+            <option value="todos" {% if request.GET.filtro_estado == 'todos' %}selected{% endif %}>Todos</option>
+        </select>
         <select name="filtro_dias" class="form-select form-select-sm border-0 bg-light fw-medium">
             <option value="">Cualquier fecha</option>
             <option value="10" {% if request.GET.filtro_dias == '10' %}selected{% endif %}>Vencen en <= 10 días</option>

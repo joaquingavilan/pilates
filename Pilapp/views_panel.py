@@ -216,13 +216,18 @@ def panel_vencimientos(request):
     from datetime import timedelta
     from django.utils import timezone
     
-    paquetes_activos = AlumnoPaquete.objects.filter(estado='activo').select_related('id_alumno__id_persona', 'id_paquete')
-    
     vencimientos = []
     hoy = timezone.now().date()
     
     filtro_dias = request.GET.get('filtro_dias')
     filtro_restantes = request.GET.get('filtro_restantes')
+    filtro_estado = request.GET.get('filtro_estado', 'activo')
+    
+    paquetes_activos = AlumnoPaquete.objects.select_related('id_alumno__id_persona', 'id_paquete')
+    if filtro_estado == 'activo':
+        paquetes_activos = paquetes_activos.filter(estado='activo')
+    elif filtro_estado == 'vencido':
+        paquetes_activos = paquetes_activos.filter(estado='expirado')
     
     for paquete in paquetes_activos:
         clases_usadas = AlumnoClase.objects.filter(
