@@ -640,6 +640,19 @@ class Feriado(models.Model):
     def __str__(self):
         return f"{self.fecha} - {self.descripcion}"
 
+class ReemplazoDia(models.Model):
+    """
+    Fechas en las que está habilitado el acceso para la profesora reemplazante.
+    """
+    fecha = models.DateField(unique=True, verbose_name="Fecha habilitada")
+    
+    def __str__(self):
+        return f"Reemplazo habilitado: {self.fecha.strftime('%d/%m/%Y')}"
+    
+    class Meta:
+        verbose_name = "Día de Reemplazo"
+        verbose_name_plural = "Días de Reemplazo"
+
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 

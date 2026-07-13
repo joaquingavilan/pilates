@@ -1437,13 +1437,14 @@ def panel_feriados_eliminar(request, fecha_str):
 def profes_clases_hoy(request, token):
     from django.utils import timezone
     from datetime import datetime
+    from .models import ReemplazoDia
     
     # Validar token (ambos tokens ahora muestran ambas disciplinas)
     es_reemplazo = False
-    if token.startswith("reemplazo-"):
-        fecha_token = token.replace("reemplazo-", "")
-        if fecha_token != timezone.now().date().isoformat():
-            return HttpResponse("Este enlace temporal ha expirado o no corresponde al día de hoy.", status=403)
+    if token == "reemplazo":
+        # Check if today is a ReemplazoDia
+        if not ReemplazoDia.objects.filter(fecha=timezone.now().date()).exists():
+            return HttpResponse("El acceso para reemplazantes no está habilitado hoy.", status=403)
         es_reemplazo = True
     elif token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
@@ -1567,10 +1568,10 @@ def profes_clases_hoy(request, token):
 
 def profes_marcar_asistencia(request, token):
     from django.utils import timezone
-    if token.startswith("reemplazo-"):
-        fecha_token = token.replace("reemplazo-", "")
-        if fecha_token != timezone.now().date().isoformat():
-            return HttpResponse("Acceso denegado. Enlace expirado.", status=403)
+    from .models import ReemplazoDia
+    if token == "reemplazo":
+        if not ReemplazoDia.objects.filter(fecha=timezone.now().date()).exists():
+            return HttpResponse("Acceso denegado. Enlace no habilitado hoy.", status=403)
     elif token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
         
@@ -1634,7 +1635,7 @@ def profes_marcar_asistencia(request, token):
 
 
 def profes_pagos(request, token):
-    if token.startswith("reemplazo-"):
+    if token == "reemplazo":
         return HttpResponse("Acceso denegado para reemplazos.", status=403)
     if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)
@@ -1658,7 +1659,7 @@ def profes_pagos(request, token):
 @require_POST
 @transaction.atomic
 def profes_registrar_pago(request, token):
-    if token.startswith("reemplazo-"):
+    if token == "reemplazo":
         return HttpResponse("Acceso denegado para reemplazos.", status=403)
     if token not in ["acceso-profes", "acceso-profes-mat"]:
         return HttpResponse("Acceso denegado.", status=403)

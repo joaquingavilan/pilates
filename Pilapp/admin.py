@@ -22,3 +22,4 @@ from .models import Feriado
 class FeriadoAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'descripcion')
     search_fields = ('fecha', 'descripcion')
+admin.site.register(ReemplazoDia)
