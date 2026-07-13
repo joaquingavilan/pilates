@@ -1436,12 +1436,24 @@ def profes_clases_hoy(request, token):
     else:
         hoy = timezone.now().date()
     
-    # Buscar todas las clases de hoy ordenadas por horario del turno (SIN FILTRAR DISCIPLINA)
-    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno').order_by('id_turno__horario')
+    # Obtener nombre del día
+    dias_semana = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"}
+    nombre_dia = dias_semana[hoy.weekday()]
+    
+    # Buscar turnos de hoy
+    from .models import Turno
+    turnos_hoy = Turno.objects.filter(dia__iexact=nombre_dia).order_by('horario')
+    
+    # Buscar todas las clases de hoy (SIN FILTRAR DISCIPLINA)
+    clases_hoy = Clase.objects.filter(fecha=hoy).select_related('id_turno')
     
     clases_data = []
+    turnos_procesados = set()
     
     for clase in clases_hoy:
+        if clase.id_turno:
+            turnos_procesados.add(clase.id_turno_id)
+            
         alumnos_lista = []
         
         # Alumnos regulares (excluimos canceló y reprogramó)
@@ -1480,8 +1492,23 @@ def profes_clases_hoy(request, token):
             'clase': clase,
             'horario': clase.id_turno.horario.strftime('%H:%M') if clase.id_turno else 'S/H',
             'disciplina': clase.id_turno.disciplina if clase.id_turno else 'Reformer',
-            'alumnos': alumnos_lista
+            'alumnos': alumnos_lista,
+            'orden': clase.id_turno.horario.strftime('%H:%M') if clase.id_turno else '23:59'
         })
+        
+    # Agregar turnos sin clases
+    for turno in turnos_hoy:
+        if turno.id_turno not in turnos_procesados:
+            clases_data.append({
+                'clase': None,
+                'horario': turno.horario.strftime('%H:%M'),
+                'disciplina': turno.disciplina,
+                'alumnos': [],
+                'orden': turno.horario.strftime('%H:%M')
+            })
+            
+    # Ordenar por horario
+    clases_data.sort(key=lambda x: x['orden'])
         
     # --- ALERTAS DE ASISTENCIA FALTANTE ---
     # Buscar clases desde el 6 de julio de 2026 hasta ayer que tengan alumnos sin asistencia marcada
