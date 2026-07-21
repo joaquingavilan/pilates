@@ -124,7 +124,7 @@
       <form method="post" id="formRegistrarPago" action="">
         {% csrf_token %}
         <input type="hidden" name="redirect_to" value="pagos">
-
+        <input type="hidden" name="id_alumno_paquete" id="modal-paquete-id" value="">
 
         <div class="modal-header">
           <h5 class="modal-title">Registrar pago</h5>
@@ -221,7 +221,9 @@
     const pagado = button.dataset.pagado;
 
     // Construir la URL usando la misma estructura de Django
-    form.action = `/panel/alumnos/${alumnoId}/paquetes/${paqueteId}/registrar_pago/?next=pagos`;
+    form.action = `/panel/alumnos/${alumnoId}/pagos/registrar/?next=pagos`;
+    document.getElementById('modal-paquete-id').value = paqueteId;
+    
     // Mostrar información del alumno
     modalAlumnoNombre.textContent = alumnoNombre;
 
