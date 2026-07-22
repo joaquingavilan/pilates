@@ -669,3 +669,17 @@ def update_clase_total_ocasionales(sender, instance, **kwargs):
         clase = Clase.objects.get(pk=instance.id_clase_id)
         clase.total_inscriptos = clase.obtener_total_inscriptos
         clase.save(update_fields=['total_inscriptos'])
+
+class ExAlumno(models.Model):
+    """
+    Guarda el historial de un alumno que fue eliminado del sistema.
+    """
+    id_ex_alumno = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=100)
+    apellido = models.CharField(max_length=100)
+    telefono = models.CharField(max_length=50, blank=True, null=True)
+    horarios = models.TextField(blank=True, null=True, help_text="Turnos que tenía asignados")
+    fecha_baja = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nombre} {self.apellido}"

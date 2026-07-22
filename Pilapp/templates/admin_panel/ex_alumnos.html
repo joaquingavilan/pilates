@@ -1,0 +1,89 @@
+{% extends 'admin_panel/base.html' %}
+
+{% block title %}Ex-Alumnos (Archivo){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0 d-inline-block"><i class="bi bi-archive me-2"></i>Ex-Alumnos (Archivo)</h2>
+        <span class="badge bg-secondary fs-6 ms-3">{{ ex_alumnos|length }} eliminados</span>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Buscar Alumno</label>
+                <input type="text" name="q" class="form-control" placeholder="Nombre, apellido o teléfono..." value="{{ query }}">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Día / Horario (Filtro por horarios anteriores)</label>
+                <input type="text" name="dia" class="form-control" placeholder="Ej: Lunes, 18:00, Martes..." value="{{ dia }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Filtrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Nombre y Apellido</th>
+                        <th>Teléfono</th>
+                        <th>Horarios que tenía asignados</th>
+                        <th>Fecha de Eliminación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ex in ex_alumnos %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle bg-secondary bg-opacity-10 text-secondary me-3">
+                                    {{ ex.nombre|first|upper }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">{{ ex.nombre }} {{ ex.apellido }}</h6>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if ex.telefono %}
+                            <a href="https://wa.me/{{ ex.telefono }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-whatsapp text-success me-1"></i> {{ ex.telefono }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted fst-italic">Sin teléfono</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info text-dark text-wrap text-start" style="max-width: 300px; line-height: 1.5;">
+                                {{ ex.horarios|default:"Sin turnos previos" }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ ex.fecha_baja|date:"d M Y - H:i" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                            No se encontraron ex-alumnos con esos filtros.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

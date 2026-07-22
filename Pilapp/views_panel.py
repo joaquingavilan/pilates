@@ -21,6 +21,7 @@ from django.utils import timezone
 #imports del proyecto
 
 from .models import (
+    ExAlumno,
     Alumno, Persona, Clase, Turno, AlumnoClase, AlumnoClaseOcasional,
     AlumnoPaquete, Paquete, Pago, PagoAlumno, ClienteProspecto,
     AlumnoPaqueteTurno, PagoInstructor, Instructor
@@ -1209,7 +1210,23 @@ def panel_alumno_eliminar(request, id_alumno):
         .distinct()
     )
 
+    # Capturar info para ExAlumno
+    turnos_str_list = []
+    paquetes_activos = AlumnoPaquete.objects.filter(id_alumno=alumno, estado='activo')
+    for paq in paquetes_activos:
+        for apt in paq.alumnopaqueteturno_set.all():
+            turnos_str_list.append(f"{apt.id_turno.dia} {apt.id_turno.horario.strftime('%H:%M')} {apt.id_turno.disciplina}")
+    
+    horarios_str = ", ".join(turnos_str_list) if turnos_str_list else "Sin turnos"
+
     with transaction.atomic():
+        ExAlumno.objects.create(
+            nombre=persona.nombre if persona else "Desconocido",
+            apellido=persona.apellido if persona else "Desconocido",
+            telefono=telefono,
+            horarios=horarios_str
+        )
+
         # 1) Borrado principal (cascade elimina: AlumnoPaquete*, AlumnoClase*, AlumnoClaseOcasional, PagoAlumno, etc.)
         alumno.delete()
 
@@ -1851,3 +1868,27 @@ def panel_resumen_pagos(request):
     }
     return render(request, "admin_panel/pagos/resumen.html", context)
 
+
+@admin_required
+def panel_ex_alumnos(request):
+    query = request.GET.get('q', '').strip()
+    dia = request.GET.get('dia', '').strip()
+    
+    ex_alumnos = ExAlumno.objects.all().order_by('-fecha_baja')
+    
+    if query:
+        ex_alumnos = ex_alumnos.filter(
+            Q(nombre__icontains=query) |
+            Q(apellido__icontains=query) |
+            Q(telefono__icontains=query) |
+            Q(horarios__icontains=query)
+        )
+    
+    if dia:
+        ex_alumnos = ex_alumnos.filter(horarios__icontains=dia)
+        
+    return render(request, "admin_panel/ex_alumnos.html", {
+        "ex_alumnos": ex_alumnos,
+        "query": query,
+        "dia": dia,
+    })

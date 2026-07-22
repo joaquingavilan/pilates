@@ -165,9 +165,15 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if 'alumno' in request.resolver_match.url_name %}active{% endif %}" 
+                <a class="nav-link {% if 'alumno' in request.resolver_match.url_name and 'ex_alumno' not in request.resolver_match.url_name %}active{% endif %}" 
                    href="{% url 'panel_alumnos' %}">
                     <i class="bi bi-people"></i> Alumnos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'ex_alumno' in request.resolver_match.url_name %}active{% endif %}" 
+                   href="{% url 'panel_ex_alumnos' %}">
+                    <i class="bi bi-archive"></i> Ex-Alumnos
                 </a>
             </li>
             <li class="nav-item">
