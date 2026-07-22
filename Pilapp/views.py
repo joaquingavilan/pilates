@@ -222,9 +222,12 @@ def cambiar_turnos_paquete_datos(data):
             if str(turno_str).isdigit():
                 turno_obj = Turno.objects.get(id_turno=int(turno_str))
             else:
-                dia, hora = turno_str.split(' ')
+                parts = turno_str.split(' ')
+                dia = parts[0]
+                hora = parts[1]
+                disciplina = parts[2] if len(parts) > 2 else 'Reformer'
                 hora_obj = datetime.strptime(hora, "%H:%M").time()
-                turno_obj = Turno.objects.get(dia=dia, horario=hora_obj, disciplina='Reformer')
+                turno_obj = Turno.objects.get(dia=dia, horario=hora_obj, disciplina=disciplina)
             turnos_nuevos_objs.append(turno_obj)
         except ValueError:
             errores.append(f"Formato de turno inválido: {turno_str}")
@@ -1623,10 +1626,12 @@ def registrar_alumno_datos(data):
                 # Viene desde el panel web (id_turno)
                 turno = Turno.objects.get(id_turno=int(turno_str))
             else:
-                # Viene desde el bot (string como "Jueves 19:30")
-                dia, horario = turno_str.split()
-                # Bot solo soporta Reformer por defecto
-                turno = Turno.objects.get(dia=dia, horario=horario, disciplina='Reformer')
+                # Viene desde el bot (string como "Jueves 19:30" o "Jueves 19:30 Mat")
+                parts = turno_str.split()
+                dia = parts[0]
+                horario = parts[1]
+                disciplina = parts[2] if len(parts) > 2 else 'Reformer'
+                turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
                 
             logging.debug(f"[registrar_alumno_datos] Turno encontrado: {turno}, estado={turno.estado}")
             if turno.estado == "Ocupado":
@@ -2211,12 +2216,13 @@ def verificar_turno(request):
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Lunes"
             horario = data.get("horario")  # Ejemplo: "07:00"
+            disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not horario:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'horario'"}, status=400)
 
             try:
-                turno = Turno.objects.get(dia=dia, horario=horario)
+                turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": "No hay un turno registrado para ese día y horario. No tenemos clases en ese horario."})
 
