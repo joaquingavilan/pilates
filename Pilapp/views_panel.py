@@ -1869,7 +1869,6 @@ def panel_resumen_pagos(request):
     return render(request, "admin_panel/pagos/resumen.html", context)
 
 
-@admin_required
 def panel_ex_alumnos(request):
     query = request.GET.get('q', '').strip()
     dia = request.GET.get('dia', '').strip()
