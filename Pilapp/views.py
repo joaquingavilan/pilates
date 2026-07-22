@@ -1497,9 +1497,10 @@ def registrar_alumno_ocasional_datos(data):
     if not errores:
         # 📌 Obtener turno
         try:
-            turno = Turno.objects.get(dia=dia_turno, horario=data["hora_turno"])
+            disciplina = data.get("disciplina", "Reformer")
+            turno = Turno.objects.get(dia=dia_turno, horario=data["hora_turno"], disciplina=disciplina)
         except Turno.DoesNotExist:
-            errores.append(f"El turno {dia_turno} {data['hora_turno']} no existe.")
+            errores.append(f"El turno {dia_turno} {data['hora_turno']} ({disciplina}) no existe.")
 
     if not errores:
         # 📌 Validar clase específica en esa fecha
