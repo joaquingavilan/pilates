@@ -979,12 +979,18 @@ def panel_clase_detalle(request, id_clase):
     clase.total = clase.total_reg + clase.total_ocas
 
     # Alumnos regulares (para la lista de abajo)
-    alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase).select_related(
+    alumnos_regulares = AlumnoClase.objects.filter(
+        id_clase=clase,
+        estado__in=['reservado', 'pendiente', 'recuperó', 'asistió', 'faltó']
+    ).select_related(
         'id_alumno_paquete__id_alumno__id_persona'
     )
     
     # Alumnos ocasionales (para la lista de abajo)
-    alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(id_clase=clase).select_related(
+    alumnos_ocasionales = AlumnoClaseOcasional.objects.filter(
+        id_clase=clase,
+        estado__in=['reservado', 'asistió', 'faltó']
+    ).select_related(
         'id_alumno__id_persona'
     )
     
