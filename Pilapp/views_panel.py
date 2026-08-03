@@ -1335,15 +1335,15 @@ def panel_renovar_paquete_alumno(request, id_alumno, id_alumno_paquete):
 def panel_registrar_pago_alumno(request, id_alumno):
     alumno = get_object_or_404(Alumno, id_alumno=id_alumno)
     id_alumno_paquete = request.POST.get("id_alumno_paquete")
-    if not id_alumno_paquete:
-        messages.error(request, "Debes seleccionar un paquete para el pago.")
-        return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
-        
-    alumno_paquete = get_object_or_404(
-        AlumnoPaquete,
-        id_alumno_paquete=id_alumno_paquete,
-        id_alumno=alumno
-    )
+    
+    if id_alumno_paquete:
+        alumno_paquete = get_object_or_404(
+            AlumnoPaquete,
+            id_alumno_paquete=id_alumno_paquete,
+            id_alumno=alumno
+        )
+    else:
+        alumno_paquete = None
 
     monto_raw = (request.POST.get("monto") or "").strip()
     metodo_pago = (request.POST.get("metodo_pago") or "").strip()
@@ -1365,61 +1365,70 @@ def panel_registrar_pago_alumno(request, id_alumno):
         errores.append("El monto no tiene un formato válido.")
 
     if errores:
-        # Si no usas messages, puedes devolver un HttpResponse o guardar en session.
-        # Por simplicidad, redirigimos al detalle.
+        for error in errores:
+            messages.error(request, error)
         return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
 
-    # Costo del paquete y acumulado anterior
-    costo = alumno_paquete.id_paquete.costo or Decimal("0")
+    if alumno_paquete:
+        # Costo del paquete y acumulado anterior
+        costo = alumno_paquete.id_paquete.costo or Decimal("0")
 
-    total_pagado_antes = (
-        PagoAlumno.objects
-        .filter(id_alumno_paquete=alumno_paquete, id_pago__estado__in=["pagado", "parcial"])
-        .aggregate(total=Sum("id_pago__monto"))
-        .get("total") or Decimal("0")
-    )
+        total_pagado_antes = (
+            PagoAlumno.objects
+            .filter(id_alumno_paquete=alumno_paquete, id_pago__estado__in=["pagado", "parcial"])
+            .aggregate(total=Sum("id_pago__monto"))
+            .get("total") or Decimal("0")
+        )
 
-    restante_antes = max(Decimal("0"), costo - total_pagado_antes)
+        restante_antes = max(Decimal("0"), costo - total_pagado_antes)
 
-    # Estado del pago creado (según lo que faltaba en ese momento)
-    estado_pago_creado = "pagado" if monto >= restante_antes else "parcial"
-
-    nro_pago = f"APQ-{alumno_paquete.id_alumno_paquete}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
+        # Estado del pago creado (según lo que faltaba en ese momento)
+        estado_pago_creado = "pagado" if monto >= restante_antes else "parcial"
+        nro_pago = f"APQ-{alumno_paquete.id_alumno_paquete}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
+    else:
+        estado_pago_creado = "pagado"
+        nro_pago = f"ADV-{alumno.id_alumno}-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
 
     pago = Pago.objects.create(
         fecha=timezone.localdate(),
         monto=monto,
-        nro_pago=nro_pago,
-        estado=estado_pago_creado,
         metodo_pago=metodo_pago,
-        comprobante=comprobante or None,
-        id_factura=None
+        comprobante=comprobante,
+        estado=estado_pago_creado,
+        nro_pago=nro_pago,
     )
 
     PagoAlumno.objects.create(
         id_pago=pago,
+        id_alumno=alumno,
         id_alumno_paquete=alumno_paquete,
-        observaciones=observaciones or None
+        observaciones=observaciones
     )
 
-    # Actualizar estado_pago del paquete según acumulado total
-    total_pagado_despues = total_pagado_antes + monto
-    if costo > 0 and total_pagado_despues >= costo:
-        alumno_paquete.estado_pago = "pagado"
-    elif total_pagado_despues > 0:
-        alumno_paquete.estado_pago = "parcial"
-    else:
-        alumno_paquete.estado_pago = "pendiente"
+    if alumno_paquete:
+        # Volvemos a calcular el total pagado (incluyendo el actual)
+        total_nuevo = (
+            PagoAlumno.objects
+            .filter(id_alumno_paquete=alumno_paquete, id_pago__estado__in=["pagado", "parcial"])
+            .aggregate(total=Sum("id_pago__monto"))
+            .get("total") or Decimal("0")
+        )
 
-    alumno_paquete.save()
-    # CAMBIO AQUÍ: Usar el parámetro next
-    next_page = request.GET.get('next', 'detalle')
+        # Actualizar estado de pago del paquete
+        if total_nuevo >= costo:
+            alumno_paquete.estado_pago = "pagado"
+        else:
+            alumno_paquete.estado_pago = "parcial"
+            
+        alumno_paquete.save()
     
+    messages.success(request, "Pago registrado correctamente.")
+    
+    next_page = request.GET.get('next', 'detalle')
     if next_page == 'pagos':
         return redirect("panel_pagos")
     else:
         return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)
-         
 
 def panel_feriados(request):
     from .models import Feriado
