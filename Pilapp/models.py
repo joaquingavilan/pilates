@@ -443,12 +443,14 @@ class PagoAlumno(models.Model):
     Campos:
         id_pago_alumno (PK)
         id_pago (FK Pago)
-        id_alumno_paquete (FK)
+        id_alumno (FK Alumno)
+        id_alumno_paquete (FK) (Opcional, si es saldo a favor)
         observaciones (texto opcional)
     """
     id_pago_alumno = models.AutoField(primary_key=True)
     id_pago = models.ForeignKey(Pago, on_delete=models.CASCADE)
-    id_alumno_paquete = models.ForeignKey(AlumnoPaquete, on_delete=models.CASCADE)
+    id_alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE, null=True, blank=True)
+    id_alumno_paquete = models.ForeignKey(AlumnoPaquete, on_delete=models.SET_NULL, null=True, blank=True)
     observaciones = models.TextField(blank=True, null=True)
 
     def __str__(self):
