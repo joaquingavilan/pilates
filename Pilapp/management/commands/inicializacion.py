@@ -29,8 +29,8 @@ class Command(BaseCommand):
                 self.stdout.write("✓ Instructora ya existe")
 
         # 2) Turnos
-        result_turnos = crear_turnos()
-        self.stdout.write(self.style.SUCCESS(f"✓ {result_turnos['mensaje']}"))
+        # # result_turnos = crear_turnos()
+        # # self.stdout.write(self.style.SUCCESS(f"✓ {result_turnos['mensaje']}"))
 
         # 3) Clases para 30 días
         hoy = timezone.localdate()
