@@ -1776,6 +1776,7 @@ def profes_registrar_pago(request, token):
             )
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
+                id_alumno=paquete_actual.id_alumno,
                 id_alumno_paquete=paquete_actual,
                 observaciones=observaciones_pago
             )
@@ -1831,8 +1832,9 @@ def panel_pago_eliminar(request, id_pago):
         pago_alumnos = PagoAlumno.objects.filter(id_pago=pago)
         for pa in pago_alumnos:
             paquete = pa.id_alumno_paquete
-            paquete.estado_pago = 'pendiente'
-            paquete.save()
+            if paquete:
+                paquete.estado_pago = 'pendiente'
+                paquete.save()
             
         pago.delete()
         messages.success(request, "Pago eliminado correctamente.")
