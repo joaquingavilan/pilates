@@ -1140,7 +1140,6 @@ def registrar_asistencias(request):
         data = json.loads(request.body)
         dia = data.get("dia")
         horario = data.get("horario")
-            disciplina = data.get("disciplina", "Reformer")
         fecha_str = data.get("fecha")
         faltaron = data.get("faltaron", [])
         asistieron = data.get("asistieron", [])
@@ -1169,7 +1168,7 @@ def registrar_asistencias(request):
 
         # Turno
         try:
-            turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
+            turno = Turno.objects.get(dia=dia, horario=horario)
         except Turno.DoesNotExist:
             errores.append("Turno no encontrado.")
             return JsonResponse({"errores": errores}, status=404)
@@ -1870,8 +1869,8 @@ def obtener_alumnos_turno(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Martes"
-            horario = data.get("horario")
-            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "18:00"
+            horario = data.get("horario")  # Ejemplo: "18:00"
+            disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not horario:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'horario'"}, status=400)
@@ -1990,7 +1989,6 @@ def obtener_alumnos_clase(request):
             data = json.loads(request.body)
             dia = data.get("dia")
             horario = data.get("horario")
-            disciplina = data.get("disciplina", "Reformer")
             fecha = data.get("fecha")  # Opcional
 
             if not dia or not horario:
@@ -2219,8 +2217,7 @@ def verificar_turno(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Lunes"
-            horario = data.get("horario")
-            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "07:00"
+            horario = data.get("horario")  # Ejemplo: "07:00"
             disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not horario:
@@ -2294,7 +2291,6 @@ def verificar_turno_a_partir_de(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Opcional ahora
-            disciplina = data.get("disciplina", "Reformer")
             hora_minima = data.get("hora_minima")
             disciplina = data.get("disciplina", "Reformer")
 
@@ -2368,8 +2364,7 @@ def verificar_turno_antes_de(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Miércoles"
-            hora_maxima = data.get("hora_maxima")
-            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "10:00"
+            hora_maxima = data.get("hora_maxima")  # Ejemplo: "10:00"
 
             if not dia or not hora_maxima:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'hora_maxima'"}, status=400)
@@ -2546,8 +2541,7 @@ def verificar_clase_hoy(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            horario = data.get("horario")
-            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "19:00"
+            horario = data.get("horario")  # Ejemplo: "19:00"
 
             if not horario:
                 return JsonResponse({"error": "Debes enviar 'horario'."}, status=400)
