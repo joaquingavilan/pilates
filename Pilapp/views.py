@@ -1637,6 +1637,10 @@ def registrar_alumno_datos(data):
                 dia = parts[0]
                 horario = parts[1]
                 disciplina = parts[2] if len(parts) > 2 else 'Reformer'
+                if disciplina.upper() == 'MAT':
+                    disciplina = 'MAT'
+                else:
+                    disciplina = disciplina.capitalize()
                 turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
                 
             logging.debug(f"[registrar_alumno_datos] Turno encontrado: {turno}, estado={turno.estado}")
