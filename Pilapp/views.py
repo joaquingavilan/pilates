@@ -1140,6 +1140,7 @@ def registrar_asistencias(request):
         data = json.loads(request.body)
         dia = data.get("dia")
         horario = data.get("horario")
+            disciplina = data.get("disciplina", "Reformer")
         fecha_str = data.get("fecha")
         faltaron = data.get("faltaron", [])
         asistieron = data.get("asistieron", [])
@@ -1168,7 +1169,7 @@ def registrar_asistencias(request):
 
         # Turno
         try:
-            turno = Turno.objects.get(dia=dia, horario=horario)
+            turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
         except Turno.DoesNotExist:
             errores.append("Turno no encontrado.")
             return JsonResponse({"errores": errores}, status=404)
@@ -1869,14 +1870,15 @@ def obtener_alumnos_turno(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Martes"
-            horario = data.get("horario")  # Ejemplo: "18:00"
+            horario = data.get("horario")
+            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "18:00"
 
             if not dia or not horario:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'horario'"}, status=400)
 
             # Buscar turno
             try:
-                turno = Turno.objects.get(dia=dia, horario=horario)
+                turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": f"No existe turno para {dia} a las {horario}."})
             hoy = timezone.localdate()
@@ -1988,6 +1990,7 @@ def obtener_alumnos_clase(request):
             data = json.loads(request.body)
             dia = data.get("dia")
             horario = data.get("horario")
+            disciplina = data.get("disciplina", "Reformer")
             fecha = data.get("fecha")  # Opcional
 
             if not dia or not horario:
@@ -1995,7 +1998,7 @@ def obtener_alumnos_clase(request):
 
             # Buscar turno
             try:
-                turno = Turno.objects.get(dia=dia, horario=horario)
+                turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": f"No existe turno {dia} {horario}."})
 
@@ -2216,7 +2219,8 @@ def verificar_turno(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Lunes"
-            horario = data.get("horario")  # Ejemplo: "07:00"
+            horario = data.get("horario")
+            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "07:00"
             disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not horario:
@@ -2290,7 +2294,9 @@ def verificar_turno_a_partir_de(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Opcional ahora
+            disciplina = data.get("disciplina", "Reformer")
             hora_minima = data.get("hora_minima")
+            disciplina = data.get("disciplina", "Reformer")
 
             if not hora_minima:
                 return JsonResponse({"error": "Debes enviar 'hora_minima'"}, status=400)
@@ -2303,7 +2309,7 @@ def verificar_turno_a_partir_de(request):
             resultados = []
 
             for dia_actual in dias_a_buscar:
-                turnos_disponibles = buscar_turnos_disponibles(dia_actual, operador_hora="gte", hora_referencia=hora_minima)
+                turnos_disponibles = buscar_turnos_disponibles(dia_actual, operador_hora="gte", hora_referencia=hora_minima, disciplina=disciplina)
 
                 if turnos_disponibles:
                     resultados.append({
@@ -2362,7 +2368,8 @@ def verificar_turno_antes_de(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Miércoles"
-            hora_maxima = data.get("hora_maxima")  # Ejemplo: "10:00"
+            hora_maxima = data.get("hora_maxima")
+            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "10:00"
 
             if not dia or not hora_maxima:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'hora_maxima'"}, status=400)
@@ -2445,7 +2452,7 @@ def verificar_turno_manana(request):
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
 
-def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
+def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None, disciplina="Reformer"):
     """
     Busca los turnos con lugares disponibles según el día y un criterio horario opcional.
 
@@ -2476,6 +2483,8 @@ def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
     """
 
     filtros = {"dia": dia}
+    if disciplina:
+        filtros["disciplina"] = disciplina
 
     if operador_hora and hora_referencia:
         filtros[f"horario__{operador_hora}"] = hora_referencia
@@ -2488,7 +2497,8 @@ def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None):
         if lugares_disponibles > 0:
             turnos_disponibles.append({
                 "horario": turno.horario.strftime("%H:%M"),
-                "lugares_disponibles": lugares_disponibles
+                "lugares_disponibles": lugares_disponibles,
+                "disciplina": turno.disciplina
             })
 
     return turnos_disponibles
@@ -2536,7 +2546,8 @@ def verificar_clase_hoy(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            horario = data.get("horario")  # Ejemplo: "19:00"
+            horario = data.get("horario")
+            disciplina = data.get("disciplina", "Reformer")  # Ejemplo: "19:00"
 
             if not horario:
                 return JsonResponse({"error": "Debes enviar 'horario'."}, status=400)
