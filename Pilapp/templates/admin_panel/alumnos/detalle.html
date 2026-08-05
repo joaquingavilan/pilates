@@ -415,7 +415,12 @@
             <select name="id_alumno_paquete" id="pago_id_alumno_paquete" class="form-select">
               <option value="">(Ninguno - Dejar como Saldo a Favor / Adelanto)</option>
               {% for paquete in paquetes %}
-              <option value="{{ paquete.id_alumno_paquete }}">{{ paquete.id_paquete.nombre }} ({{ paquete.estado_pago|title }})</option>
+              <option value="{{ paquete.id_alumno_paquete }}">
+                Paquete {{ paquete.id_paquete.cantidad_clases }} clases - 
+                Inicio: {{ paquete.fecha_inicio|date:"d/m/Y"|default:"Pendiente" }} - 
+                Usadas: {{ paquete.clases_usadas }}/{{ paquete.id_paquete.cantidad_clases }} 
+                ({{ paquete.estado_pago|title }})
+              </option>
               {% endfor %}
             </select>
           </div>
