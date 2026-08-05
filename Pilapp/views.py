@@ -1168,7 +1168,7 @@ def registrar_asistencias(request):
 
         # Turno
         try:
-            turno = Turno.objects.get(dia=dia, horario=horario)
+            turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
         except Turno.DoesNotExist:
             errores.append("Turno no encontrado.")
             return JsonResponse({"errores": errores}, status=404)
@@ -1990,6 +1990,7 @@ def obtener_alumnos_clase(request):
             dia = data.get("dia")
             horario = data.get("horario")
             fecha = data.get("fecha")  # Opcional
+            disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not horario:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'horario'"}, status=400)
@@ -2570,7 +2571,7 @@ def verificar_clase_hoy(request):
 
             # Buscar turno por día y horario
             try:
-                turno = Turno.objects.get(dia=dia_hoy, horario=horario)
+                turno = Turno.objects.get(dia=dia_hoy, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": "No hay turno registrado para hoy a ese horario."})
             except Turno.MultipleObjectsReturned:
