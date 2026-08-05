@@ -226,6 +226,7 @@ def cambiar_turnos_paquete_datos(data):
                 dia = parts[0]
                 hora = parts[1]
                 disciplina = parts[2] if len(parts) > 2 else 'Reformer'
+                disciplina = 'MAT' if disciplina.upper() == 'MAT' else disciplina.capitalize()
                 hora_obj = datetime.strptime(hora, "%H:%M").time()
                 turno_obj = Turno.objects.get(dia=dia, horario=hora_obj, disciplina=disciplina)
             turnos_nuevos_objs.append(turno_obj)
@@ -388,8 +389,12 @@ def renovar_paquete_datos(data):
     # 2. Procesar nuevos turnos
     for turno_str in turnos_nuevos_str:
         try:
-            dia, hora = turno_str.rsplit(" ", 1)
-            turno_obj = Turno.objects.get(dia=dia, horario=hora)
+            parts = turno_str.split()
+            dia = parts[0]
+            hora = parts[1]
+            disciplina = parts[2] if len(parts) > 2 else 'Reformer'
+            disciplina = 'MAT' if disciplina.upper() == 'MAT' else disciplina.capitalize()
+            turno_obj = Turno.objects.get(dia=dia, horario=hora, disciplina=disciplina)
 
             disponibles = buscar_turnos_disponibles(
                 dia,
