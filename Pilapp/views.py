@@ -1148,6 +1148,7 @@ def registrar_asistencias(request):
         fecha_str = data.get("fecha")
         faltaron = data.get("faltaron", [])
         asistieron = data.get("asistieron", [])
+        disciplina = data.get("disciplina", "Reformer")
 
         if not dia:
             errores.append("Falta el campo 'dia'.")
@@ -2554,6 +2555,7 @@ def verificar_clase_hoy(request):
         try:
             data = json.loads(request.body)
             horario = data.get("horario")  # Ejemplo: "19:00"
+            disciplina = data.get("disciplina", "Reformer")
 
             if not horario:
                 return JsonResponse({"error": "Debes enviar 'horario'."}, status=400)
