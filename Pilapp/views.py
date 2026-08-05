@@ -2365,11 +2365,12 @@ def verificar_turno_antes_de(request):
             data = json.loads(request.body)
             dia = data.get("dia")  # Ejemplo: "Miércoles"
             hora_maxima = data.get("hora_maxima")  # Ejemplo: "10:00"
+            disciplina = data.get("disciplina", "Reformer")
 
             if not dia or not hora_maxima:
                 return JsonResponse({"error": "Debes enviar 'dia' y 'hora_maxima'"}, status=400)
 
-            turnos_disponibles = buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia=hora_maxima)
+            turnos_disponibles = buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia=hora_maxima, disciplina=disciplina)
 
             if not turnos_disponibles:
                 return JsonResponse({"message": f"No hay turnos disponibles para {dia} antes de {hora_maxima}."})
@@ -2427,11 +2428,12 @@ def verificar_turno_manana(request):
         try:
             data = json.loads(request.body)
             dia = data.get("dia")
+            disciplina = data.get("disciplina", "Reformer")
 
             if not dia:
                 return JsonResponse({"error": "Debes enviar 'dia'"}, status=400)
 
-            turnos_disponibles = buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia="12:00")
+            turnos_disponibles = buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia="12:00", disciplina=disciplina)
 
             if not turnos_disponibles:
                 return JsonResponse({"message": f"No hay turnos disponibles para la mañana del {dia}."})
