@@ -17,19 +17,19 @@ from difflib import get_close_matches
 DAY_INDEX = {
     "Lunes": 0,
     "Martes": 1,
-    "Miércoles": 2,
+    "MiÃ©rcoles": 2,
     "Jueves": 3,
     "Viernes": 4,
-    "Sábado": 5,
+    "SÃ¡bado": 5,
     "Domingo": 6
 }
 DAY_NAME_ES = {
     0: "Lunes",
     1: "Martes",
-    2: "Miércoles",
+    2: "MiÃ©rcoles",
     3: "Jueves",
     4: "Viernes",
-    5: "Sábado",
+    5: "SÃ¡bado",
     6: "Domingo"
 }
 
@@ -38,10 +38,10 @@ def normalize_dia_es(dia_str):
     mapping = {
         'monday': 'Lunes',
         'tuesday': 'Martes',
-        'wednesday': 'Mi�rcoles',
+        'wednesday': 'Miércoles',
         'thursday': 'Jueves',
         'friday': 'Viernes',
-        'saturday': 'S�bado',
+        'saturday': 'Sábado',
         'sunday': 'Domingo'
     }
     d_lower = dia_str.lower().strip()
@@ -51,7 +51,7 @@ def normalize_dia_es(dia_str):
 
 def reprogramar_clase_datos(data):
     """
-    Lógica interna para reprogramar o cancelar una clase.
+    LÃ³gica interna para reprogramar o cancelar una clase.
     Recibe data (dict) y retorna (dict) con los resultados.
     """
     id_alumno = data.get("id_alumno")
@@ -95,7 +95,7 @@ def reprogramar_clase_datos(data):
             tipo_alumno = "ocasional"
 
     if not tipo_alumno:
-        return {"errores": ["El alumno no está registrado en la clase de origen."]}
+        return {"errores": ["El alumno no estÃ¡ registrado en la clase de origen."]}
 
     es_reprogramacion = all([dia_destino, hora_destino, fecha_destino_str])
     clase_destino = None 
@@ -113,28 +113,28 @@ def reprogramar_clase_datos(data):
                 defaults={"id_instructor": Instructor.objects.first()}
             )
         except (ValueError, TypeError):
-            return {"errores": ["Formato de fecha inválido (YYYY-MM-DD)."]}
+            return {"errores": ["Formato de fecha invÃ¡lido (YYYY-MM-DD)."]}
         except Turno.DoesNotExist:
             return {"errores": ["No existe el turno destino especificado."]}
 
         # Verificar cupos
         if clase_destino.obtener_total_inscriptos >= 4:
-            return {"errores": ["La clase destino ya está llena."]}
+            return {"errores": ["La clase destino ya estÃ¡ llena."]}
 
         # Verificar duplicados en destino
         ya_en_clase = AlumnoClase.objects.filter(id_alumno_paquete__id_alumno=alumno, id_clase=clase_destino).exists() if tipo_alumno == "regular" else \
                       AlumnoClaseOcasional.objects.filter(id_alumno=alumno, id_clase=clase_destino).exists()
         
         if ya_en_clase:
-            return {"errores": ["El alumno ya está registrado en la clase destino."]}
+            return {"errores": ["El alumno ya estÃ¡ registrado en la clase destino."]}
 
-        # Ejecutar Reprogramación
+        # Ejecutar ReprogramaciÃ³n
         if tipo_alumno == "regular":
-            alumno_clase.estado = "reprogramó"
+            alumno_clase.estado = "reprogramÃ³"
             alumno_clase.save()
-            AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperó")
+            AlumnoClase.objects.create(id_alumno_paquete=alumno_clase.id_alumno_paquete, id_clase=clase_destino, estado="recuperÃ³")
         else:
-            alumno_clase_ocasional.estado = "canceló"
+            alumno_clase_ocasional.estado = "cancelÃ³"
             alumno_clase_ocasional.save()
             AlumnoClaseOcasional.objects.create(id_alumno=alumno, id_clase=clase_destino, estado="reservado")
         
@@ -142,12 +142,12 @@ def reprogramar_clase_datos(data):
         msg = "Clase reprogramada correctamente."
 
     else:
-        # Ejecutar solo Cancelación
+        # Ejecutar solo CancelaciÃ³n
         if tipo_alumno == "regular":
-            alumno_clase.estado = "canceló"
+            alumno_clase.estado = "cancelÃ³"
             alumno_clase.save()
         else:
-            alumno_clase_ocasional.estado = "canceló"
+            alumno_clase_ocasional.estado = "cancelÃ³"
             alumno_clase_ocasional.save()
 
     # LIBERAR SIEMPRE EL CUPO ORIGEN
@@ -175,7 +175,7 @@ def reprogramar_clase(request):
     Reprograma una clase de un alumno (regular u ocasional) hacia otra fecha y horario.
     """
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
@@ -225,7 +225,7 @@ def cambiar_turnos_paquete_datos(data):
         ).order_by('-id_alumno_paquete').first()
 
     if not alumno_paquete:
-        return {"errores": ["No se encontró un paquete activo para el alumno"]}
+        return {"errores": ["No se encontrÃ³ un paquete activo para el alumno"]}
 
     turnos_anteriores_objs = AlumnoPaqueteTurno.objects.filter(id_alumno_paquete=alumno_paquete)
     turnos_anteriores = [f"{t.id_turno.dia} {t.id_turno.horario.strftime('%H:%M')}" for t in turnos_anteriores_objs]
@@ -246,7 +246,7 @@ def cambiar_turnos_paquete_datos(data):
                 turno_obj = Turno.objects.get(dia=dia, horario=hora_obj, disciplina=disciplina)
             turnos_nuevos_objs.append(turno_obj)
         except ValueError:
-            errores.append(f"Formato de turno inválido: {turno_str}")
+            errores.append(f"Formato de turno invÃ¡lido: {turno_str}")
         except Turno.DoesNotExist:
             errores.append(f"Turno {turno_str} no existe")
 
@@ -311,17 +311,17 @@ def cambiar_turnos_paquete(request):
 
     Entradas (JSON):
     - id_alumno (int)                 [obligatorio]
-    - id_paquete (int)                [opcional; si no se envia, toma el paquete activo más reciente]
+    - id_paquete (int)                [opcional; si no se envia, toma el paquete activo mÃ¡s reciente]
     - turnos_nuevos (list[str])      [obligatorio; formato: "Dia HH:MM"]
 
-    Lógica:
+    LÃ³gica:
     1. Verifica que el alumno y paquete existan.
     2. Valida disponibilidad de los nuevos turnos.
     3. Reasigna clases futuras del paquete a los nuevos turnos.
     4. Mantiene clases pasadas intactas.
     """
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
@@ -340,7 +340,7 @@ def cambiar_turnos_paquete(request):
 
 def renovar_paquete_datos(data):
     """
-    Lógica interna para renovar o actualizar un paquete.
+    LÃ³gica interna para renovar o actualizar un paquete.
     """
     id_alumno = data.get("id_alumno")
     nombre_in = data.get("nombre")
@@ -370,9 +370,9 @@ def renovar_paquete_datos(data):
     
     if isinstance(tipo_paquete, str):
         try:
-            tipo_paquete = int(tipo_paquete.split()[0])  # Extraer número de clases
+            tipo_paquete = int(tipo_paquete.split()[0])  # Extraer nÃºmero de clases
         except ValueError:
-            return {"errores": ["Formato de 'tipo_paquete' inválido."]}
+            return {"errores": ["Formato de 'tipo_paquete' invÃ¡lido."]}
 
     try:
         alumno = Alumno.objects.get(id_alumno=id_alumno)
@@ -425,7 +425,7 @@ def renovar_paquete_datos(data):
         except Turno.DoesNotExist:
             errores.append(f"Turno {turno_str} no existe")
         except ValueError:
-            errores.append(f"Formato de turno inválido: {turno_str}")
+            errores.append(f"Formato de turno invÃ¡lido: {turno_str}")
 
     # 3. Combinar turnos sin duplicar
     turnos_finales = {t.id_turno: t for t in turnos_actuales}
@@ -436,9 +436,9 @@ def renovar_paquete_datos(data):
     turnos_finales = list(turnos_finales.values())
 
     if not turnos_finales:
-        return {"errores": ["No hay turnos válidos para la renovación."]}
+        return {"errores": ["No hay turnos vÃ¡lidos para la renovaciÃ³n."]}
 
-    # 4. Calcular distribución
+    # 4. Calcular distribuciÃ³n
     cantidad_clases = paquete.cantidad_clases
     cantidad_turnos = len(turnos_finales)
 
@@ -541,7 +541,7 @@ def renovar_paquete_datos(data):
 
     return {
         "status": "success",
-        "message": "Renovación completa",
+        "message": "RenovaciÃ³n completa",
         "data": {
             "alumno": f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}",
             "paquete": f"{paquete.cantidad_clases} clases",
@@ -560,7 +560,7 @@ def renovar_paquete(request):
     Renueva o actualiza un paquete de clases para un alumno.
     """
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
@@ -582,7 +582,7 @@ def relacionar_alumnos(request):
     """
     POST /relacionar_alumnos/
     -------------------------
-    Crea o reactiva una relación simétrica entre dos alumnos.
+    Crea o reactiva una relaciÃ³n simÃ©trica entre dos alumnos.
 
     Entradas (JSON):
     - id_alumno_1 (int)         [obligatorio]
@@ -593,7 +593,7 @@ def relacionar_alumnos(request):
     Reglas:
     - No se puede relacionar un alumno consigo mismo.
     - Ambos alumnos deben existir.
-    - Si la relación ya existe:
+    - Si la relaciÃ³n ya existe:
         - si estaba inactiva, se reactiva
         - se actualiza tipo_relacion
         - se actualiza observaciones
@@ -601,7 +601,7 @@ def relacionar_alumnos(request):
 
     Respuesta 200 OK:
     {
-        "message": "Relación creada correctamente.",
+        "message": "RelaciÃ³n creada correctamente.",
         "data": {
             "id_relacion_alumno": 1,
             "id_alumno_1": 3,
@@ -614,7 +614,7 @@ def relacionar_alumnos(request):
     """
 
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     errores = []
 
@@ -638,7 +638,7 @@ def relacionar_alumnos(request):
 
         if id_alumno_1 == id_alumno_2:
             return JsonResponse(
-                {"errores": ["No se puede crear una relación entre el mismo alumno."]},
+                {"errores": ["No se puede crear una relaciÃ³n entre el mismo alumno."]},
                 status=400
             )
 
@@ -655,7 +655,7 @@ def relacionar_alumnos(request):
         tipos_validos = [choice[0] for choice in RelacionAlumno.TIPOS_RELACION]
         if tipo_relacion not in tipos_validos:
             return JsonResponse(
-                {"errores": [f"tipo_relacion inválido. Valores permitidos: {tipos_validos}"]},
+                {"errores": [f"tipo_relacion invÃ¡lido. Valores permitidos: {tipos_validos}"]},
                 status=400
             )
 
@@ -675,7 +675,7 @@ def relacionar_alumnos(request):
             relacion.observaciones = observaciones
             relacion.activa = True
             relacion.save()
-            message = "La relación ya existía y fue actualizada/reactivada correctamente."
+            message = "La relaciÃ³n ya existÃ­a y fue actualizada/reactivada correctamente."
         else:
             relacion = RelacionAlumno.objects.create(
                 id_alumno_1=alumno_1,
@@ -685,7 +685,7 @@ def relacionar_alumnos(request):
                 activa=True
             )
             creada = True
-            message = "Relación creada correctamente."
+            message = "RelaciÃ³n creada correctamente."
 
         return JsonResponse({
             "message": message,
@@ -701,7 +701,7 @@ def relacionar_alumnos(request):
         }, status=200)
 
     except json.JSONDecodeError:
-        return JsonResponse({"error": "JSON inválido."}, status=400)
+        return JsonResponse({"error": "JSON invÃ¡lido."}, status=400)
 
     except Exception as e:
         logging.error(f"[relacionar_alumnos] Error: {str(e)}")
@@ -726,7 +726,7 @@ def obtener_relacionados(request):
                 "id_relacion_alumno": 3,
                 "id_alumno_relacionado": 25,
                 "nombre": "Laura",
-                "apellido": "Gómez",
+                "apellido": "GÃ³mez",
                 "estado": "regular",
                 "tipo_relacion": "familiares",
                 "observaciones": "Madre e hija",
@@ -738,7 +738,7 @@ def obtener_relacionados(request):
     """
 
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     try:
         data = json.loads(request.body)
@@ -788,7 +788,7 @@ def obtener_relacionados(request):
         }, status=200)
 
     except json.JSONDecodeError:
-        return JsonResponse({"error": "JSON inválido."}, status=400)
+        return JsonResponse({"error": "JSON invÃ¡lido."}, status=400)
 
     except Exception as e:
         logging.error(f"[obtener_relacionados] Error: {str(e)}")
@@ -800,32 +800,32 @@ def obtener_clases_agendadas(request):
     """
     POST /obtener_clases_agendadas/
     -------------------------------
-    Devuelve la lista de clases agendadas para un alumno, filtradas desde una fecha mínima (por defecto, la fecha actual).
+    Devuelve la lista de clases agendadas para un alumno, filtradas desde una fecha mÃ­nima (por defecto, la fecha actual).
 
-    Métodos admitidos:
-    - POST → obtiene las clases agendadas.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - POST â obtiene las clases agendadas.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
     Entradas (JSON):
     - id_alumno (int)                 [obligatorio]
     - fecha_minima (str, YYYY-MM-DD)  [opcional]
 
     Validaciones y posibles errores:
-    - Falta 'id_alumno' → 400 {"errores": ["Falta el campo 'id_alumno'."]}
-    - 'fecha_minima' con formato inválido → 400 {"errores": ["La fecha debe tener el formato YYYY-MM-DD."]}
-    - Alumno no encontrado → 404 {"errores": ["Alumno no encontrado"]}
-    - Error no controlado → 500 {"error": "<mensaje de excepción>"}
+    - Falta 'id_alumno' â 400 {"errores": ["Falta el campo 'id_alumno'."]}
+    - 'fecha_minima' con formato invÃ¡lido â 400 {"errores": ["La fecha debe tener el formato YYYY-MM-DD."]}
+    - Alumno no encontrado â 404 {"errores": ["Alumno no encontrado"]}
+    - Error no controlado â 500 {"error": "<mensaje de excepciÃ³n>"}
 
-    Comportamiento según estado del alumno:
-    - estado == "regular" → consulta en AlumnoClase (clases regulares).
-    - estado == "ocasional" → consulta en AlumnoClaseOcasional (clases con fecha >= fecha_minima).
-    - estado distinto (p. ej. "inactivo") → 200 {"clases": [], "message": "El alumno está inactivo, no tiene clases agendadas actualmente."}
+    Comportamiento segÃºn estado del alumno:
+    - estado == "regular" â consulta en AlumnoClase (clases regulares).
+    - estado == "ocasional" â consulta en AlumnoClaseOcasional (clases con fecha >= fecha_minima).
+    - estado distinto (p. ej. "inactivo") â 200 {"clases": [], "message": "El alumno estÃ¡ inactivo, no tiene clases agendadas actualmente."}
 
     Cada elemento de la lista "clases" tiene esta estructura:
     {
     "id_clase": int,
     "fecha": "YYYY-MM-DD",
-    "dia": "NombreDelDía",
+    "dia": "NombreDelDÃ­a",
     "hora": "HH:MM",
     "tipo": "regular" | "ocasional",
     "estado": "<estado actual>"
@@ -848,7 +848,7 @@ def obtener_clases_agendadas(request):
     """
 
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     errores = []
 
@@ -915,10 +915,10 @@ def obtener_clases_agendadas(request):
         else:
             return JsonResponse({
                 "clases": [],
-                "message": "El alumno está inactivo, no tiene clases agendadas actualmente."
+                "message": "El alumno estÃ¡ inactivo, no tiene clases agendadas actualmente."
             })
 
-        # Filtrar por fecha mínima
+        # Filtrar por fecha mÃ­nima
         clases_filtradas = [
             c for c in clases_resultado
             if datetime.strptime(c["fecha"], "%Y-%m-%d").date() >= fecha_minima
@@ -944,7 +944,7 @@ def normalizar(texto):
 def resolver_nombre(nombre_dict, alumnos_dict):
     """
     Intenta matchear el nombre recibido con los nombres normalizados de alumnos anotados.
-    Retorna id_alumno si hay un único match.
+    Retorna id_alumno si hay un Ãºnico match.
     """
     nombre_input = normalizar(nombre_dict.get("nombre", ""))
     apellido_input = normalizar(nombre_dict.get("apellido", ""))
@@ -984,10 +984,10 @@ def registrar_pago(request):
     Entradas (JSON):
     - monto (int)           [Obligatorio]
     - metodo_pago (str)     [Obligatorio]
-    - nombre (str)          [Opcional; para búsqueda]
-    - apellido (str)        [Opcional; para búsqueda]
-    - telefono (str)        [Opcional; para búsqueda; acepta formato string]
-    - ruc (str)             [Opcional; para búsqueda]
+    - nombre (str)          [Opcional; para bÃºsqueda]
+    - apellido (str)        [Opcional; para bÃºsqueda]
+    - telefono (str)        [Opcional; para bÃºsqueda; acepta formato string]
+    - ruc (str)             [Opcional; para bÃºsqueda]
     - cant_clases (int)     [Opcional]
     - fecha_pago (str)      [Opcional; formato YYYY-MM-DD; default hoy]
     - comprobante (str)     [Opcional]
@@ -996,19 +996,19 @@ def registrar_pago(request):
     Respuesta 200 OK:
     {
         "status": "success",
-        "message": "Mensaje de confirmación",
+        "message": "Mensaje de confirmaciÃ³n",
         "data": { "alumno": "Nombre", "paquete_actualizado": "X clases", "pago_id": ID }
     }
     """
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     errores = []
 
     try:
         data = json.loads(request.body)
         
-        # 1. Extracción de datos
+        # 1. ExtracciÃ³n de datos
         monto = data.get("monto")
         metodo = data.get("metodo_pago")
         comprobante = data.get("comprobante", "Sin comprobante adjunto")
@@ -1022,7 +1022,7 @@ def registrar_pago(request):
         if not monto or not metodo:
             return JsonResponse({"errores": ["Falta monto o metodo_pago"]}, status=400)
 
-        # 2. Búsqueda de Alumno
+        # 2. BÃºsqueda de Alumno
         alumno = None
         if id_alumno:
             alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
@@ -1064,7 +1064,7 @@ def registrar_pago(request):
             comprobante=comprobante
         )
 
-        # 4. VINCULACIÓn
+        # 4. VINCULACIÃn
         alumno_paquete  = AlumnoPaquete.objects.filter(id_alumno=alumno, estado__in=["activo", "pendiente"]).order_by('-id_alumno_paquete').first()
 
         if alumno_paquete:
@@ -1091,7 +1091,7 @@ def registrar_pago(request):
         PagoAlumno.objects.create(
             id_pago=nuevo_pago,
             id_alumno_paquete=alumno_paquete,
-            observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
+            observaciones=f"Pago registrado vÃ­a WhatsApp. Ref: {comprobante}"
             )
 
         return JsonResponse({
@@ -1114,46 +1114,46 @@ def registrar_asistencias(request):
     """
     POST /registrar_asistencias/
     ----------------------------
-    Registra las asistencias y ausencias de alumnos (regulares y ocasionales) en una clase determinada por día, horario y fecha.
+    Registra las asistencias y ausencias de alumnos (regulares y ocasionales) en una clase determinada por dÃ­a, horario y fecha.
 
-    Métodos admitidos:
-    - POST → registra las asistencias.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - POST â registra las asistencias.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
     Entradas (JSON):
     - dia (str)                   [obligatorio]
     - horario (str)               [obligatorio]
     - fecha (str, YYYY-MM-DD)     [opcional; si falta, se usa la fecha actual del sistema]
-    - asistieron (list[dict])     [opcional; formato {"nombre": "Ana", "apellido": "Pérez"}]
-    - faltaron (list[dict])       [opcional; formato {"nombre": "Laura", "apellido": "Gómez"}]
+    - asistieron (list[dict])     [opcional; formato {"nombre": "Ana", "apellido": "PÃ©rez"}]
+    - faltaron (list[dict])       [opcional; formato {"nombre": "Laura", "apellido": "GÃ³mez"}]
 
     Validaciones y posibles errores:
-    - Falta 'dia' o 'horario' → 400 {"errores": ["Falta el campo 'dia'.", "Falta el campo 'horario'."]}
-    - 'fecha' con formato inválido → 400 {"errores": ["Formato de fecha inválido, debe ser YYYY-MM-DD."]}
-    - 'fecha' futura → 400 {"errores": ["No se puede registrar asistencia para fechas futuras."]}
-    - Turno no encontrado → 404 {"errores": ["Turno no encontrado."]}
-    - Clase no encontrada para ese turno y fecha → 404 {"errores": ["Clase no encontrada para ese turno y fecha."]}
-    - Excepción no controlada → 500 {"error": "<mensaje de excepción>"}
+    - Falta 'dia' o 'horario' â 400 {"errores": ["Falta el campo 'dia'.", "Falta el campo 'horario'."]}
+    - 'fecha' con formato invÃ¡lido â 400 {"errores": ["Formato de fecha invÃ¡lido, debe ser YYYY-MM-DD."]}
+    - 'fecha' futura â 400 {"errores": ["No se puede registrar asistencia para fechas futuras."]}
+    - Turno no encontrado â 404 {"errores": ["Turno no encontrado."]}
+    - Clase no encontrada para ese turno y fecha â 404 {"errores": ["Clase no encontrada para ese turno y fecha."]}
+    - ExcepciÃ³n no controlada â 500 {"error": "<mensaje de excepciÃ³n>"}
 
     Comportamiento interno:
     - Busca el turno (Turno.dia, Turno.horario).
     - Busca la clase correspondiente (Clase.id_turno, Clase.fecha).
     - Crea un diccionario de alumnos de la clase (regulares y ocasionales), indexados por nombre normalizado.
     - Actualiza el estado de cada alumno:
-    • "faltó" para los incluidos en `faltaron`
-    • "asistió" para los incluidos en `asistieron`
+    â¢ "faltÃ³" para los incluidos en `faltaron`
+    â¢ "asistiÃ³" para los incluidos en `asistieron`
     - Si el nombre no se encuentra, se agrega a `alumnos_no_encontrados`.
 
     Respuesta 200 OK:
     {
-    "asistencias_registradas": ["ana pérez", "laura gómez", ...],
-    "alumnos_no_encontrados": ["maría fernández", ...],
+    "asistencias_registradas": ["ana pÃ©rez", "laura gÃ³mez", ...],
+    "alumnos_no_encontrados": ["marÃ­a fernÃ¡ndez", ...],
     "message": "Asistencias registradas correctamente para <N> alumnos."
     }
     """
 
     if request.method != "POST":
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
     errores = []
     try:
@@ -1180,7 +1180,7 @@ def registrar_asistencias(request):
                 if fecha > timezone.localdate():
                     errores.append("No se puede registrar asistencia para fechas futuras.")
             except ValueError:
-                errores.append("Formato de fecha inválido, debe ser YYYY-MM-DD.")
+                errores.append("Formato de fecha invÃ¡lido, debe ser YYYY-MM-DD.")
         else:
             fecha = timezone.localdate()
 
@@ -1201,7 +1201,7 @@ def registrar_asistencias(request):
             errores.append("Clase no encontrada para ese turno y fecha.")
             return JsonResponse({"errores": errores}, status=404)
 
-        # Construir diccionario: nombre_normalizado → (id_alumno, instancia, tipo)
+        # Construir diccionario: nombre_normalizado â (id_alumno, instancia, tipo)
         alumnos_dict = {}
 
         alumnos_regulares = AlumnoClase.objects.filter(id_clase=clase)
@@ -1225,7 +1225,7 @@ def registrar_asistencias(request):
             nombre_match = resolver_nombre(alumno_dict, alumnos_dict)
             if nombre_match:
                 _, instancia, _ = alumnos_dict[nombre_match]
-                instancia.estado = "faltó"
+                instancia.estado = "faltÃ³"
                 instancia.save()
                 if nombre_match not in ya_procesados:
                     procesados.append(nombre_match)
@@ -1240,7 +1240,7 @@ def registrar_asistencias(request):
             nombre_match = resolver_nombre(alumno_dict, alumnos_dict)
             if nombre_match and nombre_match not in ya_procesados:
                 _, instancia, _ = alumnos_dict[nombre_match]
-                instancia.estado = "asistió"
+                instancia.estado = "asistiÃ³"
                 instancia.save()
                 procesados.append(nombre_match)
                 ya_procesados.add(nombre_match)
@@ -1262,25 +1262,25 @@ def registrar_asistencias(request):
 
 def obtener_fecha_proximo_dia(dia_nombre):
     """
-    Calcula la próxima fecha (tipo date) correspondiente a un día de la semana dado.
+    Calcula la prÃ³xima fecha (tipo date) correspondiente a un dÃ­a de la semana dado.
     """
-    logging.info(f"[obtener_fecha_proximo_dia] Calculando próxima fecha para día: {dia_nombre}")
+    logging.info(f"[obtener_fecha_proximo_dia] Calculando prÃ³xima fecha para dÃ­a: {dia_nombre}")
     
     hoy = datetime.now().date()
     logging.debug(f"[obtener_fecha_proximo_dia] Fecha de hoy: {hoy}")
     
     dia_actual = hoy.weekday()
-    logging.debug(f"[obtener_fecha_proximo_dia] Día actual (weekday): {dia_actual}")
+    logging.debug(f"[obtener_fecha_proximo_dia] DÃ­a actual (weekday): {dia_actual}")
     
     dia_objetivo = DAY_INDEX[dia_nombre]
-    logging.debug(f"[obtener_fecha_proximo_dia] Día objetivo (weekday): {dia_objetivo} para '{dia_nombre}'")
+    logging.debug(f"[obtener_fecha_proximo_dia] DÃ­a objetivo (weekday): {dia_objetivo} para '{dia_nombre}'")
     
     dias_hasta_objetivo = (dia_objetivo - dia_actual + 7) % 7
-    logging.debug(f"[obtener_fecha_proximo_dia] Días hasta objetivo (inicial): {dias_hasta_objetivo}")
+    logging.debug(f"[obtener_fecha_proximo_dia] DÃ­as hasta objetivo (inicial): {dias_hasta_objetivo}")
     
     if dias_hasta_objetivo == 0:
-        dias_hasta_objetivo = 7  # Si es hoy, te vas al próximo mismo día (no hoy mismo)
-        logging.debug(f"[obtener_fecha_proximo_dia] Es hoy, ajustando a próxima semana: {dias_hasta_objetivo} días")
+        dias_hasta_objetivo = 7  # Si es hoy, te vas al prÃ³ximo mismo dÃ­a (no hoy mismo)
+        logging.debug(f"[obtener_fecha_proximo_dia] Es hoy, ajustando a prÃ³xima semana: {dias_hasta_objetivo} dÃ­as")
     
     fecha_objetivo = hoy + timedelta(days=dias_hasta_objetivo)
     logging.info(f"[obtener_fecha_proximo_dia] Fecha calculada: {fecha_objetivo} ({dia_nombre})")
@@ -1292,25 +1292,25 @@ def obtener_id_alumno(request):
     """
     POST /obtener_id_alumno/
     ------------------------
-    Obtiene el ID y el estado de un alumno a partir de su número de teléfono.  
-    Si existen múltiples personas con el mismo teléfono, utiliza nombre y apellido para desambiguar.
+    Obtiene el ID y el estado de un alumno a partir de su nÃºmero de telÃ©fono.  
+    Si existen mÃºltiples personas con el mismo telÃ©fono, utiliza nombre y apellido para desambiguar.
 
-    Métodos admitidos:
-    - POST → realiza la búsqueda del alumno.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - POST â realiza la bÃºsqueda del alumno.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
     Entradas (JSON):
     - telefono (str)    [obligatorio]
-    - nombre (str)      [opcional; usado para desambiguar si hay más de una persona con el mismo teléfono]
-    - apellido (str)    [opcional; usado para desambiguar si hay más de una persona con el mismo teléfono]
+    - nombre (str)      [opcional; usado para desambiguar si hay mÃ¡s de una persona con el mismo telÃ©fono]
+    - apellido (str)    [opcional; usado para desambiguar si hay mÃ¡s de una persona con el mismo telÃ©fono]
 
     Validaciones y posibles errores:
-    - Falta 'telefono' → 400 {"error": "El campo 'telefono' es obligatorio."}
-    - Ninguna persona con ese teléfono → 404 {"error": "No se encontró ninguna persona con ese teléfono."}
-    - Varias personas con el mismo teléfono y sin coincidencia exacta de nombre/apellido → 400 {"error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."}
-    - Más de una coincidencia exacta → 400 {"error": "Se encontró más de una persona con ese teléfono, nombre y apellido."}
-    - Persona sin registro como alumno → 404 {"error": "La persona existe pero no está registrada como alumno."}
-    - Error no controlado → 500 {"error": "<mensaje de excepción>"}
+    - Falta 'telefono' â 400 {"error": "El campo 'telefono' es obligatorio."}
+    - Ninguna persona con ese telÃ©fono â 404 {"error": "No se encontrÃ³ ninguna persona con ese telÃ©fono."}
+    - Varias personas con el mismo telÃ©fono y sin coincidencia exacta de nombre/apellido â 400 {"error": "Hay varias personas con ese telÃ©fono, pero ninguna coincide exactamente con el nombre y apellido."}
+    - MÃ¡s de una coincidencia exacta â 400 {"error": "Se encontrÃ³ mÃ¡s de una persona con ese telÃ©fono, nombre y apellido."}
+    - Persona sin registro como alumno â 404 {"error": "La persona existe pero no estÃ¡ registrada como alumno."}
+    - Error no controlado â 500 {"error": "<mensaje de excepciÃ³n>"}
 
     Salida exitosa (200 OK):
     {
@@ -1333,23 +1333,23 @@ def obtener_id_alumno(request):
             personas_filtradas = []
 
             if personas.count() == 0:
-                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
+                return JsonResponse({"error": "No se encontrÃ³ ninguna persona con ese telÃ©fono."}, status=404)
 
             if personas.count() == 1:
                 persona = personas.first()
             else:
-                # Más de una persona con ese teléfono, aplicar comparación con nombre y apellido
+                # MÃ¡s de una persona con ese telÃ©fono, aplicar comparaciÃ³n con nombre y apellido
                 for p in personas:
                     if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
                         personas_filtradas.append(p)
 
                 if len(personas_filtradas) == 0:
                     return JsonResponse({
-                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                        "error": "Hay varias personas con ese telÃ©fono, pero ninguna coincide exactamente con el nombre y apellido."
                     }, status=400)
                 if len(personas_filtradas) > 1:
                     return JsonResponse({
-                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
+                        "error": "Se encontrÃ³ mÃ¡s de una persona con ese telÃ©fono, nombre y apellido."
                     }, status=400)
 
                 persona = personas_filtradas[0]
@@ -1358,7 +1358,7 @@ def obtener_id_alumno(request):
             try:
                 alumno = Alumno.objects.get(id_persona=persona)
             except Alumno.DoesNotExist:
-                return JsonResponse({"error": "La persona existe pero no está registrada como alumno."}, status=404)
+                return JsonResponse({"error": "La persona existe pero no estÃ¡ registrada como alumno."}, status=404)
 
             return JsonResponse({
                 "id_alumno": alumno.id_alumno,
@@ -1369,7 +1369,7 @@ def obtener_id_alumno(request):
             logging.error(f"[obtener_id_alumno] Error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 
@@ -1381,35 +1381,35 @@ def registrar_alumno_ocasional(request):
     ---------------------------------
     Registra un nuevo alumno ocasional en una clase puntual (sin paquete).
 
-    Métodos admitidos:
-    - POST → crea la persona, el alumno y su registro en una clase existente.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - POST â crea la persona, el alumno y su registro en una clase existente.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
     Entradas (JSON):
     - nombre (str)              [obligatorio]
     - apellido (str)            [obligatorio]
     - telefono (str)            [obligatorio]
     - hora_turno (str)          [obligatorio]
-    - dia_turno (str)           [opcional si se envía 'fecha']
+    - dia_turno (str)           [opcional si se envÃ­a 'fecha']
     - fecha (str, YYYY-MM-DD)   [opcional]
     - canal_captacion (str)     [opcional]
     - observaciones (str)       [opcional]
 
     Validaciones y posibles errores:
-    - Falta alguno de los campos obligatorios → ValueError con mensaje unificado.
-    - 'fecha' con formato inválido → "La fecha debe tener el formato YYYY-MM-DD."
-    - Si no se proporciona 'fecha' ni 'dia_turno' → "Debe proporcionar el día del turno si no proporciona la fecha."
-    - Turno inexistente → "El turno <día> <hora> no existe."
-    - Clase inexistente en ese turno/fecha → "No existe clase programada para <fecha> en el turno <día> <hora>."
-    - Clase llena (≥4 inscriptos) → "La clase del <fecha> a las <hora> ya está llena."
-    - Excepción no controlada → 400 {"error": "<mensaje>"}
+    - Falta alguno de los campos obligatorios â ValueError con mensaje unificado.
+    - 'fecha' con formato invÃ¡lido â "La fecha debe tener el formato YYYY-MM-DD."
+    - Si no se proporciona 'fecha' ni 'dia_turno' â "Debe proporcionar el dÃ­a del turno si no proporciona la fecha."
+    - Turno inexistente â "El turno <dÃ­a> <hora> no existe."
+    - Clase inexistente en ese turno/fecha â "No existe clase programada para <fecha> en el turno <dÃ­a> <hora>."
+    - Clase llena (â¥4 inscriptos) â "La clase del <fecha> a las <hora> ya estÃ¡ llena."
+    - ExcepciÃ³n no controlada â 400 {"error": "<mensaje>"}
 
     Comportamiento interno:
-    1. Si se envía `fecha`:
+    1. Si se envÃ­a `fecha`:
     - Se convierte a date.
     - Si falta `dia_turno`, se infiere desde la fecha.
-    2. Si no se envía `fecha`, calcula la próxima fecha correspondiente a `dia_turno` (usando `obtener_fecha_proximo_dia`).
-    3. Busca el `Turno` correspondiente al día y horario.
+    2. Si no se envÃ­a `fecha`, calcula la prÃ³xima fecha correspondiente a `dia_turno` (usando `obtener_fecha_proximo_dia`).
+    3. Busca el `Turno` correspondiente al dÃ­a y horario.
     4. Busca la `Clase` existente en esa fecha.
     5. Si hay cupo, crea:
     - Una nueva `Persona`.
@@ -1420,7 +1420,7 @@ def registrar_alumno_ocasional(request):
     {
     "mensaje": "Alumno ocasional registrado correctamente",
     "fecha_clase": "YYYY-MM-DD",
-    "turno": "Día HH:MM"
+    "turno": "DÃ­a HH:MM"
     }
     """
 
@@ -1434,36 +1434,36 @@ def registrar_alumno_ocasional(request):
             logging.error(f"[registrar_alumno_ocasional] Error: {str(e)}")
             logging.error(f"[registrar_alumno_ocasional] Datos recibidos: {request.body.decode('utf-8')}")
             return JsonResponse({"error": str(e)}, status=400)
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 def registrar_alumno_ocasional_datos(data):
     """
-    Registra en base de datos un nuevo alumno ocasional y lo asigna a una clase específica.
+    Registra en base de datos un nuevo alumno ocasional y lo asigna a una clase especÃ­fica.
 
-    Parámetros:
+    ParÃ¡metros:
     - data (dict): Diccionario con los datos de entrada.  
     Claves esperadas:
         - nombre (str)              [obligatorio]
         - apellido (str)            [obligatorio]
         - telefono (str)            [obligatorio]
         - hora_turno (str)          [obligatorio]
-        - dia_turno (str)           [opcional si se envía 'fecha']
+        - dia_turno (str)           [opcional si se envÃ­a 'fecha']
         - fecha (str, YYYY-MM-DD)   [opcional]
         - canal_captacion (str)     [opcional]
         - observaciones (str)       [opcional]
 
     Validaciones:
     - Verifica que existan los campos obligatorios.
-    - Si se envía `fecha`, la convierte a `datetime.date`.  
-    - Si no se envía `dia_turno`, lo deduce automáticamente desde la fecha.  
+    - Si se envÃ­a `fecha`, la convierte a `datetime.date`.  
+    - Si no se envÃ­a `dia_turno`, lo deduce automÃ¡ticamente desde la fecha.  
     - Si el formato de `fecha` es incorrecto, agrega error.
-    - Si no se envía `fecha`, requiere `dia_turno` y calcula la próxima fecha válida usando `obtener_fecha_proximo_dia`.
+    - Si no se envÃ­a `fecha`, requiere `dia_turno` y calcula la prÃ³xima fecha vÃ¡lida usando `obtener_fecha_proximo_dia`.
     - Verifica que exista un `Turno` para el `dia_turno` y `hora_turno`.
-    - Verifica que exista una `Clase` para ese turno y fecha, y que no esté completa (`total_inscriptos < 4`).
+    - Verifica que exista una `Clase` para ese turno y fecha, y que no estÃ© completa (`total_inscriptos < 4`).
     - Si hay errores acumulados, lanza `ValueError` con el resumen de los mensajes concatenados.
 
     Acciones ejecutadas:
-    1. Crea una instancia de `Persona` (nombre, apellido, teléfono, observaciones).
+    1. Crea una instancia de `Persona` (nombre, apellido, telÃ©fono, observaciones).
     2. Crea un `Alumno` asociado con esa persona (`estado="ocasional"`).
     3. Crea un registro en `AlumnoClaseOcasional` vinculado a la `Clase` existente, con `estado="reservado"`.
 
@@ -1472,23 +1472,23 @@ def registrar_alumno_ocasional_datos(data):
     {
         "mensaje": "Alumno ocasional registrado correctamente",
         "fecha_clase": "YYYY-MM-DD",
-        "turno": "Día HH:MM"
+        "turno": "DÃ­a HH:MM"
     }
 
     Excepciones:
-    - ValueError: cuando se detectan errores de validación o disponibilidad.
-    - Cualquier otra excepción será capturada por la vista superior (`registrar_alumno_ocasional`) y devuelta como JSON con status 400.
+    - ValueError: cuando se detectan errores de validaciÃ³n o disponibilidad.
+    - Cualquier otra excepciÃ³n serÃ¡ capturada por la vista superior (`registrar_alumno_ocasional`) y devuelta como JSON con status 400.
     """
 
     errores = []
 
-    # 📌 Validar campos básicos
+    # ð Validar campos bÃ¡sicos
     if not data.get("nombre"):
         errores.append("Debe proporcionar un nombre.")
     if not data.get("apellido"):
         errores.append("Debe proporcionar un apellido.")
     if not data.get("telefono"):
-        errores.append("Debe proporcionar un número de teléfono.")
+        errores.append("Debe proporcionar un nÃºmero de telÃ©fono.")
     if not data.get("hora_turno"):
         errores.append("Debe proporcionar el horario del turno.")
 
@@ -1496,19 +1496,19 @@ def registrar_alumno_ocasional_datos(data):
     dia_turno = data.get("dia_turno")
     fecha_str = data.get("fecha")
 
-    # 📌 Resolver fecha y día
+    # ð Resolver fecha y dÃ­a
     if fecha_str:
         try:
             fecha_clase = datetime.strptime(fecha_str, "%Y-%m-%d").date()
             if not dia_turno:
                 dia_numero = fecha_clase.weekday()
-                dia_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+                dia_nombre = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes", "SÃ¡bado", "Domingo"]
                 dia_turno = dia_nombre[dia_numero]
         except ValueError:
             errores.append("La fecha debe tener el formato YYYY-MM-DD.")
     else:
         if not dia_turno:
-            errores.append("Debe proporcionar el día del turno si no proporciona la fecha.")
+            errores.append("Debe proporcionar el dÃ­a del turno si no proporciona la fecha.")
         else:
             fecha_clase = obtener_fecha_proximo_dia(dia_turno)
 
@@ -1516,7 +1516,7 @@ def registrar_alumno_ocasional_datos(data):
     clase = None
 
     if not errores:
-        # 📌 Obtener turno
+        # ð Obtener turno
         try:
             disciplina = data.get("disciplina", "Reformer")
             turno = Turno.objects.get(dia=dia_turno, horario=data["hora_turno"], disciplina=disciplina)
@@ -1524,20 +1524,20 @@ def registrar_alumno_ocasional_datos(data):
             errores.append(f"El turno {dia_turno} {data['hora_turno']} ({disciplina}) no existe.")
 
     if not errores:
-        # 📌 Validar clase específica en esa fecha
+        # ð Validar clase especÃ­fica en esa fecha
         try:
             clase = Clase.objects.get(id_turno=turno, fecha=fecha_clase)
             if clase.obtener_total_inscriptos >= 4:
-                errores.append(f"La clase del {fecha_clase} a las {data['hora_turno']} ya está llena.")
+                errores.append(f"La clase del {fecha_clase} a las {data['hora_turno']} ya estÃ¡ llena.")
         except Clase.DoesNotExist:
             errores.append(f"No existe clase programada para {fecha_clase} en el turno {dia_turno} {data['hora_turno']}.")
 
 
-    # 📌 Si hay errores, abortar
+    # ð Si hay errores, abortar
     if errores:
         raise ValueError("Errores encontrados: " + "; ".join(errores))
 
-    # 📌 Crear Persona
+    # ð Crear Persona
     persona = Persona.objects.create(
         nombre=data["nombre"],
         apellido=data["apellido"],
@@ -1545,14 +1545,14 @@ def registrar_alumno_ocasional_datos(data):
         observaciones=data.get("observaciones", "")
     )
 
-    # 📌 Crear Alumno
+    # ð Crear Alumno
     alumno = Alumno.objects.create(
         id_persona=persona,
         canal_captacion=data.get("canal_captacion", ""),
         estado="ocasional"
     )
 
-    # 📌 Crear AlumnoClaseOcasional
+    # ð Crear AlumnoClaseOcasional
     AlumnoClaseOcasional.objects.create(
         id_alumno=alumno,
         id_clase=clase,
@@ -1575,29 +1575,29 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
     -----------------------
     Registra un nuevo alumno regular con un paquete de clases y sus turnos asociados.
 
-    Métodos admitidos:
-    - POST → crea la persona, el alumno, el paquete y las clases asociadas.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - POST â crea la persona, el alumno, el paquete y las clases asociadas.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
     Entradas (JSON):
     - nombre (str)                 [obligatorio]
     - apellido (str)               [obligatorio]
     - telefono (str)               [obligatorio]
     - paquete (int)                [obligatorio] cantidad de clases (ej. 4, 8, 12)
-    - turnos (list[str])           [obligatorio] formato ["Lunes 18:00", "Miércoles 19:00", ...]
+    - turnos (list[str])           [obligatorio] formato ["Lunes 18:00", "MiÃ©rcoles 19:00", ...]
     - fecha_inicio (str, YYYY-MM-DD) [opcional]
     - canal_captacion (str)        [opcional]
     - ruc (str)                    [opcional]
     - observaciones (str)          [opcional]
 
     Validaciones y posibles errores:
-    - Turno inexistente → "El turno <día> <hora> no existe."
-    - Turno con estado "Ocupado" → "El turno <día> <hora> ya tiene su cupo general completo."
-    - Paquete inexistente → "Paquete con <n> clases no existe."
-    - Clase no programada → "No existe clase programada para <fecha> en el turno <día> <hora>."
-    - Clase llena (≥4 inscriptos) → "La clase del <fecha> a las <hora> ya está llena."
-    - Excepciones de validación → 400 {"error": "Errores encontrados: ..."}
-    - Excepciones no controladas → 400 {"error": "<mensaje de excepción>"}
+    - Turno inexistente â "El turno <dÃ­a> <hora> no existe."
+    - Turno con estado "Ocupado" â "El turno <dÃ­a> <hora> ya tiene su cupo general completo."
+    - Paquete inexistente â "Paquete con <n> clases no existe."
+    - Clase no programada â "No existe clase programada para <fecha> en el turno <dÃ­a> <hora>."
+    - Clase llena (â¥4 inscriptos) â "La clase del <fecha> a las <hora> ya estÃ¡ llena."
+    - Excepciones de validaciÃ³n â 400 {"error": "Errores encontrados: ..."}
+    - Excepciones no controladas â 400 {"error": "<mensaje de excepciÃ³n>"}
 
     Comportamiento interno:
     1. Valida los turnos recibidos, descartando los inexistentes o llenos.
@@ -1605,11 +1605,11 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
     3. Calcula la cantidad de clases por turno (`paquete.cantidad_clases // len(turnos)`).
     4. Determina las fechas a reservar:
     - Usa `fecha_inicio` si se especifica.
-    - Si no, obtiene la próxima fecha para cada turno mediante `obtener_fecha_proximo_dia`.
+    - Si no, obtiene la prÃ³xima fecha para cada turno mediante `obtener_fecha_proximo_dia`.
     - Calcula las fechas reales con `obtener_fechas_turno_normal(id_turno, fecha_inicio, clases_por_turno)`.
     5. Verifica que existan clases programadas y con cupo disponible en esas fechas.
     6. Si todas las validaciones pasan:
-    - Crea una `Persona` (nombre, apellido, teléfono, etc.).
+    - Crea una `Persona` (nombre, apellido, telÃ©fono, etc.).
     - Crea un `Alumno` asociado (`estado="regular"`).
     - Crea un `AlumnoPaquete` con estado `"activo"`.
     - Registra los turnos (`AlumnoPaqueteTurno`) y las clases (`AlumnoClase` con estado `"pendiente"`).
@@ -1628,7 +1628,7 @@ def registrar_alumno(request):  #registrar un alumno con un paquete y turnos
         except Exception as e:
             logging.error(f"Error en registrar_alumno: {str(e)}")
             return JsonResponse({"error": str(e)}, status=400)
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 def registrar_alumno_datos(data):
     """
@@ -1640,7 +1640,7 @@ def registrar_alumno_datos(data):
     turnos_asignados = []
     clases_a_reservar = []  # Nuevo: para preparar las clases validadas
 
-    # ✅ Validar turnos
+    # â Validar turnos
     logging.info(f"[registrar_alumno_datos] Validando turnos: {data.get('turnos')}")
     for turno_str in data["turnos"]:
         try:
@@ -1670,7 +1670,7 @@ def registrar_alumno_datos(data):
             logging.error(f"[registrar_alumno_datos] Turno {turno_str} no existe")
             errores.append(f"El turno {turno_str} no existe.")
 
-    # ✅ Validar paquete
+    # â Validar paquete
     logging.info(f"[registrar_alumno_datos] Validando paquete: {data.get('paquete')} clases")
     try:
         paquete = Paquete.objects.get(cantidad_clases=data["paquete"])
@@ -1682,12 +1682,12 @@ def registrar_alumno_datos(data):
     if not turnos_asignados:
         errores.append("Debes seleccionar al menos un turno para registrar el paquete.")
 
-    # ✅ Validar clases específicas
+    # â Validar clases especÃ­ficas
     if not errores:
         cantidad_clases = paquete.cantidad_clases
         cantidad_turnos = len(turnos_asignados)
         clases_por_turno = cantidad_clases // cantidad_turnos
-        logging.info(f"[registrar_alumno_datos] Distribución: {cantidad_clases} clases / {cantidad_turnos} turnos = {clases_por_turno} clases por turno")
+        logging.info(f"[registrar_alumno_datos] DistribuciÃ³n: {cantidad_clases} clases / {cantidad_turnos} turnos = {clases_por_turno} clases por turno")
 
         for turno in turnos_asignados:
             logging.info(f"[registrar_alumno_datos] Procesando turno: {turno.dia} {turno.horario}")
@@ -1696,7 +1696,7 @@ def registrar_alumno_datos(data):
             logging.debug(f"[registrar_alumno_datos] fecha_inicio recibida en data: {fecha_inicio}")
             
             if not fecha_inicio:
-                logging.info(f"[registrar_alumno_datos] No hay fecha_inicio, calculando próxima fecha para día: {turno.dia}")
+                logging.info(f"[registrar_alumno_datos] No hay fecha_inicio, calculando prÃ³xima fecha para dÃ­a: {turno.dia}")
                 fecha_calculada = obtener_fecha_proximo_dia(turno.dia)
                 logging.info(f"[registrar_alumno_datos] Fecha calculada (date): {fecha_calculada}")
                 fecha_inicio = str(fecha_calculada)
@@ -1717,7 +1717,7 @@ def registrar_alumno_datos(data):
                     logging.debug(f"[registrar_alumno_datos] Clase encontrada: id={clase.id_clase}, inscriptos={clase.total_inscriptos}")
                     if clase.obtener_total_inscriptos >= 4:
                         logging.warning(f"[registrar_alumno_datos] Clase llena: {fecha_clase} {turno.horario}")
-                        errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya está llena.")
+                        errores.append(f"La clase del {fecha_clase} a las {turno.horario} ya estÃ¡ llena.")
                     else:
                         clases_a_reservar.append((turno, clase))
                         logging.info(f"[registrar_alumno_datos] Clase reservada: {fecha_clase} {turno.horario}")
@@ -1732,12 +1732,12 @@ def registrar_alumno_datos(data):
                     clases_a_reservar.append((turno, clase))
                     logging.info(f"[registrar_alumno_datos] Clase auto-creada y reservada: {fecha_clase} {turno.horario}")
 
-    # 📌 Si hay errores, devolverlos todos juntos
+    # ð Si hay errores, devolverlos todos juntos
     if errores:
         logging.error(f"[registrar_alumno_datos] Errores acumulados: {errores}")
         raise ValueError("Errores encontrados: " + "; ".join(errores))
 
-    # 📌 Crear objetos (solo si todo está validado)
+    # ð Crear objetos (solo si todo estÃ¡ validado)
     logging.info(f"[registrar_alumno_datos] Creando persona: {data['nombre']} {data['apellido']}")
     persona = Persona.objects.create(
         nombre=data["nombre"],
@@ -1786,22 +1786,22 @@ def listar_precios_paquetes(request):
     Devuelve la lista de paquetes de clases disponibles y sus costos.  
     Permite filtrar opcionalmente por cantidad de clases.
 
-    Métodos admitidos:
-    - GET → obtiene la lista de paquetes.
-    - Otros métodos → 405 {"error": "Método no permitido"}
+    MÃ©todos admitidos:
+    - GET â obtiene la lista de paquetes.
+    - Otros mÃ©todos â 405 {"error": "MÃ©todo no permitido"}
 
-    Parámetros (query string):
-    - cantidad (int) [opcional] → si se especifica, filtra por la cantidad exacta de clases.
+    ParÃ¡metros (query string):
+    - cantidad (int) [opcional] â si se especifica, filtra por la cantidad exacta de clases.
 
     Comportamiento:
-    - Si se envía `cantidad`, busca un solo paquete con esa cantidad de clases.
-    • Si existe, devuelve su cantidad y costo.
-    • Si no existe, devuelve {"message": "No existe paquete de <cantidad> clases."}
-    - Si no se envía `cantidad`, lista todos los paquetes existentes ordenados por cantidad de clases.
+    - Si se envÃ­a `cantidad`, busca un solo paquete con esa cantidad de clases.
+    â¢ Si existe, devuelve su cantidad y costo.
+    â¢ Si no existe, devuelve {"message": "No existe paquete de <cantidad> clases."}
+    - Si no se envÃ­a `cantidad`, lista todos los paquetes existentes ordenados por cantidad de clases.
     - Los costos se devuelven formateados con separadores de miles usando puntos ("1.200.000").
 
     Validaciones y posibles errores:
-    - Error interno → 500 {"error": "<mensaje de excepción>"}
+    - Error interno â 500 {"error": "<mensaje de excepciÃ³n>"}
 
     Salida exitosa (200 OK):
     {
@@ -1814,15 +1814,15 @@ def listar_precios_paquetes(request):
 
     Ejemplo con filtro:
     GET /listar_precios_paquetes/?cantidad=8  
-    → {"paquetes": [{"cantidad_clases": 8, "costo": "340.000"}]}
+    â {"paquetes": [{"cantidad_clases": 8, "costo": "340.000"}]}
     """
 
     if request.method == "GET":
         try:
-            cantidad = request.GET.get("cantidad")  # <-- Capturamos parámetro opcional
+            cantidad = request.GET.get("cantidad")  # <-- Capturamos parÃ¡metro opcional
             
             if cantidad:
-                # Si se envió cantidad, buscar solo ese paquete
+                # Si se enviÃ³ cantidad, buscar solo ese paquete
                 try:
                     paquete = Paquete.objects.get(cantidad_clases=int(cantidad))
                     lista_paquetes = [{
@@ -1847,7 +1847,7 @@ def listar_precios_paquetes(request):
             logging.error(f"Error en listar_precios_paquetes: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -1855,27 +1855,27 @@ def obtener_alumnos_turno(request):
     """
     POST /obtener_alumnos_turno/
     ----------------------------
-    Devuelve los alumnos (regulares y ocasionales) del **próximo encuentro**
-    correspondiente al turno indicado (día + horario).
+    Devuelve los alumnos (regulares y ocasionales) del **prÃ³ximo encuentro**
+    correspondiente al turno indicado (dÃ­a + horario).
 
     Concepto:
-    - "Turno" → horario fijo que se repite semanalmente (ej. Martes 18:00).
-    - "Clase" → instancia específica de ese turno en una fecha concreta.
+    - "Turno" â horario fijo que se repite semanalmente (ej. Martes 18:00).
+    - "Clase" â instancia especÃ­fica de ese turno en una fecha concreta.
 
     Entradas (JSON):
     - dia (str)       [obligatorio] Ejemplo: "Martes"
     - horario (str)   [obligatorio] Ejemplo: "18:00"
 
-    Lógica:
-    1. Busca el turno definido por día y horario (`Turno`).
-    2. Calcula la próxima fecha que corresponda a ese turno (puede ser hoy o el próximo martes).
+    LÃ³gica:
+    1. Busca el turno definido por dÃ­a y horario (`Turno`).
+    2. Calcula la prÃ³xima fecha que corresponda a ese turno (puede ser hoy o el prÃ³ximo martes).
     3. Busca la clase concreta (`Clase`) de ese turno en esa fecha.
     4. Devuelve la lista de alumnos asociados (regulares y ocasionales).
 
     Errores comunes:
-    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'horario'"}
-    - Turno inexistente → {"message": "No existe turno para <día> a las <hora>."}
-    - Clase no encontrada → {"message": "No hay clase hoy para el turno <día> <hora>."}
+    - Falta de parÃ¡metros â 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente â {"message": "No existe turno para <dÃ­a> a las <hora>."}
+    - Clase no encontrada â {"message": "No hay clase hoy para el turno <dÃ­a> <hora>."}
 
     Respuesta:
     {
@@ -1883,8 +1883,8 @@ def obtener_alumnos_turno(request):
     "horario": "18:00",
     "fecha": "2025-11-11",
     "alumnos": [
-        {"nombre": "Laura", "apellido": "Gómez", "telefono": "0981...", "tipo": "regular"},
-        {"nombre": "Sofía", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
+        {"nombre": "Laura", "apellido": "GÃ³mez", "telefono": "0981...", "tipo": "regular"},
+        {"nombre": "SofÃ­a", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
     ]
     }
     """
@@ -1909,13 +1909,13 @@ def obtener_alumnos_turno(request):
             dia_a_numero = {
                 "Lunes": 0,
                 "Martes": 1,
-                "Miércoles": 2,
+                "MiÃ©rcoles": 2,
                 "Jueves": 3,
                 "Viernes": 4,
-                "Sábado": 5
+                "SÃ¡bado": 5
             }
 
-            # Si el día que pidieron no es hoy, buscar la próxima fecha de ese día
+            # Si el dÃ­a que pidieron no es hoy, buscar la prÃ³xima fecha de ese dÃ­a
             if hoy.weekday() != dia_a_numero[dia]:
                 dias_a_sumar = (dia_a_numero[dia] - hoy.weekday()) % 7
                 if dias_a_sumar == 0:
@@ -1966,7 +1966,7 @@ def obtener_alumnos_turno(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -1974,28 +1974,28 @@ def obtener_alumnos_clase(request):
     """
     POST /obtener_alumnos_clase/
     ----------------------------
-    Devuelve los alumnos (regulares y ocasionales) de una **clase específica**,
-    identificada por su turno (día y horario) y una fecha concreta.
+    Devuelve los alumnos (regulares y ocasionales) de una **clase especÃ­fica**,
+    identificada por su turno (dÃ­a y horario) y una fecha concreta.
 
     Concepto:
-    - "Clase" → la ocurrencia en una fecha particular de un turno semanal.
+    - "Clase" â la ocurrencia en una fecha particular de un turno semanal.
 
     Entradas (JSON):
     - dia (str)       [obligatorio] Ejemplo: "Martes"
     - horario (str)   [obligatorio] Ejemplo: "18:00"
-    - fecha (str, YYYY-MM-DD) [opcional] → Si no se envía, se usa la próxima fecha para ese turno.
+    - fecha (str, YYYY-MM-DD) [opcional] â Si no se envÃ­a, se usa la prÃ³xima fecha para ese turno.
 
-    Lógica:
+    LÃ³gica:
     1. Busca el `Turno` correspondiente.
     2. Determina la fecha:
-    • Usa la recibida, o si falta, calcula la próxima que caiga en ese día.
+    â¢ Usa la recibida, o si falta, calcula la prÃ³xima que caiga en ese dÃ­a.
     3. Busca la `Clase` asociada a ese turno y fecha.
     4. Devuelve todos los alumnos inscriptos en esa clase.
 
     Errores comunes:
-    - Parámetros faltantes → 400 {"error": "Debes enviar 'dia' y 'horario'"}
-    - Turno inexistente → {"message": "No existe turno <día> <hora>."}
-    - Clase inexistente → {"message": "No hay clase programada para <día> <hora> el <fecha>."}
+    - ParÃ¡metros faltantes â 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente â {"message": "No existe turno <dÃ­a> <hora>."}
+    - Clase inexistente â {"message": "No hay clase programada para <dÃ­a> <hora> el <fecha>."}
 
     Respuesta:
     {
@@ -2003,8 +2003,8 @@ def obtener_alumnos_clase(request):
     "horario": "18:00",
     "fecha": "2025-11-11",
     "alumnos": [
-        {"nombre": "Laura", "apellido": "Gómez", "telefono": "0981...", "tipo": "regular"},
-        {"nombre": "Sofía", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
+        {"nombre": "Laura", "apellido": "GÃ³mez", "telefono": "0981...", "tipo": "regular"},
+        {"nombre": "SofÃ­a", "apellido": "Torres", "telefono": "0971...", "tipo": "ocasional"}
     ]
     }
     """
@@ -2030,15 +2030,15 @@ def obtener_alumnos_clase(request):
             if fecha:
                 fecha_objetivo = datetime.strptime(fecha, "%Y-%m-%d").date()
             else:
-                # Buscar la próxima fecha de ese día
+                # Buscar la prÃ³xima fecha de ese dÃ­a
                 hoy = timezone.localdate()
                 dias_semana = {
                     "Lunes": 0,
                     "Martes": 1,
-                    "Miércoles": 2,
+                    "MiÃ©rcoles": 2,
                     "Jueves": 3,
                     "Viernes": 4,
-                    "Sábado": 5
+                    "SÃ¡bado": 5
                 }
                 dia_numero = dias_semana[dia]
                 dias_a_sumar = (dia_numero - hoy.weekday()) % 7
@@ -2087,7 +2087,7 @@ def obtener_alumnos_clase(request):
             logging.error(f"Error en obtener_alumnos_clase: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 
@@ -2097,29 +2097,29 @@ def obtener_alumnos_dia(request):
     POST /obtener_alumnos_dia/
     --------------------------
     Devuelve todos los alumnos (regulares y ocasionales) de **todas las clases**
-    que ocurren en un día determinado (por ejemplo, todos los martes próximos).
+    que ocurren en un dÃ­a determinado (por ejemplo, todos los martes prÃ³ximos).
 
     Concepto:
-    - Devuelve múltiples clases, una por turno, en la fecha que coincide con el día indicado.
+    - Devuelve mÃºltiples clases, una por turno, en la fecha que coincide con el dÃ­a indicado.
 
     Entradas (JSON):
     - dia (str) [obligatorio] Ejemplo: "Martes"
 
-    Lógica:
-    1. Calcula la fecha del próximo día solicitado (ej. próximo martes).
-    2. Busca todas las clases (`Clase`) programadas para esa fecha y ese día.
-    3. Devuelve los alumnos de todas ellas, indicando a qué turno pertenece cada uno.
+    LÃ³gica:
+    1. Calcula la fecha del prÃ³ximo dÃ­a solicitado (ej. prÃ³ximo martes).
+    2. Busca todas las clases (`Clase`) programadas para esa fecha y ese dÃ­a.
+    3. Devuelve los alumnos de todas ellas, indicando a quÃ© turno pertenece cada uno.
 
     Errores comunes:
-    - Falta 'dia' → 400 {"error": "Debes enviar 'dia'"}
-    - Sin clases programadas → {"message": "No hay clases programadas para hoy <día>."}
+    - Falta 'dia' â 400 {"error": "Debes enviar 'dia'"}
+    - Sin clases programadas â {"message": "No hay clases programadas para hoy <dÃ­a>."}
 
     Respuesta:
     {
     "dia": "Martes",
     "fecha": "2025-11-11",
     "alumnos": [
-        {"nombre": "Lucía", "apellido": "Aguirre", "telefono": "0982...", "turno": "17:00", "tipo": "regular"},
+        {"nombre": "LucÃ­a", "apellido": "Aguirre", "telefono": "0982...", "turno": "17:00", "tipo": "regular"},
         {"nombre": "Nadia", "apellido": "Torres", "telefono": "0974...", "turno": "18:00", "tipo": "ocasional"}
     ]
     }
@@ -2134,18 +2134,18 @@ def obtener_alumnos_dia(request):
                 return JsonResponse({"error": "Debes enviar 'dia'"}, status=400)
 
 
-            # Calcular fecha correcta según el día solicitado
+            # Calcular fecha correcta segÃºn el dÃ­a solicitado
             hoy = timezone.localdate()
             dia_a_numero = {
                 "Lunes": 0,
                 "Martes": 1,
-                "Miércoles": 2,
+                "MiÃ©rcoles": 2,
                 "Jueves": 3,
                 "Viernes": 4,
-                "Sábado": 5
+                "SÃ¡bado": 5
             }
 
-            # Buscar la próxima fecha que sea el día pedido
+            # Buscar la prÃ³xima fecha que sea el dÃ­a pedido
             if hoy.weekday() != dia_a_numero[dia]:
                 dias_a_sumar = (dia_a_numero[dia] - hoy.weekday()) % 7
                 if dias_a_sumar == 0:
@@ -2202,7 +2202,7 @@ def obtener_alumnos_dia(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 
@@ -2212,26 +2212,26 @@ def verificar_turno(request):
     """
     POST /verificar_turno/
     ----------------------
-    Verifica si existe un turno (día + horario) y cuántos lugares disponibles tiene actualmente.
+    Verifica si existe un turno (dÃ­a + horario) y cuÃ¡ntos lugares disponibles tiene actualmente.
 
     Concepto:
     - "Turno" = un horario recurrente semanal (ej. Lunes 07:00).
-    - No se valida la clase de una fecha específica, sino la configuración general del turno.
+    - No se valida la clase de una fecha especÃ­fica, sino la configuraciÃ³n general del turno.
 
     Entradas (JSON):
     - dia (str)       [obligatorio] Ejemplo: "Lunes"
     - horario (str)   [obligatorio] Ejemplo: "07:00"
 
-    Lógica:
-    1. Busca el turno configurado con ese día y horario (`Turno`).
+    LÃ³gica:
+    1. Busca el turno configurado con ese dÃ­a y horario (`Turno`).
     2. Si no existe, devuelve un mensaje indicando que no hay clases en ese horario.
     3. Si existe, calcula los lugares disponibles (4 - lugares_ocupados).
     4. Devuelve un mensaje indicando si hay cupos libres o no.
 
     Errores:
-    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'horario'"}
-    - Turno inexistente → {"message": "No hay un turno registrado para ese día y horario. No tenemos clases en ese horario."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta de parÃ¡metros â 400 {"error": "Debes enviar 'dia' y 'horario'"}
+    - Turno inexistente â {"message": "No hay un turno registrado para ese dÃ­a y horario. No tenemos clases en ese horario."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
     {"message": "Hay 2 lugares disponibles."}
@@ -2252,7 +2252,7 @@ def verificar_turno(request):
             try:
                 turno = Turno.objects.get(dia=dia, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
-                return JsonResponse({"message": "No hay un turno registrado para ese día y horario. No tenemos clases en ese horario."})
+                return JsonResponse({"message": "No hay un turno registrado para ese dÃ­a y horario. No tenemos clases en ese horario."})
 
             lugares_disponibles = 4 - turno.lugares_ocupados
 
@@ -2265,7 +2265,7 @@ def verificar_turno(request):
             logging.error(f"Error en verificar_turno: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -2273,25 +2273,25 @@ def verificar_turno_a_partir_de(request):
     """
     POST /verificar_turno_a_partir_de/
     ----------------------------------
-    Busca todos los turnos disponibles en uno o varios días, a partir de una hora mínima especificada.
+    Busca todos los turnos disponibles en uno o varios dÃ­as, a partir de una hora mÃ­nima especificada.
 
     Concepto:
     - Permite consultar horarios iguales o posteriores a una hora de referencia.
-    - Si no se especifica 'dia', busca en todos los días de la semana hábiles.
+    - Si no se especifica 'dia', busca en todos los dÃ­as de la semana hÃ¡biles.
 
     Entradas (JSON):
     - hora_minima (str) [obligatorio] Ejemplo: "15:00"
     - dia (str)         [opcional] Ejemplo: "Martes"
 
-    Lógica:
-    1. Si se envía 'dia', busca solo en ese día; si no, recorre todos los días Lunes–Sábado.
-    2. Para cada día, llama a `buscar_turnos_disponibles(dia_actual, operador_hora="gte", hora_referencia=hora_minima)`.
+    LÃ³gica:
+    1. Si se envÃ­a 'dia', busca solo en ese dÃ­a; si no, recorre todos los dÃ­as LunesâSÃ¡bado.
+    2. Para cada dÃ­a, llama a `buscar_turnos_disponibles(dia_actual, operador_hora="gte", hora_referencia=hora_minima)`.
     3. Devuelve los turnos que tienen lugares disponibles.
 
     Errores:
-    - Falta de parámetros → 400 {"error": "Debes enviar 'hora_minima'"}
-    - Sin resultados → {"message": "No hay turnos disponibles después de <hora_minima>."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta de parÃ¡metros â 400 {"error": "Debes enviar 'hora_minima'"}
+    - Sin resultados â {"message": "No hay turnos disponibles despuÃ©s de <hora_minima>."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
     {
@@ -2305,7 +2305,7 @@ def verificar_turno_a_partir_de(request):
         ]
         },
         {
-        "dia": "Miércoles",
+        "dia": "MiÃ©rcoles",
         "hora_minima": "15:00",
         "turnos_disponibles": [...]
         }
@@ -2326,7 +2326,7 @@ def verificar_turno_a_partir_de(request):
             if dia:
                 dias_a_buscar = [dia]
             else:
-                dias_a_buscar = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+                dias_a_buscar = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes", "SÃ¡bado"]
 
             resultados = []
 
@@ -2341,7 +2341,7 @@ def verificar_turno_a_partir_de(request):
                     })
 
             if not resultados:
-                return JsonResponse({"message": f"No hay turnos disponibles después de {hora_minima}."})
+                return JsonResponse({"message": f"No hay turnos disponibles despuÃ©s de {hora_minima}."})
 
             return JsonResponse({"resultados": resultados})
 
@@ -2349,35 +2349,35 @@ def verificar_turno_a_partir_de(request):
             logging.error(f"Error en verificar_turno_a_partir_de: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 @csrf_exempt
 def verificar_turno_antes_de(request):
     """
     POST /verificar_turno_antes_de/
     -------------------------------
-    Busca los turnos disponibles antes de una hora máxima dentro de un día determinado.
+    Busca los turnos disponibles antes de una hora mÃ¡xima dentro de un dÃ­a determinado.
 
     Concepto:
-    - Permite conocer los horarios disponibles previos a una hora límite.
+    - Permite conocer los horarios disponibles previos a una hora lÃ­mite.
 
     Entradas (JSON):
-    - dia (str)         [obligatorio] Ejemplo: "Miércoles"
+    - dia (str)         [obligatorio] Ejemplo: "MiÃ©rcoles"
     - hora_maxima (str) [obligatorio] Ejemplo: "10:00"
 
-    Lógica:
-    1. Busca todos los turnos del día indicado cuya hora sea anterior a la hora máxima.
+    LÃ³gica:
+    1. Busca todos los turnos del dÃ­a indicado cuya hora sea anterior a la hora mÃ¡xima.
     2. Usa `buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia=hora_maxima)`.
     3. Devuelve los turnos con cupos disponibles.
 
     Errores:
-    - Falta de parámetros → 400 {"error": "Debes enviar 'dia' y 'hora_maxima'"}
-    - Sin resultados → {"message": "No hay turnos disponibles para <día> antes de <hora_maxima>."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta de parÃ¡metros â 400 {"error": "Debes enviar 'dia' y 'hora_maxima'"}
+    - Sin resultados â {"message": "No hay turnos disponibles para <dÃ­a> antes de <hora_maxima>."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
     {
-    "dia": "Miércoles",
+    "dia": "MiÃ©rcoles",
     "hora_maxima": "10:00",
     "turnos_disponibles": [
         {"horario": "08:00", "lugares_disponibles": 1},
@@ -2389,7 +2389,7 @@ def verificar_turno_antes_de(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "Miércoles"
+            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "MiÃ©rcoles"
             hora_maxima = data.get("hora_maxima")  # Ejemplo: "10:00"
             disciplina = data.get("disciplina", "Reformer")
 
@@ -2411,7 +2411,7 @@ def verificar_turno_antes_de(request):
             logging.error(f"Error en verificar_turno_antes_de: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -2419,31 +2419,31 @@ def verificar_turno_manana(request):
     """
     POST /verificar_turno_manana/
     -----------------------------
-    Devuelve los turnos con lugares disponibles durante la **mañana** (antes de las 12:00)
-    para un día específico.
+    Devuelve los turnos con lugares disponibles durante la **maÃ±ana** (antes de las 12:00)
+    para un dÃ­a especÃ­fico.
 
     Concepto:
     - "Turno" = horario fijo recurrente (ej. Lunes 08:00).
-    - Este endpoint filtra todos los turnos de ese día cuya hora sea menor a las 12:00.
+    - Este endpoint filtra todos los turnos de ese dÃ­a cuya hora sea menor a las 12:00.
 
     Entradas (JSON):
     - dia (str) [obligatorio] Ejemplo: "Martes"
 
-    Lógica:
+    LÃ³gica:
     1. Valida que se reciba el campo 'dia'.
     2. Llama a `buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia="12:00")`.
     3. Si hay turnos con cupos libres, los devuelve con su horario y cantidad de lugares.
-    4. Si no hay, devuelve un mensaje indicando que no hay turnos disponibles esa mañana.
+    4. Si no hay, devuelve un mensaje indicando que no hay turnos disponibles esa maÃ±ana.
 
     Errores:
-    - Falta de parámetros → 400 {"error": "Debes enviar 'dia'"}
-    - Sin resultados → {"message": "No hay turnos disponibles para la mañana del <día>."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta de parÃ¡metros â 400 {"error": "Debes enviar 'dia'"}
+    - Sin resultados â {"message": "No hay turnos disponibles para la maÃ±ana del <dÃ­a>."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
     {
     "dia": "Martes",
-    "turnos_disponibles_mañana": [
+    "turnos_disponibles_maÃ±ana": [
         {"horario": "07:00", "lugares_disponibles": 2},
         {"horario": "08:00", "lugares_disponibles": 1}
     ]
@@ -2462,43 +2462,43 @@ def verificar_turno_manana(request):
             turnos_disponibles = buscar_turnos_disponibles(dia, operador_hora="lt", hora_referencia="12:00", disciplina=disciplina)
 
             if not turnos_disponibles:
-                return JsonResponse({"message": f"No hay turnos disponibles para la mañana del {dia}."})
+                return JsonResponse({"message": f"No hay turnos disponibles para la maÃ±ana del {dia}."})
 
             return JsonResponse({
                 "dia": dia,
-                "turnos_disponibles_mañana": turnos_disponibles
+                "turnos_disponibles_maÃ±ana": turnos_disponibles
             })
 
         except Exception as e:
             logging.error(f"Error en verificar_turno_manana: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 def buscar_turnos_disponibles(dia, operador_hora=None, hora_referencia=None, disciplina="Reformer"):
     """
-    Busca los turnos con lugares disponibles según el día y un criterio horario opcional.
+    Busca los turnos con lugares disponibles segÃºn el dÃ­a y un criterio horario opcional.
 
-    Esta función se utiliza por varios endpoints (`verificar_turno_a_partir_de`,
+    Esta funciÃ³n se utiliza por varios endpoints (`verificar_turno_a_partir_de`,
     `verificar_turno_antes_de`, `verificar_turno_manana`) para obtener turnos libres
     con distintos filtros de hora.
 
-    Parámetros:
-    - dia (str): Día de la semana. Ejemplo: "Martes".
-    - operador_hora (str, opcional): Tipo de comparación sobre la hora del turno.
-    • 'gte' → mayor o igual que la hora de referencia.
-    • 'lt'  → menor que la hora de referencia.
-    • 'exact' → igual a la hora de referencia.
+    ParÃ¡metros:
+    - dia (str): DÃ­a de la semana. Ejemplo: "Martes".
+    - operador_hora (str, opcional): Tipo de comparaciÃ³n sobre la hora del turno.
+    â¢ 'gte' â mayor o igual que la hora de referencia.
+    â¢ 'lt'  â menor que la hora de referencia.
+    â¢ 'exact' â igual a la hora de referencia.
     - hora_referencia (str, opcional): Hora de referencia en formato "HH:MM".
 
-    Lógica:
-    1. Construye el filtro dinámico (por ejemplo: `horario__lt="12:00"`).
-    2. Filtra los turnos (`Turno.objects.filter(...)`) del día indicado.
+    LÃ³gica:
+    1. Construye el filtro dinÃ¡mico (por ejemplo: `horario__lt="12:00"`).
+    2. Filtra los turnos (`Turno.objects.filter(...)`) del dÃ­a indicado.
     3. Calcula los lugares disponibles (4 - lugares_ocupados).
     4. Retorna solo los turnos con cupos > 0.
 
     Retorna:
-    list[dict] → Ejemplo:
+    list[dict] â Ejemplo:
     [
     {"horario": "07:00", "lugares_disponibles": 2},
     {"horario": "08:00", "lugares_disponibles": 1}
@@ -2534,7 +2534,7 @@ def verificar_clase_hoy(request):
     POST /verificar_clase_hoy/
     --------------------------
     Verifica si existe una clase programada **para hoy** en un horario determinado
-    y devuelve cuántos lugares quedan disponibles.
+    y devuelve cuÃ¡ntos lugares quedan disponibles.
 
     Concepto:
     - "Turno" = horario recurrente semanal (ej. Lunes 19:00).
@@ -2543,22 +2543,22 @@ def verificar_clase_hoy(request):
     Entradas (JSON):
     - horario (str) [obligatorio] Ejemplo: "19:00"
 
-    Lógica:
+    LÃ³gica:
     1. Obtiene la fecha actual (`now().date()`).
-    2. Determina el nombre del día actual en español (Lunes–Sábado).
-    3. Si hoy es domingo → no hay clases.
-    4. Busca el turno correspondiente al día actual y al horario.
+    2. Determina el nombre del dÃ­a actual en espaÃ±ol (LunesâSÃ¡bado).
+    3. Si hoy es domingo â no hay clases.
+    4. Busca el turno correspondiente al dÃ­a actual y al horario.
     5. Busca la clase asociada a ese turno y la fecha actual.
     6. Cuenta los alumnos regulares (`AlumnoClase`) y ocasionales (`AlumnoClaseOcasional`) de esa clase.
     7. Calcula los lugares disponibles (4 - lugares_ocupados).
     8. Devuelve un mensaje indicando la disponibilidad.
 
     Errores:
-    - Falta 'horario' → 400 {"error": "Debes enviar 'horario'."}
-    - Domingo → {"message": "Hoy es domingo y no hay clases."}
-    - Turno inexistente → {"message": "No hay turno registrado para hoy a ese horario."}
-    - Clase inexistente → {"message": "No hay clase programada hoy a ese horario."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta 'horario' â 400 {"error": "Debes enviar 'horario'."}
+    - Domingo â {"message": "Hoy es domingo y no hay clases."}
+    - Turno inexistente â {"message": "No hay turno registrado para hoy a ese horario."}
+    - Clase inexistente â {"message": "No hay clase programada hoy a ese horario."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
     {"message": "Hay 2 lugares disponibles para hoy a las 19:00."}
@@ -2578,14 +2578,14 @@ def verificar_clase_hoy(request):
             # Obtener fecha actual
             fecha_hoy = now().date()
 
-            # Sacar el nombre del día actual en español
+            # Sacar el nombre del dÃ­a actual en espaÃ±ol
             dias_traducidos = {
                 0: 'Lunes',
                 1: 'Martes',
-                2: 'Miércoles',
+                2: 'MiÃ©rcoles',
                 3: 'Jueves',
                 4: 'Viernes',
-                5: 'Sábado',
+                5: 'SÃ¡bado',
                 6: 'Domingo'
             }
             dia_idx = fecha_hoy.weekday()  # Monday=0, Sunday=6
@@ -2595,13 +2595,13 @@ def verificar_clase_hoy(request):
             if dia_hoy == 'Domingo':
                 return JsonResponse({"message": "Hoy es domingo y no hay clases."})
 
-            # Buscar turno por día y horario
+            # Buscar turno por dÃ­a y horario
             try:
                 turno = Turno.objects.get(dia=dia_hoy, horario=horario, disciplina=disciplina)
             except Turno.DoesNotExist:
                 return JsonResponse({"message": "No hay turno registrado para hoy a ese horario."})
             except Turno.MultipleObjectsReturned:
-                return JsonResponse({"error": "Error: múltiples turnos encontrados para ese horario."}, status=500)
+                return JsonResponse({"error": "Error: mÃºltiples turnos encontrados para ese horario."}, status=500)
 
             # Buscar la clase de hoy con ese turno
             try:
@@ -2624,7 +2624,7 @@ def verificar_clase_hoy(request):
             logging.error(f"Error en verificar_clase_hoy: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
     else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -2633,35 +2633,35 @@ def actualizar_ruc(request):
     """
     POST /actualizar_ruc/
     ---------------------
-    Actualiza el número de RUC asociado a una persona ya registrada, identificada principalmente por su teléfono.
+    Actualiza el nÃºmero de RUC asociado a una persona ya registrada, identificada principalmente por su telÃ©fono.
 
     Concepto:
-    - Cada persona se identifica primero por su número de teléfono.
-    - Si hay más de una persona con el mismo teléfono, se usa nombre y apellido para desambiguar.
+    - Cada persona se identifica primero por su nÃºmero de telÃ©fono.
+    - Si hay mÃ¡s de una persona con el mismo telÃ©fono, se usa nombre y apellido para desambiguar.
     - El RUC se guarda directamente en la tabla `Persona`.
 
     Entradas (JSON):
     - telefono (str) [obligatorio]
     - ruc (str) [obligatorio]
-    - nombre (str) [opcional, requerido si hay duplicados de teléfono]
-    - apellido (str) [opcional, requerido si hay duplicados de teléfono]
+    - nombre (str) [opcional, requerido si hay duplicados de telÃ©fono]
+    - apellido (str) [opcional, requerido si hay duplicados de telÃ©fono]
 
-    Lógica:
+    LÃ³gica:
     1. Valida que existan los campos `telefono` y `ruc`.
-    2. Busca todas las personas con ese número de teléfono.
-    3. Si hay más de una coincidencia:
-    - Filtra por nombre y apellido exactos (sin mayúsculas/minúsculas ni espacios extra).
+    2. Busca todas las personas con ese nÃºmero de telÃ©fono.
+    3. Si hay mÃ¡s de una coincidencia:
+    - Filtra por nombre y apellido exactos (sin mayÃºsculas/minÃºsculas ni espacios extra).
     4. Si no encuentra coincidencias o encuentra varias ambiguas, devuelve error.
-    5. Si hay una coincidencia válida, actualiza el campo `ruc` de esa persona.
+    5. Si hay una coincidencia vÃ¡lida, actualiza el campo `ruc` de esa persona.
 
     Errores:
-    - Falta de parámetros → 400 {"error": "El teléfono es obligatorio. El nuevo RUC es obligatorio."}
-    - Persona no encontrada → 404 {"error": "No se encontró ninguna persona con ese teléfono."}
-    - Ambigüedad por duplicados → 400 {"error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente..."}
-    - Error interno → 500 {"error": "<mensaje>"}
+    - Falta de parÃ¡metros â 400 {"error": "El telÃ©fono es obligatorio. El nuevo RUC es obligatorio."}
+    - Persona no encontrada â 404 {"error": "No se encontrÃ³ ninguna persona con ese telÃ©fono."}
+    - AmbigÃ¼edad por duplicados â 400 {"error": "Hay varias personas con ese telÃ©fono, pero ninguna coincide exactamente..."}
+    - Error interno â 500 {"error": "<mensaje>"}
 
     Salida:
-    {"message": "RUC actualizado correctamente para Marta Gómez."}
+    {"message": "RUC actualizado correctamente para Marta GÃ³mez."}
     """
 
     if request.method == "POST":
@@ -2674,35 +2674,35 @@ def actualizar_ruc(request):
 
             errores = []
             if not telefono:
-                errores.append("El teléfono es obligatorio.")
+                errores.append("El telÃ©fono es obligatorio.")
             if not nuevo_ruc:
                 errores.append("El nuevo RUC es obligatorio.")
 
             if errores:
                 return JsonResponse({"error": " ".join(errores)}, status=400)
 
-            # Buscar por teléfono
+            # Buscar por telÃ©fono
             personas = Persona.objects.filter(telefono=telefono.strip())
             personas_filtradas = []
 
             if personas.count() == 0:
-                return JsonResponse({"error": "No se encontró ninguna persona con ese teléfono."}, status=404)
+                return JsonResponse({"error": "No se encontrÃ³ ninguna persona con ese telÃ©fono."}, status=404)
 
             if personas.count() == 1:
                 persona = personas.first()
             else:
-                # Hay más de una → usar nombre y apellido para desambiguar
+                # Hay mÃ¡s de una â usar nombre y apellido para desambiguar
                 for p in personas:
                     if p.nombre.strip().lower() == nombre and p.apellido.strip().lower() == apellido:
                         personas_filtradas.append(p)
 
                 if len(personas_filtradas) == 0:
                     return JsonResponse({
-                        "error": "Hay varias personas con ese teléfono, pero ninguna coincide exactamente con el nombre y apellido."
+                        "error": "Hay varias personas con ese telÃ©fono, pero ninguna coincide exactamente con el nombre y apellido."
                     }, status=400)
                 if len(personas_filtradas) > 1:
                     return JsonResponse({
-                        "error": "Se encontró más de una persona con ese teléfono, nombre y apellido."
+                        "error": "Se encontrÃ³ mÃ¡s de una persona con ese telÃ©fono, nombre y apellido."
                     }, status=400)
 
                 persona = personas_filtradas[0]
@@ -2719,7 +2719,7 @@ def actualizar_ruc(request):
             logging.error(f"[actualizar_ruc] Error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    return JsonResponse({"error": "MÃ©todo no permitido"}, status=405)
 
 
 
@@ -2728,26 +2728,26 @@ def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
     Genera una lista de fechas semanales correspondientes a un turno recurrente.
 
     Concepto:
-    - "Turno" = horario fijo en un día de la semana (ej. Lunes 19:00).
-    - Esta función calcula las próximas `n` fechas donde ese turno ocurre,
+    - "Turno" = horario fijo en un dÃ­a de la semana (ej. Lunes 19:00).
+    - Esta funciÃ³n calcula las prÃ³ximas `n` fechas donde ese turno ocurre,
     comenzando desde una fecha inicial.
 
-    Parámetros:
+    ParÃ¡metros:
     - id_turno (int): ID del turno en la base de datos.
-    - fecha_inicio (str): Fecha base en formato "YYYY-MM-DD". Si no coincide con el día del turno,
-    se ajusta automáticamente al siguiente día correspondiente.
-    - n (int): Cantidad de fechas a generar (por ejemplo, 4 clases → 4 fechas).
+    - fecha_inicio (str): Fecha base en formato "YYYY-MM-DD". Si no coincide con el dÃ­a del turno,
+    se ajusta automÃ¡ticamente al siguiente dÃ­a correspondiente.
+    - n (int): Cantidad de fechas a generar (por ejemplo, 4 clases â 4 fechas).
 
-    Lógica:
+    LÃ³gica:
     1. Busca el turno correspondiente por `id_turno`.
-    2. Determina el índice del día de la semana (Lunes=0, Viernes=4).
-    3. Ajusta `fecha_inicio` al próximo día que coincida con el día del turno.
-    4. Genera `n` fechas separadas por intervalos de 7 días.
+    2. Determina el Ã­ndice del dÃ­a de la semana (Lunes=0, Viernes=4).
+    3. Ajusta `fecha_inicio` al prÃ³ximo dÃ­a que coincida con el dÃ­a del turno.
+    4. Genera `n` fechas separadas por intervalos de 7 dÃ­as.
     5. Devuelve las fechas en formato "YYYY-MM-DD".
 
     Errores:
-    - Turno inexistente → {"error": "Turno no encontrado"}
-    - Día del turno inválido → {"error": "Día del turno inválido"}
+    - Turno inexistente â {"error": "Turno no encontrado"}
+    - DÃ­a del turno invÃ¡lido â {"error": "DÃ­a del turno invÃ¡lido"}
 
     Salida:
     {
@@ -2763,14 +2763,14 @@ def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
     dias_map = {
         "Lunes": 0,
         "Martes": 1,
-        "Miércoles": 2,
+        "MiÃ©rcoles": 2,
         "Jueves": 3,
         "Viernes": 4,
-        "Sábado": 5,
+        "SÃ¡bado": 5,
     }
 
     if turno.dia not in dias_map:
-        return {"error": "Día del turno inválido"}
+        return {"error": "DÃ­a del turno invÃ¡lido"}
 
     dia_turno_idx = dias_map[turno.dia]
     fecha_actual = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
