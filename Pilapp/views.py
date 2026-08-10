@@ -33,6 +33,21 @@ DAY_NAME_ES = {
     6: "Domingo"
 }
 
+def normalize_dia_es(dia_str):
+    if not dia_str: return dia_str
+    mapping = {
+        'monday': 'Lunes',
+        'tuesday': 'Martes',
+        'wednesday': 'MiÈrcoles',
+        'thursday': 'Jueves',
+        'friday': 'Viernes',
+        'saturday': 'S·bado',
+        'sunday': 'Domingo'
+    }
+    d_lower = dia_str.lower().strip()
+    return mapping.get(d_lower, dia_str)
+
+
 
 def reprogramar_clase_datos(data):
     """
@@ -1143,7 +1158,7 @@ def registrar_asistencias(request):
     errores = []
     try:
         data = json.loads(request.body)
-        dia = data.get("dia")
+        dia = normalize_dia_es(data.get("dia"))
         horario = data.get("horario")
         fecha_str = data.get("fecha")
         faltaron = data.get("faltaron", [])
@@ -1878,7 +1893,7 @@ def obtener_alumnos_turno(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")  # Ejemplo: "Martes"
+            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "Martes"
             horario = data.get("horario")  # Ejemplo: "18:00"
             disciplina = data.get("disciplina", "Reformer")
 
@@ -1997,7 +2012,7 @@ def obtener_alumnos_clase(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")
+            dia = normalize_dia_es(data.get("dia"))
             horario = data.get("horario")
             fecha = data.get("fecha")  # Opcional
             disciplina = data.get("disciplina", "Reformer")
@@ -2113,7 +2128,7 @@ def obtener_alumnos_dia(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")  # Ejemplo: "Martes"
+            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "Martes"
 
             if not dia:
                 return JsonResponse({"error": "Debes enviar 'dia'"}, status=400)
@@ -2227,7 +2242,7 @@ def verificar_turno(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")  # Ejemplo: "Lunes"
+            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "Lunes"
             horario = data.get("horario")  # Ejemplo: "07:00"
             disciplina = data.get("disciplina", "Reformer")
 
@@ -2301,7 +2316,7 @@ def verificar_turno_a_partir_de(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")  # Opcional ahora
+            dia = normalize_dia_es(data.get("dia"))  # Opcional ahora
             hora_minima = data.get("hora_minima")
             disciplina = data.get("disciplina", "Reformer")
 
@@ -2374,7 +2389,7 @@ def verificar_turno_antes_de(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")  # Ejemplo: "Mi√©rcoles"
+            dia = normalize_dia_es(data.get("dia"))  # Ejemplo: "Mi√©rcoles"
             hora_maxima = data.get("hora_maxima")  # Ejemplo: "10:00"
             disciplina = data.get("disciplina", "Reformer")
 
@@ -2438,7 +2453,7 @@ def verificar_turno_manana(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            dia = data.get("dia")
+            dia = normalize_dia_es(data.get("dia"))
             disciplina = data.get("disciplina", "Reformer")
 
             if not dia:
