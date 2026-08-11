@@ -685,3 +685,26 @@ class ExAlumno(models.Model):
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"
+
+
+class HonorarioInstructor(models.Model):
+    """
+    Registra el pago u honorario de una instructora por turno/día.
+    """
+    TURNO_CHOICES = [
+        ('Mañana', 'Mañana'),
+        ('Tarde', 'Tarde'),
+        ('Otro', 'Otro')
+    ]
+    
+    id_honorario = models.AutoField(primary_key=True)
+    id_instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)
+    fecha = models.DateField()
+    turno = models.CharField(max_length=10, choices=TURNO_CHOICES)
+    cantidad_clases = models.IntegerField(default=1)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    observacion = models.CharField(max_length=255, blank=True, null=True)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.id_instructor.id_persona.nombre} - {self.fecha} ({self.turno}) - {self.monto_total}"

@@ -1642,7 +1642,11 @@ def profes_clases_hoy(request, token):
                     if hay_pendientes:
                         fechas_alertas.add(fecha_check)
 
+    from .models import Instructor
+    instructores_lista = Instructor.objects.select_related('id_persona').all()
+    
     return render(request, "admin_panel/profes/clases_hoy.html", {
+        "instructores_lista": instructores_lista,
         "clases_data": clases_data,
         "fecha_hoy": hoy,
         "token": token,
@@ -1921,3 +1925,90 @@ def panel_ex_alumnos(request):
         "query": query,
         "dia": dia,
     })
+
+@require_POST
+def profes_registrar_honorario(request, token):
+    from django.utils import timezone
+    from datetime import datetime
+    from .models import Instructor, HonorarioInstructor
+    
+    # Validar token
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    fecha_str = request.POST.get("fecha")
+    id_instructor = request.POST.get("id_instructor")
+    turno = request.POST.get("turno")
+    cantidad_clases = request.POST.get("cantidad_clases", 1)
+    monto_total = request.POST.get("monto_total", 0)
+    
+    try:
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        instructor = Instructor.objects.get(pk=id_instructor)
+        
+        HonorarioInstructor.objects.create(
+            id_instructor=instructor,
+            fecha=fecha,
+            turno=turno,
+            cantidad_clases=int(cantidad_clases),
+            monto_total=float(monto_total)
+        )
+        messages.success(request, f"¡Honorario de {monto_total} Gs. guardado correctamente para el turno {turno}!")
+    except Exception as e:
+        messages.error(request, f"Error al guardar honorario: {e}")
+        
+    # Redirigir de vuelta a la página actual manteniendo la fecha
+    url = redirect("profes_clases_hoy", token=token)
+    if fecha_str:
+        url['Location'] += f"?fecha={fecha_str}"
+    return url
+
+
+def panel_honorarios_resumen(request):
+    from .models import HonorarioInstructor, Instructor
+    from django.db.models import Sum
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    
+    filtro_mes = request.GET.get('mes', timezone.now().strftime('%Y-%m'))
+    
+    try:
+        año, mes = map(int, filtro_mes.split('-'))
+    except ValueError:
+        año, mes = timezone.now().year, timezone.now().month
+        
+    # Obtener honorarios del mes seleccionado
+    honorarios = HonorarioInstructor.objects.filter(
+        fecha__year=año,
+        fecha__month=mes
+    ).select_related('id_instructor__id_persona').order_by('fecha')
+    
+    # Agrupar por instructora y fecha
+    # Estructura: { id_instructor: { 'nombre': '...', 'dias': { '2023-10-01': { 'M': x, 'T': y, 'total_monto': z } }, 'total_clases': X, 'total_monto': Y } }
+    resumen = {}
+    for h in honorarios:
+        id_inst = h.id_instructor.id_instructor
+        if id_inst not in resumen:
+            resumen[id_inst] = {
+                'nombre': f"{h.id_instructor.id_persona.nombre} {h.id_instructor.id_persona.apellido}",
+                'dias': {},
+                'total_clases': 0,
+                'total_monto': 0
+            }
+            
+        fecha_str = h.fecha.strftime('%d/%m')
+        if fecha_str not in resumen[id_inst]['dias']:
+            resumen[id_inst]['dias'][fecha_str] = {'clases': 0, 'monto': 0, 'detalle': []}
+            
+        resumen[id_inst]['dias'][fecha_str]['clases'] += h.cantidad_clases
+        resumen[id_inst]['dias'][fecha_str]['monto'] += h.monto_total
+        resumen[id_inst]['dias'][fecha_str]['detalle'].append(f"{h.turno}: {h.cantidad_clases}c ({h.monto_total} Gs)")
+        
+        resumen[id_inst]['total_clases'] += h.cantidad_clases
+        resumen[id_inst]['total_monto'] += h.monto_total
+
+    context = {
+        'filtro_mes': filtro_mes,
+        'resumen': resumen,
+    }
+    return render(request, "admin_panel/honorarios/resumen.html", context)

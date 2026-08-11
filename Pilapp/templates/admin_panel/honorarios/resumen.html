@@ -1,0 +1,67 @@
+{% extends "admin_panel/base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 mb-0" style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #1e293b;">Resumen de Honorarios</h2>
+    <form method="get" class="d-flex align-items-center gap-2">
+        <label for="mes" class="text-secondary fw-semibold mb-0" style="font-size: 0.9rem;">Filtrar Mes:</label>
+        <input type="month" name="mes" id="mes" class="form-control form-control-sm shadow-sm" style="border-radius: 8px;" value="{{ filtro_mes }}" onchange="this.form.submit()">
+    </form>
+</div>
+
+{% if resumen %}
+<div class="row row-cols-1 row-cols-xl-2 g-4">
+    {% for id_inst, datos in resumen.items %}
+    <div class="col">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header border-0 bg-white pt-4 pb-2 px-4 rounded-top-4 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold" style="color: #4f46e5; font-family: 'Outfit', sans-serif;">
+                    <i class="bi bi-person-badge me-2"></i>{{ datos.nombre }}
+                </h5>
+                <span class="badge" style="background-color: #6366f1; font-size: 0.9rem;">
+                    Total: {{ datos.total_monto }} Gs.
+                </span>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead style="background-color: #f8fafc;">
+                            <tr>
+                                <th class="text-secondary fw-semibold border-0" style="border-radius: 8px 0 0 8px;">Día</th>
+                                <th class="text-secondary fw-semibold border-0">Desglose</th>
+                                <th class="text-secondary fw-semibold border-0 text-end" style="border-radius: 0 8px 8px 0;">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fecha, info in datos.dias.items %}
+                            <tr>
+                                <td class="fw-medium text-dark">{{ fecha }}</td>
+                                <td>
+                                    {% for det in info.detalle %}
+                                        <span class="badge bg-light text-secondary border me-1">{{ det }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td class="fw-bold text-end" style="color: #0f172a;">{{ info.monto }} Gs.</td>
+                            </tr>
+                            {% endfor %}
+                            <tr style="background-color: #f8fafc;">
+                                <td colspan="2" class="fw-bold text-end text-secondary" style="border-radius: 8px 0 0 8px;">Total del mes:</td>
+                                <td class="fw-bold text-end" style="color: #4f46e5; font-size: 1.1rem; border-radius: 0 8px 8px 0;">{{ datos.total_monto }} Gs.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center mt-5 p-5 bg-white rounded-4 shadow-sm border border-light">
+    <i class="bi bi-calendar-x fs-1 d-block mb-3" style="color: #cbd5e1;"></i>
+    <h3 class="fw-bold" style="color: #475569;">Sin registros</h3>
+    <p class="text-muted mb-0">No se encontraron honorarios cargados en el mes seleccionado.</p>
+</div>
+{% endif %}
+
+{% endblock %}
