@@ -101,7 +101,14 @@
                                 <td class="fw-medium text-dark">{{ fecha }}</td>
                                 <td>
                                     {% for det in info.detalle %}
-                                        <span class="badge bg-light text-secondary border me-1">{{ det }}</span>
+                                        <div class="d-inline-flex align-items-center bg-light text-secondary border rounded px-2 py-1 me-1 mb-1" style="font-size: 0.85rem;">
+                                            <span class="me-2">{{ det.texto }}</span>
+                                            <form method="post" action="{% url 'panel_eliminar_honorario' %}" class="m-0" onsubmit="return confirm('¿Seguro que deseas eliminar este honorario?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="id_honorario" value="{{ det.id }}">
+                                                <button type="submit" class="btn btn-link text-danger p-0 border-0 m-0" style="background:none;" title="Eliminar"><i class="bi bi-x-circle-fill"></i></button>
+                                            </form>
+                                        </div>
                                     {% endfor %}
                                 </td>
                                 <td class="fw-bold text-end" style="color: #0f172a;">{{ info.monto }} Gs.</td>

@@ -1996,12 +1996,15 @@ def panel_honorarios_resumen(request):
             }
             
         fecha_str = h.fecha.strftime('%d/%m')
-        if fecha_str not in resumen[id_inst]['dias']:
+        if fecha_str not in resumen[nombre_prof]['dias']:
             resumen[nombre_prof]['dias'][fecha_str] = {'clases': 0, 'monto': 0, 'detalle': []}
             
         resumen[nombre_prof]['dias'][fecha_str]['clases'] += h.cantidad_clases
         resumen[nombre_prof]['dias'][fecha_str]['monto'] += h.monto_total
-        resumen[nombre_prof]['dias'][fecha_str]['detalle'].append(f"{h.turno}: {h.cantidad_clases}c ({h.monto_total} Gs)")
+        resumen[nombre_prof]['dias'][fecha_str]['detalle'].append({
+            'id': h.id_honorario,
+            'texto': f"{h.turno}: {h.cantidad_clases}c ({h.monto_total} Gs)"
+        })
         
         resumen[nombre_prof]['total_clases'] += h.cantidad_clases
         resumen[nombre_prof]['total_monto'] += h.monto_total
