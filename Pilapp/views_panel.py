@@ -1718,7 +1718,7 @@ def profes_marcar_asistencia(request, token):
         except Exception as e:
             messages.error(request, f"Error al actualizar: {e}")
             
-    url = redirect("profes_clases_hoy", token=token)
+    url = redirect("profes_honorarios", token=token)
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
@@ -1959,7 +1959,7 @@ def profes_registrar_honorario(request, token):
         messages.error(request, f"Error al guardar honorario: {e}")
         
     # Redirigir de vuelta a la página actual manteniendo la fecha
-    url = redirect("profes_clases_hoy", token=token)
+    url = redirect("profes_honorarios", token=token)
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
@@ -2043,3 +2043,31 @@ def panel_registrar_honorario(request):
         messages.error(request, f"Error al guardar honorario: {e}")
         
     return redirect("panel_honorarios_resumen")
+
+def profes_honorarios(request, token):
+    from django.utils import timezone
+    from datetime import datetime
+    from .models import ReemplazoDia, HonorarioInstructor
+    
+    if token == "reemplazo":
+        if not ReemplazoDia.objects.filter(fecha=timezone.now().date()).exists():
+            return HttpResponse("El acceso para reemplazantes no está habilitado hoy.", status=403)
+    elif token not in ["acceso-profes", "acceso-profes-mat"]:
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    fecha_str = request.GET.get("fecha")
+    if fecha_str and token != "reemplazo":
+        try:
+            hoy = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            hoy = timezone.now().date()
+    else:
+        hoy = timezone.now().date()
+        
+    honorarios_hoy = HonorarioInstructor.objects.filter(fecha=hoy)
+    
+    return render(request, "admin_panel/profes/honorarios.html", {
+        "honorarios_hoy": honorarios_hoy,
+        "fecha_hoy": hoy,
+        "token": token,
+    })
