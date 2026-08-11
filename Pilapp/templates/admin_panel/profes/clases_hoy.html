@@ -246,7 +246,7 @@
                 {% for honorario in honorarios_hoy %}
                 <div class="list-group-item border-0 border-bottom d-flex justify-content-between align-items-center py-3">
                     <div>
-                        <div class="fw-bold" style="color: #1e293b;">{{ honorario.id_instructor.id_persona.nombre }} {{ honorario.id_instructor.id_persona.apellido }}</div>
+                        <div class="fw-bold" style="color: #1e293b;">{{ honorario.nombre_profesora }}</div>
                         <small class="text-muted">{{ honorario.turno }} - {{ honorario.cantidad_clases }} clase(s)</small>
                     </div>
                     <span class="badge" style="background-color: #e0e7ff; color: #4f46e5; font-size: 0.9rem;">{{ honorario.monto_total }} Gs.</span>
@@ -280,12 +280,7 @@
                             
                             <div class="mb-3">
                                 <label class="form-label fw-semibold text-secondary small">Instructora</label>
-                                <select class="form-select bg-light border-0 shadow-sm" name="id_instructor" required>
-                                    <option value="">Selecciona tu nombre...</option>
-                                    {% for prof in instructores_lista %}
-                                    <option value="{{ prof.id_instructor }}">{{ prof.id_persona.nombre }} {{ prof.id_persona.apellido }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" class="form-control bg-light border-0 shadow-sm" name="nombre_profesora" placeholder="Escribe tu nombre..." required>
                             </div>
 
                             <div class="row mb-3">

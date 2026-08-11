@@ -698,7 +698,7 @@ class HonorarioInstructor(models.Model):
     ]
     
     id_honorario = models.AutoField(primary_key=True)
-    id_instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)
+    nombre_profesora = models.CharField(max_length=100, default="Instructora General")
     fecha = models.DateField()
     turno = models.CharField(max_length=10, choices=TURNO_CHOICES)
     cantidad_clases = models.IntegerField(default=1)
@@ -707,4 +707,4 @@ class HonorarioInstructor(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.id_instructor.id_persona.nombre} - {self.fecha} ({self.turno}) - {self.monto_total}"
+        return f"{self.nombre_profesora} - {self.fecha} ({self.turno}) - {self.monto_total}"

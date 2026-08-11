@@ -1642,14 +1642,13 @@ def profes_clases_hoy(request, token):
                     if hay_pendientes:
                         fechas_alertas.add(fecha_check)
 
-    from .models import Instructor, HonorarioInstructor
-    instructores_lista = Instructor.objects.select_related('id_persona').all()
+    from .models import HonorarioInstructor
     
-    honorarios_hoy = HonorarioInstructor.objects.filter(fecha=hoy).select_related('id_instructor__id_persona')
+    honorarios_hoy = HonorarioInstructor.objects.filter(fecha=hoy)
     
     return render(request, "admin_panel/profes/clases_hoy.html", {
         "honorarios_hoy": honorarios_hoy,
-        "instructores_lista": instructores_lista,
+
         "clases_data": clases_data,
         "fecha_hoy": hoy,
         "token": token,
@@ -1940,17 +1939,16 @@ def profes_registrar_honorario(request, token):
         return HttpResponse("Acceso denegado. Token inválido.", status=403)
         
     fecha_str = request.POST.get("fecha")
-    id_instructor = request.POST.get("id_instructor")
+    nombre_profesora = request.POST.get("nombre_profesora", "").strip()
     turno = request.POST.get("turno")
     cantidad_clases = request.POST.get("cantidad_clases", 1)
     monto_total = request.POST.get("monto_total", 0)
     
     try:
         fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        instructor = Instructor.objects.get(pk=id_instructor)
         
         HonorarioInstructor.objects.create(
-            id_instructor=instructor,
+            nombre_profesora=nombre_profesora,
             fecha=fecha,
             turno=turno,
             cantidad_clases=int(cantidad_clases),
@@ -1984,16 +1982,14 @@ def panel_honorarios_resumen(request):
     honorarios = HonorarioInstructor.objects.filter(
         fecha__year=año,
         fecha__month=mes
-    ).select_related('id_instructor__id_persona').order_by('fecha')
+    ).order_by('fecha')
     
-    # Agrupar por instructora y fecha
-    # Estructura: { id_instructor: { 'nombre': '...', 'dias': { '2023-10-01': { 'M': x, 'T': y, 'total_monto': z } }, 'total_clases': X, 'total_monto': Y } }
     resumen = {}
     for h in honorarios:
-        id_inst = h.id_instructor.id_instructor
-        if id_inst not in resumen:
-            resumen[id_inst] = {
-                'nombre': f"{h.id_instructor.id_persona.nombre} {h.id_instructor.id_persona.apellido}",
+        nombre_prof = h.nombre_profesora
+        if nombre_prof not in resumen:
+            resumen[nombre_prof] = {
+                'nombre': nombre_prof,
                 'dias': {},
                 'total_clases': 0,
                 'total_monto': 0
@@ -2001,20 +1997,18 @@ def panel_honorarios_resumen(request):
             
         fecha_str = h.fecha.strftime('%d/%m')
         if fecha_str not in resumen[id_inst]['dias']:
-            resumen[id_inst]['dias'][fecha_str] = {'clases': 0, 'monto': 0, 'detalle': []}
+            resumen[nombre_prof]['dias'][fecha_str] = {'clases': 0, 'monto': 0, 'detalle': []}
             
-        resumen[id_inst]['dias'][fecha_str]['clases'] += h.cantidad_clases
-        resumen[id_inst]['dias'][fecha_str]['monto'] += h.monto_total
-        resumen[id_inst]['dias'][fecha_str]['detalle'].append(f"{h.turno}: {h.cantidad_clases}c ({h.monto_total} Gs)")
+        resumen[nombre_prof]['dias'][fecha_str]['clases'] += h.cantidad_clases
+        resumen[nombre_prof]['dias'][fecha_str]['monto'] += h.monto_total
+        resumen[nombre_prof]['dias'][fecha_str]['detalle'].append(f"{h.turno}: {h.cantidad_clases}c ({h.monto_total} Gs)")
         
-        resumen[id_inst]['total_clases'] += h.cantidad_clases
-        resumen[id_inst]['total_monto'] += h.monto_total
+        resumen[nombre_prof]['total_clases'] += h.cantidad_clases
+        resumen[nombre_prof]['total_monto'] += h.monto_total
 
-    instructores_lista = Instructor.objects.select_related('id_persona').all()
     context = {
         'filtro_mes': filtro_mes,
         'resumen': resumen,
-        'instructores_lista': instructores_lista,
     }
     return render(request, "admin_panel/honorarios/resumen.html", context)
 
@@ -2026,17 +2020,16 @@ def panel_registrar_honorario(request):
     from .models import Instructor, HonorarioInstructor
     
     fecha_str = request.POST.get("fecha")
-    id_instructor = request.POST.get("id_instructor")
+    nombre_profesora = request.POST.get("nombre_profesora", "").strip()
     turno = request.POST.get("turno")
     cantidad_clases = request.POST.get("cantidad_clases", 1)
     monto_total = request.POST.get("monto_total", 0)
     
     try:
         fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        instructor = Instructor.objects.get(pk=id_instructor)
         
         HonorarioInstructor.objects.create(
-            id_instructor=instructor,
+            nombre_profesora=nombre_profesora,
             fecha=fecha,
             turno=turno,
             cantidad_clases=int(cantidad_clases),
