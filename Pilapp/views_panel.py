@@ -2071,3 +2071,44 @@ def profes_honorarios(request, token):
         "fecha_hoy": hoy,
         "token": token,
     })
+
+@require_POST
+def panel_eliminar_honorario(request):
+    from .models import HonorarioInstructor
+    id_honorario = request.POST.get("id_honorario")
+    try:
+        h = HonorarioInstructor.objects.get(pk=id_honorario)
+        h.delete()
+        messages.success(request, "Honorario eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar honorario: {e}")
+        
+    # Redirigir de vuelta al panel de resumen conservando el mes filtrado
+    url = redirect("panel_honorarios_resumen")
+    referer = request.META.get('HTTP_REFERER')
+    if referer and 'mes=' in referer:
+        import urllib.parse
+        parsed_url = urllib.parse.urlparse(referer)
+        url['Location'] += '?' + parsed_url.query
+    return url
+
+@require_POST
+def profes_eliminar_honorario(request, token):
+    from .models import HonorarioInstructor
+    
+    if token not in ["acceso-profes", "acceso-profes-mat"]:
+        return HttpResponse("Acceso denegado. Token inválido.", status=403)
+        
+    id_honorario = request.POST.get("id_honorario")
+    try:
+        h = HonorarioInstructor.objects.get(pk=id_honorario)
+        h.delete()
+        messages.success(request, "Honorario eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar honorario: {e}")
+        
+    url = redirect("profes_honorarios", token=token)
+    fecha_str = request.POST.get("fecha")
+    if fecha_str:
+        url['Location'] += f"?fecha={fecha_str}"
+    return url

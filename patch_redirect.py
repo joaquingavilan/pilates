@@ -1,22 +1,15 @@
-import re
+import os
 
-with open('Pilapp/views_panel.py', 'r', encoding='utf-8') as f:
+views_path = r'C:\Users\jesus\Documents\pilates\Pilapp\views_panel.py'
+with open(views_path, 'r', encoding='utf-8') as f:
     content = f.read()
 
-old_logic = """    messages.success(request, "Pago registrado correctamente.")
-    return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)"""
-
-new_logic = """    messages.success(request, "Pago registrado correctamente.")
+target = 'url = redirect("profes_clases_hoy", token=token)'
+replacement = 'url = redirect("profes_honorarios", token=token)'
+if target in content:
+    content = content.replace(target, replacement)
     
-    next_page = request.GET.get('next', 'detalle')
-    if next_page == 'pagos':
-        return redirect("panel_pagos")
-    else:
-        return redirect("panel_alumno_detalle", id_alumno=alumno.id_alumno)"""
-
-content = content.replace(old_logic, new_logic)
-
-with open('Pilapp/views_panel.py', 'w', encoding='utf-8') as f:
+with open(views_path, 'w', encoding='utf-8') as f:
     f.write(content)
 
-print("Patched redirect in panel_registrar_pago_alumno.")
+print("Fixed redirect")
