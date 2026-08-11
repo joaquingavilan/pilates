@@ -1642,10 +1642,13 @@ def profes_clases_hoy(request, token):
                     if hay_pendientes:
                         fechas_alertas.add(fecha_check)
 
-    from .models import Instructor
+    from .models import Instructor, HonorarioInstructor
     instructores_lista = Instructor.objects.select_related('id_persona').all()
     
+    honorarios_hoy = HonorarioInstructor.objects.filter(fecha=hoy).select_related('id_instructor__id_persona')
+    
     return render(request, "admin_panel/profes/clases_hoy.html", {
+        "honorarios_hoy": honorarios_hoy,
         "instructores_lista": instructores_lista,
         "clases_data": clases_data,
         "fecha_hoy": hoy,

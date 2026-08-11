@@ -239,8 +239,25 @@
         {% endif %}
 
         {% if not es_reemplazo %}
+        {% if honorarios_hoy %}
+        <div class="mt-4">
+            <h6 class="fw-bold mb-3" style="font-family: 'Outfit', sans-serif; color: #475569;">Mis Honorarios Registrados Hoy</h6>
+            <div class="list-group shadow-sm border-0 rounded-4 mb-3">
+                {% for honorario in honorarios_hoy %}
+                <div class="list-group-item border-0 border-bottom d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <div class="fw-bold" style="color: #1e293b;">{{ honorario.id_instructor.id_persona.nombre }} {{ honorario.id_instructor.id_persona.apellido }}</div>
+                        <small class="text-muted">{{ honorario.turno }} - {{ honorario.cantidad_clases }} clase(s)</small>
+                    </div>
+                    <span class="badge" style="background-color: #e0e7ff; color: #4f46e5; font-size: 0.9rem;">{{ honorario.monto_total }} Gs.</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="mt-4 text-center">
-            <button class="btn btn-primary rounded-pill px-4 py-2 shadow-sm fw-bold" style="background-color: #6366f1; border: none; font-family: 'Outfit', sans-serif;" data-bs-toggle="modal" data-bs-target="#honorarioModal">
+            <button type="button" class="btn btn-primary rounded-pill px-4 py-2 shadow-sm fw-bold" style="background-color: #6366f1; border: none; font-family: 'Outfit', sans-serif;" data-bs-toggle="modal" data-bs-target="#honorarioModal">
                 <i class="bi bi-wallet2 me-2"></i>Registrar Mis Honorarios de Hoy
             </button>
         </div>
