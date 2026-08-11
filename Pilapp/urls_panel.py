@@ -38,6 +38,7 @@ urlpatterns = [
     path('resumen-pagos/', views_panel.panel_resumen_pagos, name='panel_resumen_pagos'),
     path('honorarios/resumen/', views_panel.panel_honorarios_resumen, name='panel_honorarios_resumen'),
     path('honorarios/registrar/', views_panel.panel_registrar_honorario, name='panel_registrar_honorario'),
+    path('honorarios/eliminar/', views_panel.panel_eliminar_honorario, name='panel_eliminar_honorario'),
     path('pagos/<int:id_pago>/eliminar/', views_panel.panel_pago_eliminar, name='panel_pago_eliminar'),
     path('pagos/<int:id_pago>/factura/', views_panel.panel_pago_actualizar_factura, name='panel_pago_actualizar_factura'),
     
@@ -70,4 +71,5 @@ urlpatterns = [
     path('profes/<str:token>/pagos/registrar/', views_panel.profes_registrar_pago, name='profes_registrar_pago'),
     path('profes/<str:token>/honorarios/', views_panel.profes_honorarios, name='profes_honorarios'),
     path('profes/<str:token>/honorarios/registrar/', views_panel.profes_registrar_honorario, name='profes_registrar_honorario'),
+    path('profes/<str:token>/honorarios/eliminar/', views_panel.profes_eliminar_honorario, name='profes_eliminar_honorario'),
 ]
