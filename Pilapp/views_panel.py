@@ -2007,8 +2007,40 @@ def panel_honorarios_resumen(request):
         resumen[id_inst]['total_clases'] += h.cantidad_clases
         resumen[id_inst]['total_monto'] += h.monto_total
 
+    instructores_lista = Instructor.objects.select_related('id_persona').all()
     context = {
         'filtro_mes': filtro_mes,
         'resumen': resumen,
+        'instructores_lista': instructores_lista,
     }
     return render(request, "admin_panel/honorarios/resumen.html", context)
+
+
+@require_POST
+def panel_registrar_honorario(request):
+    from django.utils import timezone
+    from datetime import datetime
+    from .models import Instructor, HonorarioInstructor
+    
+    fecha_str = request.POST.get("fecha")
+    id_instructor = request.POST.get("id_instructor")
+    turno = request.POST.get("turno")
+    cantidad_clases = request.POST.get("cantidad_clases", 1)
+    monto_total = request.POST.get("monto_total", 0)
+    
+    try:
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        instructor = Instructor.objects.get(pk=id_instructor)
+        
+        HonorarioInstructor.objects.create(
+            id_instructor=instructor,
+            fecha=fecha,
+            turno=turno,
+            cantidad_clases=int(cantidad_clases),
+            monto_total=float(monto_total)
+        )
+        messages.success(request, f"Honorario de {monto_total} Gs. guardado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar honorario: {e}")
+        
+    return redirect("panel_honorarios_resumen")

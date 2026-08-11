@@ -37,6 +37,7 @@ urlpatterns = [
     path('pagos/', views_panel.panel_pagos, name='panel_pagos'),
     path('resumen-pagos/', views_panel.panel_resumen_pagos, name='panel_resumen_pagos'),
     path('honorarios/resumen/', views_panel.panel_honorarios_resumen, name='panel_honorarios_resumen'),
+    path('honorarios/registrar/', views_panel.panel_registrar_honorario, name='panel_registrar_honorario'),
     path('pagos/<int:id_pago>/eliminar/', views_panel.panel_pago_eliminar, name='panel_pago_eliminar'),
     path('pagos/<int:id_pago>/factura/', views_panel.panel_pago_actualizar_factura, name='panel_pago_actualizar_factura'),
     
