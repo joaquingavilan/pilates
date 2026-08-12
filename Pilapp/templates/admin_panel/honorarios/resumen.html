@@ -72,7 +72,54 @@
 </div>
 
 
+
+{% if cruce_clases %}
+<h4 class="mb-3 fw-bold mt-4" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Cruce de Clases (Cálculo Automático)</h4>
+<div class="row row-cols-1 row-cols-xl-2 g-4 mb-5">
+    {% for nombre, datos in cruce_clases.items %}
+    <div class="col">
+        <div class="card border-0 shadow-sm rounded-4 h-100" style="background-color: #f0fdfa;">
+            <div class="card-header border-0 bg-transparent pt-4 pb-2 px-4 rounded-top-4 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold" style="color: #0d9488; font-family: 'Outfit', sans-serif;">
+                    <i class="bi bi-person-check-fill me-2"></i>{{ datos.nombre }}
+                </h5>
+                <span class="badge" style="background-color: #0d9488; font-size: 0.9rem;">
+                    Total Clases: {{ datos.total_clases }}
+                </span>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" style="background-color: transparent;">
+                        <thead style="border-bottom: 2px solid #ccfbf1;">
+                            <tr>
+                                <th class="text-secondary fw-semibold border-0" style="background-color: transparent;">Fecha</th>
+                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Mañana</th>
+                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Tarde</th>
+                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fecha, info in datos.dias.items %}
+                            <tr>
+                                <td class="fw-medium text-dark" style="background-color: transparent;">{{ fecha }}</td>
+                                <td class="text-center" style="background-color: transparent;">{% if info.mañana > 0 %}<span class="badge bg-light text-dark border">{{ info.mañana }}</span>{% else %}-{% endif %}</td>
+                                <td class="text-center" style="background-color: transparent;">{% if info.tarde > 0 %}<span class="badge bg-light text-dark border">{{ info.tarde }}</span>{% else %}-{% endif %}</td>
+                                <td class="text-center fw-bold" style="color: #0f766e; background-color: transparent;">{{ info.total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h4 class="mb-3 fw-bold" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Honorarios Registrados (Manual)</h4>
 {% if resumen %}
+
 <div class="row row-cols-1 row-cols-xl-2 g-4">
     {% for id_inst, datos in resumen.items %}
     <div class="col">

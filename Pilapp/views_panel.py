@@ -1966,9 +1966,9 @@ def profes_registrar_honorario(request, token):
 
 
 def panel_honorarios_resumen(request):
-    from .models import HonorarioInstructor, Instructor
+    from .models import HonorarioInstructor, Instructor, Clase
     from django.db.models import Sum
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, time
     from django.utils import timezone
     
     filtro_mes = request.GET.get('mes', timezone.now().strftime('%Y-%m'))
@@ -1978,7 +1978,7 @@ def panel_honorarios_resumen(request):
     except ValueError:
         año, mes = timezone.now().year, timezone.now().month
         
-    # Obtener honorarios del mes seleccionado
+    # 1. Obtener honorarios del mes seleccionado
     honorarios = HonorarioInstructor.objects.filter(
         fecha__year=año,
         fecha__month=mes
@@ -2009,9 +2009,40 @@ def panel_honorarios_resumen(request):
         resumen[nombre_prof]['total_clases'] += h.cantidad_clases
         resumen[nombre_prof]['total_monto'] += h.monto_total
 
+    # 2. Obtener cruce automático de clases
+    clases_impartidas = Clase.objects.filter(
+        fecha__year=año,
+        fecha__month=mes
+    ).select_related('id_instructor__id_persona', 'id_turno').order_by('fecha')
+    
+    cruce_clases = {}
+    for c in clases_impartidas:
+        nombre_prof = f"{c.id_instructor.id_persona.nombre} {c.id_instructor.id_persona.apellido}"
+        if nombre_prof not in cruce_clases:
+            cruce_clases[nombre_prof] = {
+                'nombre': nombre_prof,
+                'dias': {},
+                'total_clases': 0
+            }
+            
+        fecha_str = c.fecha.strftime('%d/%m')
+        if fecha_str not in cruce_clases[nombre_prof]['dias']:
+            cruce_clases[nombre_prof]['dias'][fecha_str] = {'mañana': 0, 'tarde': 0, 'total': 0}
+            
+        is_tarde = c.id_turno.horario >= time(12, 0)
+        
+        if is_tarde:
+            cruce_clases[nombre_prof]['dias'][fecha_str]['tarde'] += 1
+        else:
+            cruce_clases[nombre_prof]['dias'][fecha_str]['mañana'] += 1
+            
+        cruce_clases[nombre_prof]['dias'][fecha_str]['total'] += 1
+        cruce_clases[nombre_prof]['total_clases'] += 1
+
     context = {
         'filtro_mes': filtro_mes,
         'resumen': resumen,
+        'cruce_clases': cruce_clases,
     }
     return render(request, "admin_panel/honorarios/resumen.html", context)
 
