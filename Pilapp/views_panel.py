@@ -1718,7 +1718,7 @@ def profes_marcar_asistencia(request, token):
         except Exception as e:
             messages.error(request, f"Error al actualizar: {e}")
             
-    url = redirect("profes_honorarios", token=token)
+    url = redirect("profes_clases_hoy", token=token)
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
@@ -1959,7 +1959,7 @@ def profes_registrar_honorario(request, token):
         messages.error(request, f"Error al guardar honorario: {e}")
         
     # Redirigir de vuelta a la página actual manteniendo la fecha
-    url = redirect("profes_honorarios", token=token)
+    url = redirect("profes_clases_hoy", token=token)
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
@@ -2138,7 +2138,7 @@ def profes_eliminar_honorario(request, token):
     except Exception as e:
         messages.error(request, f"Error al eliminar honorario: {e}")
         
-    url = redirect("profes_honorarios", token=token)
+    url = redirect("profes_clases_hoy", token=token)
     fecha_str = request.POST.get("fecha")
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
