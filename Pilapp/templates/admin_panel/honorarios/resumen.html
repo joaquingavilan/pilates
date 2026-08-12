@@ -34,12 +34,7 @@
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-semibold text-secondary small">Instructora</label>
-                            <select class="form-select bg-light border-0 shadow-sm" name="id_instructor" required>
-                                <option value="">Seleccionar...</option>
-                                {% for prof in instructores_lista %}
-                                <option value="{{ prof.id_instructor }}">{{ prof.id_persona.nombre }} {{ prof.id_persona.apellido }}</option>
-                                {% endfor %}
-                            </select>
+                            <input type="text" class="form-control bg-light border-0 shadow-sm" name="nombre_profesora" placeholder="Ej: Ana Paula" required>
                         </div>
                     </div>
 
