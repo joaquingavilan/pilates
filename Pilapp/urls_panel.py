@@ -69,4 +69,5 @@ urlpatterns = [
     path('profes/<str:token>/asistencia/', views_panel.profes_marcar_asistencia, name='profes_marcar_asistencia'),
     path('profes/<str:token>/pagos/', views_panel.profes_pagos, name='profes_pagos'),
     path('profes/<str:token>/pagos/registrar/', views_panel.profes_registrar_pago, name='profes_registrar_pago'),
+    path('profes/<str:token>/honorarios/', views_panel.profes_honorarios, name='profes_honorarios'),
 ]
