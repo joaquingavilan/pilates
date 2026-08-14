@@ -69,7 +69,7 @@
 
 
 {% if cruce_clases %}
-<h4 class="mb-3 fw-bold mt-4" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Cruce de Clases (Cálculo Automático)</h4>
+<h4 class="mb-3 fw-bold mt-4" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Clases</h4>
 <div class="row row-cols-1 row-cols-xl-2 g-4 mb-5">
     {% for nombre, datos in cruce_clases.items %}
     <div class="col">
@@ -90,6 +90,8 @@
                                 <th class="text-secondary fw-semibold border-0" style="background-color: transparent;">Fecha</th>
                                 <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Mañana</th>
                                 <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Tarde</th>
+                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;" title="Reformer M/J 18:30 y 19:30">Ref M/J 18-19h</th>
+                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;" title="Mat M/J 18:30 y 19:30">Mat M/J 18-19h</th>
                                 <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Total</th>
                             </tr>
                         </thead>
@@ -99,6 +101,8 @@
                                 <td class="fw-medium text-dark" style="background-color: transparent;">{{ fecha }}</td>
                                 <td class="text-center" style="background-color: transparent;">{% if info.mañana > 0 %}<span class="badge bg-light text-dark border">{{ info.mañana }}</span>{% else %}-{% endif %}</td>
                                 <td class="text-center" style="background-color: transparent;">{% if info.tarde > 0 %}<span class="badge bg-light text-dark border">{{ info.tarde }}</span>{% else %}-{% endif %}</td>
+                                <td class="text-center" style="background-color: transparent;">{% if info.ref_mj > 0 %}<span class="badge bg-light text-dark border">{{ info.ref_mj }}</span>{% else %}-{% endif %}</td>
+                                <td class="text-center" style="background-color: transparent;">{% if info.mat_mj > 0 %}<span class="badge bg-light text-dark border">{{ info.mat_mj }}</span>{% else %}-{% endif %}</td>
                                 <td class="text-center fw-bold" style="color: #0f766e; background-color: transparent;">{{ info.total }}</td>
                             </tr>
                             {% endfor %}
