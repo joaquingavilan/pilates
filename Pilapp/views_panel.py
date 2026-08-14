@@ -2021,13 +2021,27 @@ def panel_honorarios_resumen(request):
         if nombre_prof not in cruce_clases:
             cruce_clases[nombre_prof] = {
                 'nombre': nombre_prof,
-                'dias': {},
+                'semanas': {},
                 'total_clases': 0
             }
             
+        iso_week = c.fecha.isocalendar()[1]
+        if iso_week not in cruce_clases[nombre_prof]['semanas']:
+            cruce_clases[nombre_prof]['semanas'][iso_week] = {
+                'dias': {},
+                'total_semana': 0,
+                'inicio': c.fecha,
+                'fin': c.fecha,
+                'numero': 0
+            }
+            
+        semana = cruce_clases[nombre_prof]['semanas'][iso_week]
+        if c.fecha < semana['inicio']: semana['inicio'] = c.fecha
+        if c.fecha > semana['fin']: semana['fin'] = c.fecha
+        
         fecha_str = c.fecha.strftime('%d/%m')
-        if fecha_str not in cruce_clases[nombre_prof]['dias']:
-            cruce_clases[nombre_prof]['dias'][fecha_str] = {'mañana': 0, 'tarde': 0, 'mat_mj': 0, 'total': 0}
+        if fecha_str not in semana['dias']:
+            semana['dias'][fecha_str] = {'mañana': 0, 'tarde': 0, 'mat_mj': 0, 'total': 0, 'fecha_obj': c.fecha}
             
         is_tarde = c.id_turno.horario >= time(12, 0)
         is_mj = c.id_turno.dia in ['Martes', 'Jueves']
@@ -2035,14 +2049,24 @@ def panel_honorarios_resumen(request):
         is_mat = c.id_turno.disciplina.lower() == 'mat'
         
         if is_mj and is_1830_1930 and is_mat:
-            cruce_clases[nombre_prof]['dias'][fecha_str]['mat_mj'] += 1
+            semana['dias'][fecha_str]['mat_mj'] += 1
         elif is_tarde:
-            cruce_clases[nombre_prof]['dias'][fecha_str]['tarde'] += 1
+            semana['dias'][fecha_str]['tarde'] += 1
         else:
-            cruce_clases[nombre_prof]['dias'][fecha_str]['mañana'] += 1
+            semana['dias'][fecha_str]['mañana'] += 1
             
-        cruce_clases[nombre_prof]['dias'][fecha_str]['total'] += 1
+        semana['dias'][fecha_str]['total'] += 1
+        semana['total_semana'] += 1
         cruce_clases[nombre_prof]['total_clases'] += 1
+
+    # Format weeks dictionary and assign sequence number
+    for nombre_prof, datos in cruce_clases.items():
+        sorted_weeks = sorted(datos['semanas'].keys())
+        semanas_dict = {}
+        for idx, w in enumerate(sorted_weeks):
+            semanas_dict[w] = datos['semanas'][w]
+            semanas_dict[w]['numero'] = idx + 1
+        datos['semanas'] = semanas_dict
 
     context = {
         'filtro_mes': filtro_mes,

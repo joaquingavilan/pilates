@@ -83,29 +83,45 @@
                 </span>
             </div>
             <div class="card-body px-4 pb-4">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0" style="background-color: transparent;">
-                        <thead style="border-bottom: 2px solid #ccfbf1;">
-                            <tr>
-                                <th class="text-secondary fw-semibold border-0" style="background-color: transparent;">Fecha</th>
-                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Mañana</th>
-                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Tarde</th>
-                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;" title="Mat M/J 18:30 y 19:30">Mat M/J 18-19h</th>
-                                <th class="text-secondary fw-semibold border-0 text-center" style="background-color: transparent;">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for fecha, info in datos.dias.items %}
-                            <tr>
-                                <td class="fw-medium text-dark" style="background-color: transparent;">{{ fecha }}</td>
-                                <td class="text-center" style="background-color: transparent;">{% if info.mañana > 0 %}<span class="badge bg-light text-dark border">{{ info.mañana }}</span>{% else %}-{% endif %}</td>
-                                <td class="text-center" style="background-color: transparent;">{% if info.tarde > 0 %}<span class="badge bg-light text-dark border">{{ info.tarde }}</span>{% else %}-{% endif %}</td>
-                                <td class="text-center" style="background-color: transparent;">{% if info.mat_mj > 0 %}<span class="badge bg-light text-dark border">{{ info.mat_mj }}</span>{% else %}-{% endif %}</td>
-                                <td class="text-center fw-bold" style="color: #0f766e; background-color: transparent;">{{ info.total }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="accordion" id="accordion-{{ forloop.counter }}">
+                    {% for week_num, semana in datos.semanas.items %}
+                    <div class="accordion-item bg-transparent border-0 mb-2">
+                        <h2 class="accordion-header" id="heading-{{ forloop.parentloop.counter }}-{{ week_num }}">
+                            <button class="accordion-button collapsed shadow-sm rounded-3 py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.parentloop.counter }}-{{ week_num }}" aria-expanded="false" aria-controls="collapse-{{ forloop.parentloop.counter }}-{{ week_num }}" style="background-color: #fff; border: 1px solid #e2e8f0; color: #0f766e; font-weight: 600; font-size: 0.95rem;">
+                                Semana {{ semana.numero }} ({{ semana.inicio|date:"d/m" }} - {{ semana.fin|date:"d/m" }})
+                                <span class="badge rounded-pill ms-auto" style="background-color: #0d9488;">{{ semana.total_semana }} clases</span>
+                            </button>
+                        </h2>
+                        <div id="collapse-{{ forloop.parentloop.counter }}-{{ week_num }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ forloop.parentloop.counter }}-{{ week_num }}" data-bs-parent="#accordion-{{ forloop.parentloop.counter }}">
+                            <div class="accordion-body px-1 py-2">
+                                <div class="table-responsive bg-white rounded-3 shadow-sm border border-light">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead style="background-color: #f8fafc;">
+                                            <tr>
+                                                <th class="text-secondary fw-semibold border-0 ps-3">Fecha</th>
+                                                <th class="text-secondary fw-semibold border-0 text-center">Mañana</th>
+                                                <th class="text-secondary fw-semibold border-0 text-center">Tarde</th>
+                                                <th class="text-secondary fw-semibold border-0 text-center" title="Mat M/J 18:30 y 19:30">Mat M/J 18-19h</th>
+                                                <th class="text-secondary fw-semibold border-0 text-center pe-3">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for fecha, info in semana.dias.items %}
+                                            <tr>
+                                                <td class="fw-medium text-dark ps-3 border-light">{{ fecha }}</td>
+                                                <td class="text-center border-light">{% if info.mañana > 0 %}<span class="badge bg-light text-dark border">{{ info.mañana }}</span>{% else %}-{% endif %}</td>
+                                                <td class="text-center border-light">{% if info.tarde > 0 %}<span class="badge bg-light text-dark border">{{ info.tarde }}</span>{% else %}-{% endif %}</td>
+                                                <td class="text-center border-light">{% if info.mat_mj > 0 %}<span class="badge bg-light text-dark border">{{ info.mat_mj }}</span>{% else %}-{% endif %}</td>
+                                                <td class="text-center fw-bold pe-3 border-light" style="color: #0f766e;">{{ info.total }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
