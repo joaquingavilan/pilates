@@ -2027,17 +2027,14 @@ def panel_honorarios_resumen(request):
             
         fecha_str = c.fecha.strftime('%d/%m')
         if fecha_str not in cruce_clases[nombre_prof]['dias']:
-            cruce_clases[nombre_prof]['dias'][fecha_str] = {'mañana': 0, 'tarde': 0, 'ref_mj': 0, 'mat_mj': 0, 'total': 0}
+            cruce_clases[nombre_prof]['dias'][fecha_str] = {'mañana': 0, 'tarde': 0, 'mat_mj': 0, 'total': 0}
             
         is_tarde = c.id_turno.horario >= time(12, 0)
         is_mj = c.id_turno.dia in ['Martes', 'Jueves']
         is_1830_1930 = c.id_turno.horario in [time(18, 30), time(19, 30)]
-        is_reformer = c.id_turno.disciplina.lower() == 'reformer'
         is_mat = c.id_turno.disciplina.lower() == 'mat'
         
-        if is_mj and is_1830_1930 and is_reformer:
-            cruce_clases[nombre_prof]['dias'][fecha_str]['ref_mj'] += 1
-        elif is_mj and is_1830_1930 and is_mat:
+        if is_mj and is_1830_1930 and is_mat:
             cruce_clases[nombre_prof]['dias'][fecha_str]['mat_mj'] += 1
         elif is_tarde:
             cruce_clases[nombre_prof]['dias'][fecha_str]['tarde'] += 1
