@@ -197,7 +197,8 @@
                                             data-id="{{ paquete.id_alumno_paquete }}" 
                                             data-paquete="{{ paquete.id_paquete.id_paquete }}"
                                             data-estado="{{ paquete.estado }}" 
-                                            data-pago="{{ paquete.estado_pago }}" title="Editar Paquete">
+                                            data-pago="{{ paquete.estado_pago }}" 
+                                            data-fechainicio="{{ paquete.fecha_inicio|date:'Y-m-d' }}" title="Editar Paquete">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <form method="post" action="{% url 'panel_alumno_paquete_eliminar' alumno.id_alumno paquete.id_alumno_paquete %}" class="d-inline" onsubmit="return confirm('¿Seguro que deseas eliminar este paquete? Esta acción eliminará también sus clases y pagos asociados de manera permanente.');">
@@ -484,9 +485,13 @@
           <h5 class="modal-title">Editar Paquete</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Tipo de Paquete</label>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Fecha de Inicio</label>
+              <input type="date" name="fecha_inicio" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tipo de Paquete</label>
             <select name="id_paquete" class="form-select" required>
               {% for p in lista_paquetes %}
               <option value="{{ p.id_paquete }}">{{ p.cantidad_clases }} clases - {{ p.frecuencia }}</option>
@@ -796,6 +801,7 @@
       const id_paquete = button.getAttribute('data-paquete');
       const estado = button.getAttribute('data-estado');
       const pago = button.getAttribute('data-pago');
+      const fecha_inicio = button.getAttribute('data-fechainicio');
       
       const form = modalEditarPaquete.querySelector('form');
       let actionUrl = "{% url 'panel_alumno_paquete_editar' alumno.id_alumno 999999 %}".replace('999999', id);
@@ -804,6 +810,9 @@
       form.querySelector('[name="id_paquete"]').value = id_paquete;
       form.querySelector('[name="estado"]').value = estado;
       form.querySelector('[name="estado_pago"]').value = pago;
+      if (form.querySelector('[name="fecha_inicio"]')) {
+          form.querySelector('[name="fecha_inicio"]').value = fecha_inicio;
+      }
     });
   }
 

@@ -504,7 +504,16 @@ def panel_alumno_paquete_editar(request, id_alumno, id_alumno_paquete):
         nuevo_estado = request.POST.get("estado")
         nuevo_estado_pago = request.POST.get("estado_pago")
         nuevo_id_paquete = request.POST.get("id_paquete")
+        nueva_fecha_inicio = request.POST.get("fecha_inicio")
         
+        # Actualizar fecha de inicio
+        if nueva_fecha_inicio:
+            try:
+                from datetime import datetime
+                paquete.fecha_inicio = datetime.strptime(nueva_fecha_inicio, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
         # Actualizar tipo de paquete si se envió
         if nuevo_id_paquete and str(nuevo_id_paquete).isdigit():
             try:
