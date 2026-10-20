@@ -1,3 +1,4 @@
+import json
 #imports de python
 import time 
 from decimal import Decimal, InvalidOperation
@@ -24,7 +25,8 @@ from .models import (
     ExAlumno,
     Alumno, Persona, Clase, Turno, AlumnoClase, AlumnoClaseOcasional,
     AlumnoPaquete, Paquete, Pago, PagoAlumno, ClienteProspecto,
-    AlumnoPaqueteTurno, PagoInstructor, Instructor
+    AlumnoPaqueteTurno, PagoInstructor, Instructor,
+    Producto, MovimientoProducto, Gasto, HonorarioInstructor
 )
 
 
@@ -1859,7 +1861,6 @@ def panel_pago_eliminar(request, id_pago):
     return redirect(request.META.get('HTTP_REFERER', 'panel_resumen_pagos'))
 
 def panel_resumen_pagos(request):
-
     mes_str = request.GET.get("mes")
     if mes_str:
         try:
@@ -1874,7 +1875,6 @@ def panel_resumen_pagos(request):
     _, last_day = calendar.monthrange(mes_actual.year, mes_actual.month)
     fin_mes = mes_actual.replace(day=last_day)
     
-    from django.db.models import Q
     pagos = Pago.objects.filter(
         fecha__gte=mes_actual,
         fecha__lte=fin_mes,
@@ -1899,19 +1899,121 @@ def panel_resumen_pagos(request):
         
     pagos = pagos.order_by("-fecha")
     
-    # Calcular totales
+    # Calcular totales del mes
     total_efectivo = pagos.filter(metodo_pago="efectivo").aggregate(total=Sum("monto"))["total"] or Decimal("0")
     total_transferencia = pagos.filter(metodo_pago="transferencia").aggregate(total=Sum("monto"))["total"] or Decimal("0")
     total_general = total_efectivo + total_transferencia
     
+    # Ventas de productos del mes
+    ventas_mes = MovimientoProducto.objects.filter(
+        tipo='venta',
+        fecha__gte=mes_actual,
+        fecha__lte=fin_mes
+    ).aggregate(total=Sum("monto_total"))["total"] or Decimal("0")
+    
+    # Gastos operativos del mes
+    gastos_mes = Gasto.objects.filter(
+        fecha__gte=mes_actual,
+        fecha__lte=fin_mes
+    ).aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    
+    # Honorarios de profes del mes
+    honorarios_mes = HonorarioInstructor.objects.filter(
+        fecha__gte=mes_actual,
+        fecha__lte=fin_mes
+    ).aggregate(total=Sum("monto_total"))["total"] or Decimal("0")
+    
+    egresos_totales_mes = gastos_mes + honorarios_mes
+    ingresos_totales_mes = total_general + ventas_mes
+    balance_neto_mes = ingresos_totales_mes - egresos_totales_mes
+    
+    # DATOS PARA GRÁFICOS: Últimos 6 meses
+    meses_historial = []
+    base_date = mes_actual
+    for i in range(5, -1, -1):
+        year = base_date.year
+        month = base_date.month - i
+        while month <= 0:
+            month += 12
+            year -= 1
+        m_start = date(year, month, 1)
+        _, m_last_day = calendar.monthrange(year, month)
+        m_end = date(year, month, m_last_day)
+        
+        m_ing_clases = Pago.objects.filter(
+            fecha__gte=m_start, fecha__lte=m_end, estado__in=["pagado", "parcial"]
+        ).aggregate(total=Sum("monto"))["total"] or Decimal("0")
+        
+        m_ing_ventas = MovimientoProducto.objects.filter(
+            tipo='venta', fecha__gte=m_start, fecha__lte=m_end
+        ).aggregate(total=Sum("monto_total"))["total"] or Decimal("0")
+        
+        m_total_ing = m_ing_clases + m_ing_ventas
+        
+        m_gastos = Gasto.objects.filter(
+            fecha__gte=m_start, fecha__lte=m_end
+        ).aggregate(total=Sum("monto"))["total"] or Decimal("0")
+        
+        m_honorarios = HonorarioInstructor.objects.filter(
+            fecha__gte=m_start, fecha__lte=m_end
+        ).aggregate(total=Sum("monto_total"))["total"] or Decimal("0")
+        
+        m_total_egresos = m_gastos + m_honorarios
+        m_neto = m_total_ing - m_total_egresos
+        
+        nombres_meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        mes_nombre = f"{nombres_meses[month - 1]} {year}"
+        
+        meses_historial.append({
+            "label": mes_nombre,
+            "ingresos_clases": float(m_ing_clases),
+            "ingresos_ventas": float(m_ing_ventas),
+            "ingresos_totales": float(m_total_ing),
+            "gastos": float(m_total_egresos),
+            "neto": float(m_neto)
+        })
+        
+    chart_labels = [m["label"] for m in meses_historial]
+    chart_ingresos = [m["ingresos_totales"] for m in meses_historial]
+    chart_gastos = [m["gastos"] for m in meses_historial]
+    chart_neto = [m["neto"] for m in meses_historial]
+    
+    # Desglose de Gastos por categoría para el mes actual
+    gastos_por_cat = Gasto.objects.filter(
+        fecha__gte=mes_actual, fecha__lte=fin_mes
+    ).values("categoria").annotate(total=Sum("monto")).order_by("-total")
+    
+    cat_nombres_dict = dict(Gasto.CATEGORIA_CHOICES)
+    chart_gastos_cat_labels = [cat_nombres_dict.get(g["categoria"], g["categoria"]) for g in gastos_por_cat]
+    chart_gastos_cat_data = [float(g["total"]) for g in gastos_por_cat]
+    
+    if honorarios_mes > 0:
+        chart_gastos_cat_labels.append("Honorarios Profes")
+        chart_gastos_cat_data.append(float(honorarios_mes))
+
     context = {
         "mes_actual": mes_actual,
         "pagos": pagos,
         "total_efectivo": total_efectivo,
         "total_transferencia": total_transferencia,
         "total_general": total_general,
+        "ventas_mes": ventas_mes,
+        "gastos_mes": gastos_mes,
+        "honorarios_mes": honorarios_mes,
+        "egresos_totales_mes": egresos_totales_mes,
+        "ingresos_totales_mes": ingresos_totales_mes,
+        "balance_neto_mes": balance_neto_mes,
+        
+        # Para Chart.js
+        "chart_labels_json": json.dumps(chart_labels),
+        "chart_ingresos_json": json.dumps(chart_ingresos),
+        "chart_gastos_json": json.dumps(chart_gastos),
+        "chart_neto_json": json.dumps(chart_neto),
+        "chart_gastos_cat_labels_json": json.dumps(chart_gastos_cat_labels),
+        "chart_gastos_cat_data_json": json.dumps(chart_gastos_cat_data),
     }
     return render(request, "admin_panel/pagos/resumen.html", context)
+
 
 
 def panel_ex_alumnos(request):
@@ -2181,3 +2283,462 @@ def profes_eliminar_honorario(request, token):
     if fecha_str:
         url['Location'] += f"?fecha={fecha_str}"
     return url
+
+
+# ==========================================
+# MÓDULO DE INVENTARIO ("EL ESTANTE")
+# ==========================================
+
+def panel_inventario(request):
+    """
+    Vista del estante de inventario: productos, stock disponible, ventas y movimientos.
+    """
+    if not Producto.objects.exists():
+        p1 = Producto.objects.create(
+            nombre="Medias Antideslizantes",
+            descripcion="Medias especiales antideslizantes para pilates",
+            precio_venta=Decimal("40000"),
+            stock_actual=12
+        )
+        MovimientoProducto.objects.create(
+            producto=p1,
+            tipo='entrada',
+            cantidad=12,
+            monto_total=Decimal("0"),
+            observaciones="Carga inicial de stock"
+        )
+        p2 = Producto.objects.create(
+            nombre="Yoga Mat",
+            descripcion="Mat / Colchoneta para ejercicios de suelo y mat",
+            precio_venta=Decimal("120000"),
+            stock_actual=5
+        )
+        MovimientoProducto.objects.create(
+            producto=p2,
+            tipo='entrada',
+            cantidad=5,
+            monto_total=Decimal("0"),
+            observaciones="Carga inicial de stock"
+        )
+
+    productos = Producto.objects.filter(activo=True).order_by("nombre")
+    
+    total_productos = productos.count()
+    total_unidades = sum(p.stock_actual for p in productos)
+    productos_bajo_stock = productos.filter(stock_actual__lte=3)
+    
+    hoy = timezone.localdate()
+    mes_inicio = hoy.replace(day=1)
+    import calendar
+    _, last_day = calendar.monthrange(hoy.year, hoy.month)
+    mes_fin = hoy.replace(day=last_day)
+    
+    ventas_mes = MovimientoProducto.objects.filter(
+        tipo='venta',
+        fecha__gte=mes_inicio,
+        fecha__lte=mes_fin
+    ).aggregate(total=Sum("monto_total"))["total"] or Decimal("0")
+    
+    movimientos = MovimientoProducto.objects.select_related(
+        'producto', 'id_alumno__id_persona'
+    ).order_by("-fecha", "-id_movimiento")[:50]
+    
+    alumnos = Alumno.objects.filter(estado="regular").select_related("id_persona").order_by("id_persona__nombre")
+
+    context = {
+        "productos": productos,
+        "total_productos": total_productos,
+        "total_unidades": total_unidades,
+        "productos_bajo_stock": productos_bajo_stock,
+        "ventas_mes": ventas_mes,
+        "movimientos": movimientos,
+        "alumnos": alumnos,
+        "hoy": hoy,
+    }
+    return render(request, "admin_panel/inventario/lista.html", context)
+
+
+@require_POST
+def panel_producto_crear(request):
+    nombre = request.POST.get("nombre", "").strip()
+    descripcion = request.POST.get("descripcion", "").strip()
+    precio_str = request.POST.get("precio_venta", "0").replace(".", "").replace(",", "").strip()
+    stock_str = request.POST.get("stock_actual", "0").strip()
+    
+    if not nombre:
+        messages.error(request, "El nombre del producto es obligatorio.")
+        return redirect("panel_inventario")
+        
+    try:
+        precio = Decimal(precio_str)
+    except (InvalidOperation, ValueError):
+        precio = Decimal("0")
+        
+    try:
+        stock = int(stock_str)
+    except ValueError:
+        stock = 0
+        
+    producto = Producto.objects.create(
+        nombre=nombre,
+        descripcion=descripcion if descripcion else None,
+        precio_venta=precio,
+        stock_actual=stock
+    )
+    
+    if stock > 0:
+        MovimientoProducto.objects.create(
+            producto=producto,
+            tipo='entrada',
+            cantidad=stock,
+            precio_unitario=Decimal("0"),
+            monto_total=Decimal("0"),
+            observaciones="Stock inicial al crear el producto"
+        )
+        
+    messages.success(request, f"Producto '{nombre}' agregado al estante exitosamente.")
+    return redirect("panel_inventario")
+
+
+@require_POST
+def panel_producto_editar(request, id_producto):
+    producto = get_object_or_404(Producto, id_producto=id_producto)
+    nombre = request.POST.get("nombre", "").strip()
+    descripcion = request.POST.get("descripcion", "").strip()
+    precio_str = request.POST.get("precio_venta", "0").replace(".", "").replace(",", "").strip()
+    stock_str = request.POST.get("stock_actual", "").strip()
+    
+    if nombre:
+        producto.nombre = nombre
+    producto.descripcion = descripcion if descripcion else None
+    
+    try:
+        producto.precio_venta = Decimal(precio_str)
+    except (InvalidOperation, ValueError):
+        pass
+        
+    if stock_str != "":
+        try:
+            nuevo_stock = int(stock_str)
+            diferencia = nuevo_stock - producto.stock_actual
+            if diferencia != 0:
+                MovimientoProducto.objects.create(
+                    producto=producto,
+                    tipo='entrada' if diferencia > 0 else 'venta',
+                    cantidad=abs(diferencia),
+                    monto_total=Decimal("0"),
+                    observaciones=f"Ajuste manual de stock ({producto.stock_actual} -> {nuevo_stock})"
+                )
+                producto.stock_actual = nuevo_stock
+        except ValueError:
+            pass
+            
+    producto.save()
+    messages.success(request, f"Producto '{producto.nombre}' actualizado.")
+    return redirect("panel_inventario")
+
+
+@require_POST
+def panel_producto_eliminar(request, id_producto):
+    producto = get_object_or_404(Producto, id_producto=id_producto)
+    producto.activo = False
+    producto.save()
+    messages.success(request, f"Producto '{producto.nombre}' quitado del estante.")
+    return redirect("panel_inventario")
+
+
+@require_POST
+def panel_producto_agregar_stock(request):
+    """
+    Registra una entrada / reposición de mercadería (ej. 'pusimos 12 medias').
+    """
+    id_producto = request.POST.get("id_producto")
+    cantidad_str = request.POST.get("cantidad", "0").strip()
+    costo_str = request.POST.get("monto_total", "0").replace(".", "").replace(",", "").strip()
+    observaciones = request.POST.get("observaciones", "").strip()
+    fecha_str = request.POST.get("fecha")
+    
+    producto = get_object_or_404(Producto, id_producto=id_producto)
+    
+    try:
+        cantidad = int(cantidad_str)
+    except ValueError:
+        cantidad = 0
+        
+    if cantidad <= 0:
+        messages.error(request, "La cantidad a agregar debe ser mayor a 0.")
+        return redirect("panel_inventario")
+        
+    try:
+        costo_total = Decimal(costo_str)
+    except (InvalidOperation, ValueError):
+        costo_total = Decimal("0")
+        
+    fecha = timezone.localdate()
+    if fecha_str:
+        try:
+            fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    producto.stock_actual += cantidad
+    producto.save()
+    
+    MovimientoProducto.objects.create(
+        producto=producto,
+        tipo='entrada',
+        cantidad=cantidad,
+        precio_unitario=Decimal("0"),
+        monto_total=costo_total,
+        fecha=fecha,
+        observaciones=observaciones or "Reposición de stock"
+    )
+    
+    if costo_total > 0:
+        Gasto.objects.create(
+            fecha=fecha,
+            categoria='compra_stock',
+            descripcion=f"Compra/Reposición de {cantidad}x {producto.nombre}",
+            monto=costo_total,
+            metodo_pago='efectivo',
+            observaciones=observaciones
+        )
+        
+    messages.success(request, f"Se agregaron {cantidad} unidades a '{producto.nombre}'. Stock actual: {producto.stock_actual}.")
+    return redirect("panel_inventario")
+
+
+@require_POST
+def panel_producto_registrar_venta(request):
+    """
+    Registra la venta de un producto (descuenta stock e ingresa monto).
+    """
+    id_producto = request.POST.get("id_producto")
+    cantidad_str = request.POST.get("cantidad", "1").strip()
+    precio_str = request.POST.get("precio_unitario", "0").replace(".", "").replace(",", "").strip()
+    metodo_pago = request.POST.get("metodo_pago", "efectivo")
+    id_alumno = request.POST.get("id_alumno")
+    cliente_nombre = request.POST.get("cliente_nombre", "").strip()
+    fecha_str = request.POST.get("fecha")
+    observaciones = request.POST.get("observaciones", "").strip()
+    
+    producto = get_object_or_404(Producto, id_producto=id_producto)
+    
+    try:
+        cantidad = int(cantidad_str)
+    except ValueError:
+        cantidad = 1
+        
+    if cantidad <= 0:
+        messages.error(request, "La cantidad a vender debe ser mayor a 0.")
+        return redirect("panel_inventario")
+        
+    if producto.stock_actual < cantidad:
+        messages.error(request, f"Stock insuficiente para '{producto.nombre}'. Solo quedan {producto.stock_actual} disponibles.")
+        return redirect("panel_inventario")
+        
+    try:
+        precio_unitario = Decimal(precio_str)
+    except (InvalidOperation, ValueError):
+        precio_unitario = producto.precio_venta
+        
+    monto_total = precio_unitario * cantidad
+    
+    fecha = timezone.localdate()
+    if fecha_str:
+        try:
+            fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    alumno = None
+    if id_alumno:
+        alumno = Alumno.objects.filter(id_alumno=id_alumno).first()
+        if alumno and not cliente_nombre:
+            cliente_nombre = f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}"
+            
+    producto.stock_actual -= cantidad
+    producto.save()
+    
+    MovimientoProducto.objects.create(
+        producto=producto,
+        tipo='venta',
+        cantidad=cantidad,
+        precio_unitario=precio_unitario,
+        monto_total=monto_total,
+        metodo_pago=metodo_pago,
+        id_alumno=alumno,
+        cliente_nombre=cliente_nombre or "Cliente General",
+        fecha=fecha,
+        observaciones=observaciones
+    )
+    
+    messages.success(request, f"Venta registrada: {cantidad}x {producto.nombre} por Gs. {int(monto_total):,}. Quedan {producto.stock_actual} en stock.".replace(",", "."))
+    return redirect("panel_inventario")
+
+
+@require_POST
+def panel_producto_movimiento_eliminar(request, id_movimiento):
+    mov = get_object_or_404(MovimientoProducto, id_movimiento=id_movimiento)
+    if mov.tipo == 'entrada':
+        mov.producto.stock_actual = max(0, mov.producto.stock_actual - mov.cantidad)
+    elif mov.tipo == 'venta':
+        mov.producto.stock_actual += mov.cantidad
+    mov.producto.save()
+    
+    mov.delete()
+    messages.success(request, "Movimiento eliminado y stock reajustado.")
+    return redirect("panel_inventario")
+
+
+# ==========================================
+# MÓDULO DE GASTOS Y SERVICIOS
+# ==========================================
+
+def panel_gastos(request):
+    """
+    Control de gastos operativos del estudio: servicios básicos, mantenimientos, insumos, etc.
+    """
+    mes_str = request.GET.get("mes")
+    if mes_str:
+        try:
+            mes_actual = datetime.strptime(mes_str, "%Y-%m").date()
+        except ValueError:
+            mes_actual = timezone.now().date().replace(day=1)
+    else:
+        mes_actual = timezone.now().date().replace(day=1)
+        
+    import calendar
+    _, last_day = calendar.monthrange(mes_actual.year, mes_actual.month)
+    fin_mes = mes_actual.replace(day=last_day)
+    
+    gastos = Gasto.objects.filter(fecha__gte=mes_actual, fecha__lte=fin_mes)
+    
+    categoria_filtro = request.GET.get("categoria", "")
+    if categoria_filtro:
+        gastos = gastos.filter(categoria=categoria_filtro)
+        
+    gastos = gastos.order_by("-fecha", "-id_gasto")
+    
+    total_gastos = gastos.aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    
+    gastos_mes_completo = Gasto.objects.filter(fecha__gte=mes_actual, fecha__lte=fin_mes)
+    total_servicios = gastos_mes_completo.filter(categoria="servicios").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_mantenimiento = gastos_mes_completo.filter(categoria="mantenimiento").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_insumos = gastos_mes_completo.filter(categoria="insumos").aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    total_otros = gastos_mes_completo.exclude(categoria__in=["servicios", "mantenimiento", "insumos"]).aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    
+    desglose_cat = gastos_mes_completo.values("categoria").annotate(total=Sum("monto")).order_by("-total")
+    cat_dict = dict(Gasto.CATEGORIA_CHOICES)
+    chart_cat_labels = [cat_dict.get(d["categoria"], d["categoria"]) for d in desglose_cat]
+    chart_cat_data = [float(d["total"]) for d in desglose_cat]
+    
+    context = {
+        "mes_actual": mes_actual,
+        "gastos": gastos,
+        "categoria_filtro": categoria_filtro,
+        "categorias": Gasto.CATEGORIA_CHOICES,
+        "metodos_pago": Gasto.METODO_PAGO_CHOICES,
+        "total_gastos": total_gastos,
+        "total_servicios": total_servicios,
+        "total_mantenimiento": total_mantenimiento,
+        "total_insumos": total_insumos,
+        "total_otros": total_otros,
+        "chart_cat_labels_json": json.dumps(chart_cat_labels),
+        "chart_cat_data_json": json.dumps(chart_cat_data),
+        "hoy": timezone.localdate(),
+    }
+    return render(request, "admin_panel/gastos/lista.html", context)
+
+
+@require_POST
+def panel_gasto_registrar(request):
+    fecha_str = request.POST.get("fecha")
+    categoria = request.POST.get("categoria", "servicios")
+    descripcion = request.POST.get("descripcion", "").strip()
+    monto_str = request.POST.get("monto", "0").replace(".", "").replace(",", "").strip()
+    metodo_pago = request.POST.get("metodo_pago", "transferencia")
+    nro_comprobante = request.POST.get("nro_comprobante", "").strip()
+    observaciones = request.POST.get("observaciones", "").strip()
+    
+    if not descripcion:
+        messages.error(request, "Debes ingresar una descripción del gasto.")
+        return redirect("panel_gastos")
+        
+    try:
+        monto = Decimal(monto_str)
+    except (InvalidOperation, ValueError):
+        monto = Decimal("0")
+        
+    if monto <= 0:
+        messages.error(request, "El monto del gasto debe ser mayor a 0.")
+        return redirect("panel_gastos")
+        
+    fecha = timezone.localdate()
+    if fecha_str:
+        try:
+            fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    Gasto.objects.create(
+        fecha=fecha,
+        categoria=categoria,
+        descripcion=descripcion,
+        monto=monto,
+        metodo_pago=metodo_pago,
+        nro_comprobante=nro_comprobante if nro_comprobante else None,
+        observaciones=observaciones if observaciones else None
+    )
+    
+    messages.success(request, f"Gasto registrado: '{descripcion}' por Gs. {int(monto):,}.".replace(",", "."))
+    mes_redirect = fecha.strftime("%Y-%m")
+    return redirect(f"/panel/gastos/?mes={mes_redirect}")
+
+
+@require_POST
+def panel_gasto_editar(request, id_gasto):
+    gasto = get_object_or_404(Gasto, id_gasto=id_gasto)
+    
+    fecha_str = request.POST.get("fecha")
+    categoria = request.POST.get("categoria")
+    descripcion = request.POST.get("descripcion", "").strip()
+    monto_str = request.POST.get("monto", "0").replace(".", "").replace(",", "").strip()
+    metodo_pago = request.POST.get("metodo_pago")
+    nro_comprobante = request.POST.get("nro_comprobante", "").strip()
+    observaciones = request.POST.get("observaciones", "").strip()
+    
+    if descripcion:
+        gasto.descripcion = descripcion
+    if categoria:
+        gasto.categoria = categoria
+    if metodo_pago:
+        gasto.metodo_pago = metodo_pago
+        
+    try:
+        gasto.monto = Decimal(monto_str)
+    except (InvalidOperation, ValueError):
+        pass
+        
+    if fecha_str:
+        try:
+            gasto.fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    gasto.nro_comprobante = nro_comprobante if nro_comprobante else None
+    gasto.observaciones = observaciones if observaciones else None
+    gasto.save()
+    
+    messages.success(request, "Gasto actualizado correctamente.")
+    mes_redirect = gasto.fecha.strftime("%Y-%m")
+    return redirect(f"/panel/gastos/?mes={mes_redirect}")
+
+
+@require_POST
+def panel_gasto_eliminar(request, id_gasto):
+    gasto = get_object_or_404(Gasto, id_gasto=id_gasto)
+    mes_redirect = gasto.fecha.strftime("%Y-%m")
+    gasto.delete()
+    messages.success(request, "Gasto eliminado.")
+    return redirect(f"/panel/gastos/?mes={mes_redirect}")

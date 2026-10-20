@@ -708,3 +708,86 @@ class HonorarioInstructor(models.Model):
 
     def __str__(self):
         return f"{self.nombre_profesora} - {self.fecha} ({self.turno}) - {self.monto_total}"
+
+
+class Producto(models.Model):
+    """
+    Representa un producto para la venta o inventario en el estudio (medias, mats, toallas, etc.).
+    """
+    id_producto = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=150)
+    descripcion = models.TextField(blank=True, null=True)
+    precio_venta = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    stock_actual = models.IntegerField(default=0)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nombre} (Stock: {self.stock_actual})"
+
+
+class MovimientoProducto(models.Model):
+    """
+    Registra entradas (compras de stock) y salidas (ventas) de productos.
+    """
+    TIPO_CHOICES = [
+        ('entrada', 'Entrada / Reposición de Stock'),
+        ('venta', 'Venta / Salida'),
+    ]
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('tarjeta', 'Tarjeta'),
+        ('otro', 'Otro'),
+    ]
+
+    id_movimiento = models.AutoField(primary_key=True)
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='movimientos')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    cantidad = models.IntegerField(default=1)
+    precio_unitario = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    monto_total = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    metodo_pago = models.CharField(max_length=50, choices=METODO_PAGO_CHOICES, blank=True, null=True, default='efectivo')
+    id_alumno = models.ForeignKey('Alumno', on_delete=models.SET_NULL, blank=True, null=True)
+    cliente_nombre = models.CharField(max_length=150, blank=True, null=True)
+    fecha = models.DateField(default=timezone.now)
+    observaciones = models.TextField(blank=True, null=True)
+    creado_el = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.tipo.upper()}: {self.cantidad}x {self.producto.nombre} - Gs. {self.monto_total}"
+
+
+class Gasto(models.Model):
+    """
+    Registra los gastos y egresos del estudio (servicios, mantenimientos, insumos, etc.).
+    """
+    CATEGORIA_CHOICES = [
+        ('servicios', 'Servicios Básicos (Luz, Agua, Internet)'),
+        ('mantenimiento', 'Mantenimiento y Reparaciones (Aires, Pintura, Camas)'),
+        ('insumos', 'Insumos y Limpieza'),
+        ('compra_stock', 'Compra de Mercadería / Stock'),
+        ('alquiler', 'Alquiler y Expensas'),
+        ('honorarios_extra', 'Honorarios / Mano de Obra'),
+        ('otros', 'Otros Gastos'),
+    ]
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('tarjeta', 'Tarjeta'),
+        ('debito_automatico', 'Débito Automático'),
+        ('otro', 'Otro'),
+    ]
+
+    id_gasto = models.AutoField(primary_key=True)
+    fecha = models.DateField(default=timezone.now)
+    categoria = models.CharField(max_length=50, choices=CATEGORIA_CHOICES, default='servicios')
+    descripcion = models.CharField(max_length=255)
+    monto = models.DecimalField(max_digits=12, decimal_places=0)
+    metodo_pago = models.CharField(max_length=50, choices=METODO_PAGO_CHOICES, default='transferencia')
+    nro_comprobante = models.CharField(max_length=100, blank=True, null=True)
+    observaciones = models.TextField(blank=True, null=True)
+    creado_el = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_categoria_display()} - Gs. {self.monto} ({self.fecha})"

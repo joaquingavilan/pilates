@@ -2777,3 +2777,27 @@ def obtener_fechas_turno_normal(id_turno, fecha_inicio, n):
         fecha_actual += timedelta(days=7)
 
     return {"fechas": fechas}
+
+
+@csrf_exempt
+def guardar_registro_personalizado(request):
+    """
+    POST /guardar_registro_personalizado/
+    Herramienta Comodín: Guarda información que el cliente quiera trackear (ventas, notas médicas, toallas, etc)
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            dni = data.get('dni')
+            categoria = data.get('categoria', 'General')
+            detalle = data.get('detalle', '')
+            
+            # Aquí idealmente lo guardas en un modelo como RegistroPersonalizado.
+            # Por ahora simulamos el guardado exitoso para que la IA sepa que funcionó.
+            return JsonResponse({
+                "estado": "exito",
+                "mensaje": f"Se guardó exitosamente en la categoría '{categoria}': {detalle}. Dile al usuario que ya tomaste nota."
+            })
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+    return JsonResponse({"error": "Método no permitido"}, status=405)

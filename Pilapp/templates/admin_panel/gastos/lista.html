@@ -1,0 +1,356 @@
+{% extends 'admin_panel/base.html' %}
+{% load humanize %}
+
+{% block title %}Gastos y Servicios{% endblock %}
+
+{% block content %}
+<style>
+    .badge-cat-servicios { background-color: #cff4fc; color: #055160; font-weight: 600; }
+    .badge-cat-mantenimiento { background-color: #fff3cd; color: #664d03; font-weight: 600; }
+    .badge-cat-insumos { background-color: #e2d9f3; color: #491294; font-weight: 600; }
+    .badge-cat-alquiler { background-color: #d1e7dd; color: #0f5132; font-weight: 600; }
+    .badge-cat-compra_stock { background-color: #d2f4ea; color: #146c43; font-weight: 600; }
+    .badge-cat-otros { background-color: #e9ecef; color: #495057; font-weight: 600; }
+    
+    .table thead th {
+        background-color: #f8fafc;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+</style>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark"><i class="bi bi-receipt me-2 text-danger"></i>Control de Gastos y Servicios</h3>
+        <p class="text-muted mb-0">Registro de pagos de servicios (luz, agua, wifi), mantenimiento de aires, pintura y compras</p>
+    </div>
+    
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2 align-items-center bg-white p-1 rounded-3 shadow-sm border">
+            <input type="month" name="mes" value="{{ mes_actual|date:'Y-m' }}" class="form-control form-control-sm border-0 bg-light fw-medium">
+            <select name="categoria" class="form-select form-select-sm border-0 bg-light fw-medium" style="width: auto;">
+                <option value="">Todas las categorías</option>
+                {% for code, label in categorias %}
+                <option value="{{ code }}" {% if categoria_filtro == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-dark px-3 rounded-2 fw-semibold">Filtrar</button>
+        </form>
+
+        <button class="btn btn-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRegistrarGasto">
+            <i class="bi bi-plus-circle me-1"></i>+ Registrar Gasto
+        </button>
+    </div>
+</div>
+
+<!-- Tarjetas KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card danger h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">Total Gastos ({{ mes_actual|date:"F Y" }})</span>
+                <h3 class="stat-number mb-0 text-danger">Gs. {{ total_gastos|floatformat:"0"|intcomma }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card info h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">💡 Servicios Básicos</span>
+                <h4 class="stat-number mb-0 text-info">Gs. {{ total_servicios|floatformat:"0"|intcomma }}</h4>
+                <small class="text-muted" style="font-size: 0.75rem;">Luz ANDE, Agua, Internet</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">🛠️ Mantenimiento</span>
+                <h4 class="stat-number mb-0 text-warning">Gs. {{ total_mantenimiento|floatformat:"0"|intcomma }}</h4>
+                <small class="text-muted" style="font-size: 0.75rem;">Aires, Pintura, Reformers</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">📦 Insumos & Otros</span>
+                <h4 class="stat-number mb-0 text-secondary">Gs. {{ total_insumos|add:total_otros|floatformat:"0"|intcomma }}</h4>
+                <small class="text-muted" style="font-size: 0.75rem;">Limpieza, compras y varios</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico de distribución de gastos si existen datos -->
+<div class="row g-4 mb-4" id="seccionGraficoGastos" style="display: none;">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-pie-chart me-2 text-primary"></i>Distribución de Gastos del Mes</h6>
+            <div style="max-height: 250px;" class="d-flex justify-content-center">
+                <canvas id="chartGastosCat"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4 h-100 d-flex flex-column justify-content-center bg-light">
+            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle me-2 text-info"></i>Resumen de Salidas</h6>
+            <p class="text-muted small mb-3">En el mes de <strong>{{ mes_actual|date:"F Y" }}</strong> se han registrado salidas por un valor total de <strong>Gs. {{ total_gastos|floatformat:"0"|intcomma }}</strong>.</p>
+            <div class="d-flex gap-2">
+                <a href="{% url 'panel_resumen_pagos' %}?mes={{ mes_actual|date:'Y-m' }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-graph-up me-1"></i>Ver Balance en Resumen de Facturación
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Gastos -->
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-list-check me-2 text-danger"></i>Detalle de Gastos Registrados</h5>
+        <span class="badge bg-light text-muted border px-2 py-1">{{ gastos.count }} registros</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle table-hover mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Fecha</th>
+                    <th>Categoría</th>
+                    <th>Descripción / Concepto</th>
+                    <th>Monto</th>
+                    <th>Forma de Pago</th>
+                    <th>N° Comprobante</th>
+                    <th>Observaciones</th>
+                    <th class="text-end pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for g in gastos %}
+                <tr>
+                    <td class="ps-4 text-nowrap fw-medium text-dark">{{ g.fecha|date:"d/m/Y" }}</td>
+                    <td>
+                        <span class="badge px-2 py-1 rounded-pill 
+                            {% if g.categoria == 'servicios' %}badge-cat-servicios
+                            {% elif g.categoria == 'mantenimiento' %}badge-cat-mantenimiento
+                            {% elif g.categoria == 'insumos' %}badge-cat-insumos
+                            {% elif g.categoria == 'alquiler' %}badge-cat-alquiler
+                            {% elif g.categoria == 'compra_stock' %}badge-cat-compra_stock
+                            {% else %}badge-cat-otros{% endif %}">
+                            {{ g.get_categoria_display }}
+                        </span>
+                    </td>
+                    <td class="fw-bold text-dark">{{ g.descripcion }}</td>
+                    <td class="fw-bold text-danger text-nowrap">Gs. {{ g.monto|floatformat:"0"|intcomma }}</td>
+                    <td class="text-capitalize small text-muted">{{ g.get_metodo_pago_display }}</td>
+                    <td class="small text-muted">{{ g.nro_comprobante|default:"-" }}</td>
+                    <td class="small text-muted text-truncate" style="max-width: 200px;">{{ g.observaciones|default:"-" }}</td>
+                    <td class="text-end pe-4 text-nowrap">
+                        <button class="btn btn-sm btn-outline-secondary p-1 px-2 me-1" data-bs-toggle="modal" data-bs-target="#modalEditarGasto{{ g.id_gasto }}" title="Editar gasto">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="post" action="{% url 'panel_gasto_eliminar' g.id_gasto %}" onsubmit="return confirm('¿Eliminar este gasto?');" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger p-1 px-2" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+
+                <!-- Modal Editar Gasto -->
+                <div class="modal fade" id="modalEditarGasto{{ g.id_gasto }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content border-0 shadow">
+                            <div class="modal-header">
+                                <h5 class="modal-title fw-bold">Editar Gasto</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="post" action="{% url 'panel_gasto_editar' g.id_gasto %}">
+                                {% csrf_token %}
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            <label class="form-label fw-semibold">Fecha</label>
+                                            <input type="date" name="fecha" value="{{ g.fecha|date:'Y-m-d' }}" class="form-control" required>
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            <label class="form-label fw-semibold">Categoría</label>
+                                            <select name="categoria" class="form-select" required>
+                                                {% for code, label in categorias %}
+                                                <option value="{{ code }}" {% if g.categoria == code %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Descripción / Concepto</label>
+                                        <input type="text" name="descripcion" value="{{ g.descripcion }}" class="form-control" required>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            <label class="form-label fw-semibold">Monto (Gs.)</label>
+                                            <input type="number" name="monto" value="{{ g.monto|floatformat:'0' }}" class="form-control" required>
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            <label class="form-label fw-semibold">Forma de Pago</label>
+                                            <select name="metodo_pago" class="form-select" required>
+                                                {% for code, label in metodos_pago %}
+                                                <option value="{{ code }}" {% if g.metodo_pago == code %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">N° Comprobante / Factura</label>
+                                        <input type="text" name="nro_comprobante" value="{{ g.nro_comprobante|default:'' }}" class="form-control">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Observaciones</label>
+                                        <textarea name="observaciones" class="form-control" rows="2">{{ g.observaciones|default:'' }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-primary fw-semibold">Guardar Cambios</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <i class="bi bi-wallet2 text-muted" style="font-size: 2.5rem;"></i>
+                        <p class="mt-2 mb-2">No hay gastos registrados en este período.</p>
+                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRegistrarGasto">
+                            <i class="bi bi-plus-circle me-1"></i>Registrar el primer gasto
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= MODAL REGISTRAR GASTO ================= -->
+<div class="modal fade" id="modalRegistrarGasto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-receipt me-2"></i>Registrar Nuevo Gasto / Servicio</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'panel_gasto_registrar' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Fecha <span class="text-danger">*</span></label>
+                            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" class="form-control" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Categoría <span class="text-danger">*</span></label>
+                            <select name="categoria" class="form-select" required>
+                                {% for code, label in categorias %}
+                                <option value="{{ code }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descripción / Concepto <span class="text-danger">*</span></label>
+                        <input type="text" name="descripcion" class="form-control" placeholder="Ej: Factura ANDE, Service 2 aires sala 1, Pintura recepción" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Monto (Gs.) <span class="text-danger">*</span></label>
+                            <input type="number" name="monto" class="form-control" placeholder="Ej: 350000" min="1" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Forma de Pago <span class="text-danger">*</span></label>
+                            <select name="metodo_pago" class="form-select" required>
+                                {% for code, label in metodos_pago %}
+                                <option value="{{ code }}" {% if code == 'transferencia' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">N° Comprobante / Factura (opcional)</label>
+                        <input type="text" name="nro_comprobante" class="form-control" placeholder="Ej: Fac 001-002-123456">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Detalles adicionales</label>
+                        <textarea name="observaciones" class="form-control" rows="2" placeholder="Técnico, proveedor o notas útiles..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger fw-semibold">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var catLabels = {{ chart_cat_labels_json|safe }};
+    var catData = {{ chart_cat_data_json|safe }};
+    
+    if (catData && catData.length > 0) {
+        document.getElementById('seccionGraficoGastos').style.display = 'flex';
+        var ctx = document.getElementById('chartGastosCat').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    data: catData,
+                    backgroundColor: [
+                        '#0dcaf0', '#ffc107', '#6f42c1', '#198754', '#fd7e14', '#20c997', '#6c757d'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                var val = context.parsed || 0;
+                                return ' ' + context.label + ': Gs. ' + val.toLocaleString('es-PY');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

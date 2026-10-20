@@ -45,6 +45,21 @@ urlpatterns = [
     # Prospectos
     path('prospectos/', views_panel.panel_prospectos, name='panel_prospectos'),
 
+    # Inventario / Stock
+    path('inventario/', views_panel.panel_inventario, name='panel_inventario'),
+    path('inventario/crear/', views_panel.panel_producto_crear, name='panel_producto_crear'),
+    path('inventario/<int:id_producto>/editar/', views_panel.panel_producto_editar, name='panel_producto_editar'),
+    path('inventario/<int:id_producto>/eliminar/', views_panel.panel_producto_eliminar, name='panel_producto_eliminar'),
+    path('inventario/stock/agregar/', views_panel.panel_producto_agregar_stock, name='panel_producto_agregar_stock'),
+    path('inventario/venta/registrar/', views_panel.panel_producto_registrar_venta, name='panel_producto_registrar_venta'),
+    path('inventario/movimiento/<int:id_movimiento>/eliminar/', views_panel.panel_producto_movimiento_eliminar, name='panel_producto_movimiento_eliminar'),
+
+    # Gastos y Servicios
+    path('gastos/', views_panel.panel_gastos, name='panel_gastos'),
+    path('gastos/registrar/', views_panel.panel_gasto_registrar, name='panel_gasto_registrar'),
+    path('gastos/<int:id_gasto>/editar/', views_panel.panel_gasto_editar, name='panel_gasto_editar'),
+    path('gastos/<int:id_gasto>/eliminar/', views_panel.panel_gasto_eliminar, name='panel_gasto_eliminar'),
+
     # API endpoints
     path('api/clase/<int:id_clase>/alumnos/', views_panel.api_clase_alumnos, name='api_clase_alumnos'),
     path("api/calendario/", views_panel.api_calendario, name="api_calendario"),

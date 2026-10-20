@@ -1,39 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-
-# Virtual Environment
-.venv/
-venv/
-env/
-ENV/
-
-# IDE / OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Environment variables
 .env
-.env.*
-!.env.example
-
-# Temporary / Scratch patch scripts
-patch*.py
-fix_*.py
-create_*.py
-update_*.py
-test_*.py
-remove_*.py
-*.tmp
-*.bak
-*.swp
+*.sqlite3
+db.sqlite3
+__pycache__/
+*__pycache__*
+*.py[cod]
+venv/
+.venv/
