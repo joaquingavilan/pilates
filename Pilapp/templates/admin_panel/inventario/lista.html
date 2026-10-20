@@ -1,0 +1,512 @@
+{% extends 'admin_panel/base.html' %}
+{% load humanize %}
+
+{% block title %}Inventario y Stock{% endblock %}
+
+{% block content %}
+<style>
+    .product-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .product-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    }
+    .stock-badge-good {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        font-weight: 600;
+    }
+    .stock-badge-low {
+        background-color: #fff3cd;
+        color: #664d03;
+        font-weight: 600;
+    }
+    .stock-badge-empty {
+        background-color: #f8d7da;
+        color: #842029;
+        font-weight: 600;
+    }
+    .table thead th {
+        background-color: #f8fafc;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark"><i class="bi bi-box-seam me-2 text-primary"></i>Inventario y Stock</h3>
+        <p class="text-muted mb-0">Control del estante de productos, reposición y registro de ventas (medias, mats, toallas)</p>
+    </div>
+    
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNuevoProducto">
+            <i class="bi bi-plus-circle me-1"></i>Nuevo Producto
+        </button>
+        <button class="btn btn-success fw-semibold" data-bs-toggle="modal" data-bs-target="#modalAgregarStock">
+            <i class="bi bi-box-arrow-in-down me-1"></i>Cargar Stock (Entrada)
+        </button>
+        <button class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRegistrarVenta">
+            <i class="bi bi-cart-check me-1"></i>Registrar Venta
+        </button>
+    </div>
+</div>
+
+<!-- Tarjetas KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card info h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">Productos en Catálogo</span>
+                <h3 class="stat-number mb-0">{{ total_productos }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">Unidades Totales en Stock</span>
+                <h3 class="stat-number mb-0 text-success">{{ total_unidades }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">Stock Bajo (≤ 3 un.)</span>
+                <h3 class="stat-number mb-0 text-warning">{{ productos_bajo_stock.count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card primary h-100">
+            <div class="card-body">
+                <span class="text-muted small fw-bold text-uppercase">Ventas del Mes Actual</span>
+                <h4 class="stat-number mb-0 text-primary">Gs. {{ ventas_mes|floatformat:"0"|intcomma }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EL ESTANTE DE PRODUCTOS -->
+<div class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-shop me-2 text-secondary"></i>El Estante Disponible</h5>
+        <span class="badge bg-light text-muted border px-2 py-1">{{ productos.count }} artículos listados</span>
+    </div>
+
+    <div class="row g-4">
+        {% for p in productos %}
+        <div class="col-md-4 col-lg-3">
+            <div class="product-card p-3 h-100 d-flex flex-col justify-content-between">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge 
+                            {% if p.stock_actual > 5 %}stock-badge-good
+                            {% elif p.stock_actual > 0 %}stock-badge-low
+                            {% else %}stock-badge-empty{% endif %} px-2 py-1 rounded-pill">
+                            {% if p.stock_actual > 5 %}
+                                <i class="bi bi-check-circle me-1"></i>Stock: {{ p.stock_actual }} un.
+                            {% elif p.stock_actual > 0 %}
+                                <i class="bi bi-exclamation-triangle me-1"></i>Quedan: {{ p.stock_actual }} un.
+                            {% else %}
+                                <i class="bi bi-x-circle me-1"></i>Agotado (0 un.)
+                            {% endif %}
+                        </span>
+                        
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-link text-muted p-0" type="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                <li>
+                                    <button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalEditarProd{{ p.id_producto }}">
+                                        <i class="bi bi-pencil me-2 text-primary"></i>Editar producto
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="post" action="{% url 'panel_producto_eliminar' p.id_producto %}" onsubmit="return confirm('¿Quitar del estante este producto?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="bi bi-trash me-2"></i>Eliminar del estante
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold mb-1 text-dark">{{ p.nombre }}</h5>
+                    {% if p.descripcion %}
+                    <p class="text-muted small mb-2 text-truncate" title="{{ p.descripcion }}">{{ p.descripcion }}</p>
+                    {% else %}
+                    <p class="text-muted small mb-2">Sin descripción</p>
+                    {% endif %}
+
+                    <div class="bg-light p-2 rounded-3 mb-3 text-center">
+                        <span class="text-muted small d-block" style="font-size: 0.75rem;">PRECIO DE VENTA</span>
+                        <span class="fw-bold text-dark fs-5">Gs. {{ p.precio_venta|floatformat:"0"|intcomma }}</span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-auto">
+                    <button class="btn btn-sm btn-outline-success flex-fill fw-medium"
+                            onclick="abrirStockModal('{{ p.id_producto }}', '{{ p.nombre|escapejs }}')">
+                        <i class="bi bi-plus-lg me-1"></i>+ Stock
+                    </button>
+                    <button class="btn btn-sm btn-primary flex-fill fw-medium"
+                            {% if p.stock_actual <= 0 %}disabled{% endif %}
+                            onclick="abrirVentaModal('{{ p.id_producto }}', '{{ p.nombre|escapejs }}', '{{ p.precio_venta }}', '{{ p.stock_actual }}')">
+                        <i class="bi bi-bag-check me-1"></i>Vender
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Editar Producto -->
+            <div class="modal fade" id="modalEditarProd{{ p.id_producto }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold">Editar {{ p.nombre }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="{% url 'panel_producto_editar' p.id_producto %}">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Nombre del Producto</label>
+                                    <input type="text" name="nombre" value="{{ p.nombre }}" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Descripción (opcional)</label>
+                                    <textarea name="descripcion" class="form-control" rows="2">{{ p.descripcion|default:'' }}</textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label fw-semibold">Precio de Venta (Gs.)</label>
+                                        <input type="number" name="precio_venta" value="{{ p.precio_venta|floatformat:'0' }}" class="form-control" required>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label fw-semibold">Stock Actual</label>
+                                        <input type="number" name="stock_actual" value="{{ p.stock_actual }}" class="form-control" required>
+                                        <small class="text-muted" style="font-size: 0.75rem;">Modifica directamente el inventario</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary fw-semibold">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <i class="bi bi-box-seam text-muted" style="font-size: 3rem;"></i>
+            <h5 class="mt-3 text-muted">Aún no hay productos en el estante.</h5>
+            <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#modalNuevoProducto">
+                <i class="bi bi-plus-circle me-1"></i>Agregar Primer Producto
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- HISTORIAL DE MOVIMIENTOS Y VENTAS -->
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-clock-history me-2 text-primary"></i>Historial de Movimientos y Ventas</h5>
+        <small class="text-muted">Últimos 50 movimientos registrados</small>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle table-hover mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Fecha</th>
+                    <th>Tipo</th>
+                    <th>Producto</th>
+                    <th class="text-center">Cant.</th>
+                    <th>Monto Total</th>
+                    <th>Cliente / Alumna</th>
+                    <th>Método</th>
+                    <th>Detalle / Nota</th>
+                    <th class="text-end pe-4">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimientos %}
+                <tr>
+                    <td class="ps-4 text-nowrap fw-medium text-dark">{{ m.fecha|date:"d/m/Y" }}</td>
+                    <td>
+                        {% if m.tipo == 'venta' %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                            <i class="bi bi-arrow-up-right me-1"></i>Venta
+                        </span>
+                        {% else %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                            <i class="bi bi-arrow-down-left me-1"></i>Reposición
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold text-dark">{{ m.producto.nombre }}</td>
+                    <td class="text-center fw-bold">{{ m.cantidad }} un.</td>
+                    <td class="fw-semibold {% if m.tipo == 'venta' %}text-success{% else %}text-muted{% endif %}">
+                        {% if m.monto_total > 0 %}
+                            Gs. {{ m.monto_total|floatformat:"0"|intcomma }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if m.id_alumno %}
+                            <a href="{% url 'panel_alumno_detalle' m.id_alumno.id_alumno %}" class="text-decoration-none fw-medium text-primary">
+                                <i class="bi bi-person me-1"></i>{{ m.id_alumno.id_persona.nombre }} {{ m.id_alumno.id_persona.apellido }}
+                            </a>
+                        {% elif m.cliente_nombre %}
+                            <span class="text-dark">{{ m.cliente_nombre }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-capitalize text-muted small">{{ m.metodo_pago|default:"-" }}</td>
+                    <td class="small text-muted text-truncate" style="max-width: 200px;">{{ m.observaciones|default:"-" }}</td>
+                    <td class="text-end pe-4">
+                        <form method="post" action="{% url 'panel_producto_movimiento_eliminar' m.id_movimiento %}" onsubmit="return confirm('¿Eliminar este registro y restaurar el stock?');" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger p-1 px-2" title="Eliminar movimiento">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">No hay movimientos o ventas registradas aún.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= MODALES ================= -->
+
+<!-- Modal Nuevo Producto -->
+<div class="modal fade" id="modalNuevoProducto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2 text-primary"></i>Nuevo Producto al Estante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'panel_producto_crear' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre del Producto <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Medias Antideslizantes, Yoga Mat, Toalla" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descripción o detalle</label>
+                        <textarea name="descripcion" class="form-control" rows="2" placeholder="Color, tamaño, características..."></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Precio de Venta (Gs.) <span class="text-danger">*</span></label>
+                            <input type="number" name="precio_venta" class="form-control" placeholder="Ej: 40000" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Stock Inicial <span class="text-danger">*</span></label>
+                            <input type="number" name="stock_actual" class="form-control" placeholder="Ej: 12" value="0" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">Agregar al Estante</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cargar Stock (Entrada) -->
+<div class="modal fade" id="modalAgregarStock" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-box-arrow-in-down me-2"></i>Cargar Stock (Reposición)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'panel_producto_agregar_stock' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Producto <span class="text-danger">*</span></label>
+                        <select name="id_producto" id="stockSelectProd" class="form-select" required>
+                            <option value="">-- Selecciona el producto --</option>
+                            {% for p in productos %}
+                            <option value="{{ p.id_producto }}">{{ p.nombre }} (Stock actual: {{ p.stock_actual }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Cantidad agregada <span class="text-danger">*</span></label>
+                            <input type="number" name="cantidad" class="form-control" placeholder="Ej: 12" min="1" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Fecha</label>
+                            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Costo total de compra (Gs., opcional)</label>
+                        <input type="number" name="monto_total" class="form-control" placeholder="0">
+                        <small class="text-muted">Si ingresas un costo, se guardará automáticamente también en Gastos como mercadería.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Observación / Proveedor</label>
+                        <input type="text" name="observaciones" class="form-control" placeholder="Ej: Compra mayorista de 12 pares">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success fw-semibold">Sumar al Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registrar Venta -->
+<div class="modal fade" id="modalRegistrarVenta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cart-check me-2"></i>Registrar Venta de Producto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'panel_producto_registrar_venta' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Producto <span class="text-danger">*</span></label>
+                        <select name="id_producto" id="ventaSelectProd" class="form-select" onchange="actualizarPrecioVenta()" required>
+                            <option value="">-- Selecciona el producto --</option>
+                            {% for p in productos %}
+                            <option value="{{ p.id_producto }}" data-precio="{{ p.precio_venta|floatformat:'0' }}" data-stock="{{ p.stock_actual }}">
+                                {{ p.nombre }} (Stock: {{ p.stock_actual }} un. - Gs. {{ p.precio_venta|floatformat:"0"|intcomma }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Cantidad <span class="text-danger">*</span></label>
+                            <input type="number" name="cantidad" id="ventaCantidad" class="form-control" value="1" min="1" oninput="calcularTotalVenta()" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Precio Unitario (Gs.)</label>
+                            <input type="number" name="precio_unitario" id="ventaPrecioUnit" class="form-control" oninput="calcularTotalVenta()" required>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-secondary py-2 d-flex justify-content-between align-items-center mb-3">
+                        <span class="small fw-semibold text-muted">TOTAL A COBRAR:</span>
+                        <span class="fw-bold fs-5 text-dark" id="ventaTotalDisplay">Gs. 0</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Asociar a Alumna (opcional)</label>
+                        <select name="id_alumno" class="form-select">
+                            <option value="">-- Cliente General / Venta de paso --</option>
+                            {% for a in alumnos %}
+                            <option value="{{ a.id_alumno }}">{{ a.id_persona.nombre }} {{ a.id_persona.apellido }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Método de Cobro</label>
+                            <select name="metodo_pago" class="form-select">
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="tarjeta">Tarjeta</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-semibold">Fecha</label>
+                            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nota / Observación</label>
+                        <input type="text" name="observaciones" class="form-control" placeholder="Ej: Medias negras talle M">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">Confirmar Venta y Cobro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirStockModal(id, nombre) {
+    var select = document.getElementById('stockSelectProd');
+    if (select) {
+        select.value = id;
+    }
+    var modal = new bootstrap.Modal(document.getElementById('modalAgregarStock'));
+    modal.show();
+}
+
+function abrirVentaModal(id, nombre, precio, stock) {
+    var select = document.getElementById('ventaSelectProd');
+    if (select) {
+        select.value = id;
+    }
+    document.getElementById('ventaPrecioUnit').value = parseInt(precio) || 0;
+    document.getElementById('ventaCantidad').value = 1;
+    calcularTotalVenta();
+    var modal = new bootstrap.Modal(document.getElementById('modalRegistrarVenta'));
+    modal.show();
+}
+
+function actualizarPrecioVenta() {
+    var select = document.getElementById('ventaSelectProd');
+    var option = select.options[select.selectedIndex];
+    if (option && option.dataset.precio) {
+        document.getElementById('ventaPrecioUnit').value = option.dataset.precio;
+    }
+    calcularTotalVenta();
+}
+
+function calcularTotalVenta() {
+    var cant = parseInt(document.getElementById('ventaCantidad').value) || 0;
+    var precio = parseInt(document.getElementById('ventaPrecioUnit').value) || 0;
+    var total = cant * precio;
+    document.getElementById('ventaTotalDisplay').innerText = 'Gs. ' + total.toLocaleString('es-PY');
+}
+</script>
+
+{% endblock %}

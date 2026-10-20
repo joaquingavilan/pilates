@@ -1,7 +1,7 @@
 {% extends 'admin_panel/base.html' %}
 {% load humanize %}
 
-{% block title %}Resumen de Facturación{% endblock %}
+{% block title %}Resumen de Facturación y Finanzas{% endblock %}
 
 {% block content %}
 <style>
@@ -17,7 +17,7 @@
         border-radius: 16px;
         border: 1px solid rgba(0,0,0,0.04);
         box-shadow: 0 8px 20px rgba(0,0,0,0.03);
-        padding: 1.5rem;
+        padding: 1.25rem;
     }
     .table thead th {
         background-color: #f8fafc;
@@ -53,10 +53,15 @@
     }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
     <div>
-        <h4 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">Resumen de Facturación</h4>
-        <small class="text-muted">Control de ingresos mensuales</small>
+        <h4 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">
+            <i class="bi bi-graph-up-arrow me-2 text-primary"></i>Resumen de Facturación y Finanzas
+        </h4>
+        <small class="text-muted">Control de ingresos por clases, ventas, gastos y gráficos de evolución mensual</small>
     </div>
     
     <form method="get" class="d-flex gap-2 align-items-center bg-white p-2 rounded-3 shadow-sm border border-light">
@@ -80,31 +85,86 @@
 </div>
 {% endif %}
 
-<div class="row g-4 mb-5">
-    <div class="col-md-4">
-        <div class="summary-card h-100 text-center">
-            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Total General</h6>
-            <h3 class="mb-0 fw-bold" style="color: #1e293b; font-family: 'Outfit', sans-serif;">Gs. {{ total_general|floatformat:"0"|intcomma }}</h3>
+<!-- CARDS DE TOTALES -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="summary-card h-100 text-center border-top border-4 border-primary">
+            <h6 class="text-muted fw-bold text-uppercase mb-2" style="font-size: 0.75rem;">Facturado en Clases</h6>
+            <h4 class="mb-1 fw-bold text-dark" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_general|floatformat:"0"|intcomma }}</h4>
+            <div class="small text-muted mt-2 d-flex justify-content-around">
+                <span><i class="bi bi-cash text-success me-1"></i>Ef: {{ total_efectivo|floatformat:"0"|intcomma }}</span>
+                <span><i class="bi bi-bank text-primary me-1"></i>Tr: {{ total_transferencia|floatformat:"0"|intcomma }}</span>
+            </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="summary-card h-100 text-center">
-            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Efectivo</h6>
-            <h4 class="mb-0 fw-bold text-success" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_efectivo|floatformat:"0"|intcomma }}</h4>
+    <div class="col-md-3">
+        <div class="summary-card h-100 text-center border-top border-4 border-info">
+            <h6 class="text-muted fw-bold text-uppercase mb-2" style="font-size: 0.75rem;">Ventas Tienda / Estante</h6>
+            <h4 class="mb-1 fw-bold text-info" style="font-family: 'Outfit', sans-serif;">Gs. {{ ventas_mes|floatformat:"0"|intcomma }}</h4>
+            <small class="text-muted">Medias, mats y accesorios</small>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="summary-card h-100 text-center">
-            <h6 class="text-muted fw-bold text-uppercase mb-3" style="font-size: 0.8rem;">Transferencia</h6>
-            <h4 class="mb-0 fw-bold text-primary" style="font-family: 'Outfit', sans-serif;">Gs. {{ total_transferencia|floatformat:"0"|intcomma }}</h4>
+    <div class="col-md-3">
+        <div class="summary-card h-100 text-center border-top border-4 border-danger">
+            <h6 class="text-muted fw-bold text-uppercase mb-2" style="font-size: 0.75rem;">Gastos y Honorarios</h6>
+            <h4 class="mb-1 fw-bold text-danger" style="font-family: 'Outfit', sans-serif;">Gs. {{ egresos_totales_mes|floatformat:"0"|intcomma }}</h4>
+            <div class="small text-muted mt-2 d-flex justify-content-around">
+                <span>Serv/Mant: {{ gastos_mes|floatformat:"0"|intcomma }}</span>
+                <span>Profes: {{ honorarios_mes|floatformat:"0"|intcomma }}</span>
+            </div>
         </div>
     </div>
-
+    <div class="col-md-3">
+        <div class="summary-card h-100 text-center border-top border-4 {% if balance_neto_mes >= 0 %}border-success{% else %}border-danger{% endif %}">
+            <h6 class="text-muted fw-bold text-uppercase mb-2" style="font-size: 0.75rem;">Balance Neto del Mes</h6>
+            <h4 class="mb-1 fw-bold {% if balance_neto_mes >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-family: 'Outfit', sans-serif;">
+                Gs. {{ balance_neto_mes|floatformat:"0"|intcomma }}
+            </h4>
+            <small class="text-muted">Ingresos Totales - Egresos</small>
+        </div>
+    </div>
 </div>
 
+<!-- ================= SECCIÓN DE GRÁFICOS (PLOTS) ================= -->
+<div class="row g-4 mb-5">
+    <!-- Gráfico 1: Evolución de Facturación Histórica -->
+    <div class="col-lg-7">
+        <div class="summary-card h-100 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Facturación Mensual (Últimos 6 Meses)</h6>
+                    <small class="text-muted">Evolución de ingresos totales por mes (en Guaraníes)</small>
+                </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+                <canvas id="chartFacturacionMensual"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico 2: Ingresos vs Egresos / Balance -->
+    <div class="col-lg-5">
+        <div class="summary-card h-100 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0"><i class="bi bi-arrow-left-right me-2 text-success"></i>Ingresos vs Egresos</h6>
+                    <small class="text-muted">Comparativa de ingresos y gastos mensuales</small>
+                </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+                <canvas id="chartIngresosVsGastos"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABLA DETALLE DE PAGOS -->
 <div class="form-card">
-    <div class="p-4 border-bottom border-light">
-        <h5 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">Detalle de Pagos - {{ mes_actual|date:"F Y" }}</h5>
+    <div class="p-4 border-bottom border-light d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-0 fw-bold" style="font-family: 'Outfit', sans-serif; color: #1e293b;">Detalle de Pagos de Clases - {{ mes_actual|date:"F Y" }}</h5>
+            <small class="text-muted">{{ pagos.count }} pagos registrados en el período</small>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -114,8 +174,8 @@
                         <th class="ps-4">Fecha</th>
                         <th>Monto</th>
                         <th>Método</th>
-                        <th>Comprobante / Nro.</th>
-                        <th>Observaciones</th>
+                        <th>Comprobante / Nro. Factura</th>
+                        <th>Alumna / Observaciones</th>
                         <th class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -184,7 +244,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">
+                        <td colspan="6" class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-2 d-block mb-2 text-black-50"></i>
                             No hay pagos registrados en este mes.
                         </td>
@@ -195,5 +255,119 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var labels = {{ chart_labels_json|safe }};
+    var ingresosData = {{ chart_ingresos_json|safe }};
+    var gastosData = {{ chart_gastos_json|safe }};
+    var netoData = {{ chart_neto_json|safe }};
+
+    // 1. Gráfico de Facturación Mensual
+    var ctx1 = document.getElementById('chartFacturacionMensual').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Facturación Total (Gs.)',
+                data: ingresosData,
+                backgroundColor: 'rgba(111, 66, 193, 0.8)',
+                borderColor: '#6f42c1',
+                borderWidth: 1,
+                borderRadius: 8,
+                maxBarThickness: 45
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var val = context.parsed.y || 0;
+                            return ' Total: Gs. ' + val.toLocaleString('es-PY');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(val) {
+                            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+                            if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
+                            return val;
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+
+    // 2. Gráfico Comparativo Ingresos vs Gastos
+    var ctx2 = document.getElementById('chartIngresosVsGastos').getContext('2d');
+    new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: ingresosData,
+                    backgroundColor: 'rgba(25, 135, 84, 0.75)',
+                    borderRadius: 6,
+                    maxBarThickness: 25
+                },
+                {
+                    label: 'Egresos',
+                    data: gastosData,
+                    backgroundColor: 'rgba(220, 53, 69, 0.75)',
+                    borderRadius: 6,
+                    maxBarThickness: 25
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var val = context.parsed.y || 0;
+                            return ' ' + context.dataset.label + ': Gs. ' + val.toLocaleString('es-PY');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(val) {
+                            if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+                            if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
+                            return val;
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+});
+</script>
 
 {% endblock %}

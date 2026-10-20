@@ -9,7 +9,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('registrar_alumno/', registrar_alumno, name='registrar_alumno'),
     path('actualizar_ruc/', actualizar_ruc, name='actualizar_ruc'),
-    path('verificar_turno/', verificar_turno, name='verificar_turno'), #ready
+    path('verificar_turno/', verificar_turno, name='verificar_turno'),
+    path('guardar_registro_personalizado/', guardar_registro_personalizado, name='guardar_registro_personalizado'), #ready
     path('verificar_clase_hoy/', verificar_clase_hoy, name='verificar_clase_hoy'), #lista
     path('registrar_alumno_ocasional/', registrar_alumno_ocasional, name='registrar_alumno_ocasional'),
     path('verificar_turno_a_partir_de/', verificar_turno_a_partir_de, name='verificar_turno_a_partir_de'), #listo
