@@ -1219,28 +1219,21 @@ def api_turno_alumnos(request, id_turno):
 @require_POST
 def panel_alumno_eliminar(request, id_alumno):
     """
-    Elimina un alumno y todos sus vínculos operativos:
-    - AlumnoPaquete, AlumnoPaqueteTurno, AlumnoClase, AlumnoClaseOcasional, PagoAlumno.
-    Además, elimina los Pagos (Pago) asociados si no están vinculados a otros objetos.
-    También elimina Persona si ya no está usada por Alumno/Instructor.
-    Opcional: elimina ClienteProspecto por teléfono (aquí lo hago).
+    Elimina un alumno y sus vínculos operativos, pero CONSERVA todos los datos
+    de pagos y facturación (Pago y PagoAlumno) con nombre y datos fiscales
+    para mantener la constancia en Facturación.
     """
     alumno = get_object_or_404(Alumno.objects.select_related("id_persona"), id_alumno=id_alumno)
     persona = alumno.id_persona
     telefono = (persona.telefono or "").strip() if persona else ""
+    nombre_completo = f"{persona.nombre} {persona.apellido}".strip() if persona else "Alumno"
+    ruc_val = (persona.ruc or "").strip() if persona else ""
+    razon_social_val = (persona.razon_social or "").strip() if persona else ""
 
-    # Capturar IDs antes del delete para poder limpiar "Pago"
     paquete_ids = list(
         AlumnoPaquete.objects.filter(id_alumno=alumno).values_list("id_alumno_paquete", flat=True)
     )
 
-    pago_ids = list(
-        PagoAlumno.objects.filter(id_alumno_paquete_id__in=paquete_ids)
-        .values_list("id_pago_id", flat=True)
-        .distinct()
-    )
-
-    # Capturar info para ExAlumno
     turnos_str_list = []
     paquetes_activos = AlumnoPaquete.objects.filter(id_alumno=alumno, estado='activo')
     for paq in paquetes_activos:
@@ -1257,35 +1250,38 @@ def panel_alumno_eliminar(request, id_alumno):
             horarios=horarios_str
         )
 
-        # 1) Borrado principal (cascade elimina: AlumnoPaquete*, AlumnoClase*, AlumnoClaseOcasional, PagoAlumno, etc.)
+        # 1) PRESERVAR FACTURACIÓN: Guardar nombre, ruc y razón social en los registros de PagoAlumno
+        # y desvincular de Alumno y AlumnoPaquete para que queden guardados como constancia contable.
+        pagos_alumno = PagoAlumno.objects.filter(
+            Q(id_alumno=alumno) | Q(id_alumno_paquete_id__in=paquete_ids)
+        )
+        for pa in pagos_alumno:
+            if not pa.nombre_alumno:
+                pa.nombre_alumno = nombre_completo
+            if not pa.ruc and ruc_val:
+                pa.ruc = ruc_val
+            if not pa.razon_social and razon_social_val:
+                pa.razon_social = razon_social_val
+            pa.id_alumno = None
+            pa.id_alumno_paquete = None
+            pa.save()
+
+        # 2) Borrado del Alumno (libera turnos y clases operativas)
         alumno.delete()
 
-        # 2) Borrar pagos (Pago) si ya no están usados por otros vínculos
-        #    (Evita borrar pagos que por algún motivo estén compartidos con otra entidad)
-        for pid in pago_ids:
-            existe_otro_pago_alumno = PagoAlumno.objects.filter(id_pago_id=pid).exists()
-            existe_pago_instructor = PagoInstructor.objects.filter(id_pago_id=pid).exists()
-
-            if (not existe_otro_pago_alumno) and (not existe_pago_instructor):
-                Pago.objects.filter(id_pago=pid).delete()
-
-        # 3) Borrar persona si no quedó referenciada por nadie
-        #    (Protege el caso raro de que Persona sea también Instructor)
+        # 3) Limpiar Persona solo si ya no está usada por nadie
         if persona:
             persona_sigue_en_alumno = Alumno.objects.filter(id_persona=persona).exists()
             persona_sigue_en_instructor = Instructor.objects.filter(id_persona=persona).exists()
             if (not persona_sigue_en_alumno) and (not persona_sigue_en_instructor):
                 persona.delete()
 
-        # 4) (Opcional) Borrar prospecto por teléfono para evitar residuos de registros erróneos
-        #    Si preferís conservar prospectos históricos, se puede quitar esto.
+        # 4) Limpiar prospecto por teléfono
         if telefono:
             ClienteProspecto.objects.filter(telefono=telefono).delete()
 
-    # Volver a la lista (si querés volver al referer, también se puede)
+    messages.success(request, f"Alumno '{nombre_completo}' eliminado. Sus datos de facturación se conservan como constancia.")
     return redirect("panel_alumnos")
-
-##registrar pago de paquete para alumno desde su detalle
 
 
 def _generar_nro_pago(alumno_paquete: AlumnoPaquete) -> str:
@@ -1422,10 +1418,17 @@ def panel_registrar_pago_alumno(request, id_alumno):
         nro_pago=nro_pago,
     )
 
+    nombre_al = f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}".strip() if alumno and alumno.id_persona else "Alumno"
+    ruc_al = alumno.id_persona.ruc if alumno and alumno.id_persona else None
+    rs_al = alumno.id_persona.razon_social if alumno and alumno.id_persona else None
+
     PagoAlumno.objects.create(
         id_pago=pago,
         id_alumno=alumno,
         id_alumno_paquete=alumno_paquete,
+        nombre_alumno=nombre_al,
+        ruc=ruc_al,
+        razon_social=rs_al,
         observaciones=observaciones
     )
 
@@ -1791,10 +1794,18 @@ def profes_registrar_pago(request, token):
                 estado="pagado",
                 nro_pago=f"SALDO-{paquete_actual.id_alumno_paquete}"
             )
+            p_alumno = paquete_actual.id_alumno
+            nombre_al = f"{p_alumno.id_persona.nombre} {p_alumno.id_persona.apellido}".strip() if p_alumno and p_alumno.id_persona else "Alumna"
+            ruc_al = p_alumno.id_persona.ruc if p_alumno and p_alumno.id_persona else None
+            rs_al = p_alumno.id_persona.razon_social if p_alumno and p_alumno.id_persona else None
+
             PagoAlumno.objects.create(
                 id_pago=nuevo_pago,
-                id_alumno=paquete_actual.id_alumno,
+                id_alumno=p_alumno,
                 id_alumno_paquete=paquete_actual,
+                nombre_alumno=nombre_al,
+                ruc=ruc_al,
+                razon_social=rs_al,
                 observaciones=observaciones_pago
             )
             paquete_actual.estado_pago = "pagado"
