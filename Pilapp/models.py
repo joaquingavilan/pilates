@@ -449,8 +449,11 @@ class PagoAlumno(models.Model):
     """
     id_pago_alumno = models.AutoField(primary_key=True)
     id_pago = models.ForeignKey(Pago, on_delete=models.CASCADE)
-    id_alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE, null=True, blank=True)
+    id_alumno = models.ForeignKey(Alumno, on_delete=models.SET_NULL, null=True, blank=True)
     id_alumno_paquete = models.ForeignKey(AlumnoPaquete, on_delete=models.SET_NULL, null=True, blank=True)
+    nombre_alumno = models.CharField(max_length=200, blank=True, null=True, help_text="Nombre del alumno para constancia histórica si se elimina")
+    ruc = models.CharField(max_length=50, blank=True, null=True)
+    razon_social = models.CharField(max_length=255, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
 
     def __str__(self):

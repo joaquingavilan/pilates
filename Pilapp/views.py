@@ -1073,11 +1073,19 @@ def registrar_pago(request):
             )
 
         
+        nombre_al = f"{alumno.id_persona.nombre} {alumno.id_persona.apellido}".strip() if alumno and alumno.id_persona else "Alumna"
+        ruc_al = alumno.id_persona.ruc if alumno and alumno.id_persona else None
+        rs_al = alumno.id_persona.razon_social if alumno and alumno.id_persona else None
+
         PagoAlumno.objects.create(
             id_pago=nuevo_pago,
+            id_alumno=alumno,
             id_alumno_paquete=alumno_paquete,
+            nombre_alumno=nombre_al,
+            ruc=ruc_al,
+            razon_social=rs_al,
             observaciones=f"Pago registrado vía WhatsApp. Ref: {comprobante}"
-            )
+        )
 
         return JsonResponse({
             "status": "success",

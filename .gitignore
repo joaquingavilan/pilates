@@ -6,3 +6,7 @@ __pycache__/
 *.py[cod]
 venv/
 .venv/
+patch*.py
+fix*.py
+test*.py
+append*.py
